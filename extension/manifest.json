@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "OpenCanvas Image Cache",
+  "version": "0.1.0",
+  "description": "右键把网页图片缓存到扩展本地，并通过页面桥接把图片提供给 OpenCanvas 素材节点。",
+  "permissions": ["contextMenus", "storage", "unlimitedStorage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "OpenCanvas Image Cache"
+  }
+}

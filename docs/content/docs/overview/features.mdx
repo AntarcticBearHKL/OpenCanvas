@@ -1,0 +1,109 @@
+---
+title: Features
+description: Major features available in the current project
+---
+
+# Features
+
+This page describes what the current build actually implements.
+
+## Canvas projects
+
+- Create, rename, move, and delete canvases, and organise them into libraries; create and delete libraries from the canvas library page.
+- Switch canvases from a searchable quick switcher in the left panel and drag rows to reorder them.
+- Persist projects, viewport, background, nodes, connections, and generation history in the browser.
+- Export one or several canvases as a ZIP (a `projects.json` manifest plus every referenced image, video, and audio file), and import that ZIP to create new canvases without overwriting existing ones.
+
+## Canvas editing
+
+- Pan, zoom (wheel and slider), reset the view, and toggle the minimap.
+- Range-select, add to the selection with Shift/Cmd, and copy, paste, duplicate, and delete nodes.
+- Undo and redo node, connection, viewport, and background changes.
+- Switch between dots, lines, and blank backgrounds, and between light and dark themes.
+- Coordinate rulers along the top and left edges that follow panning and zooming.
+- Snap dragged nodes to a 16px grid; alignment guides win when an edge or centre comes within a few pixels of another node.
+- Align (left / centre / right / top / middle / bottom) and distribute (horizontal / vertical) selected nodes; distribution needs three or more.
+- Lock and hide nodes, manage them from the node list or a node's layer popover, and bulk-rename several nodes at once.
+
+## Nodes
+
+- Content nodes: text, image, video, audio.
+- Prompt nodes: prompt, music prompt, speech prompt.
+- Generation nodes: generation config, image generation, speech generation, music generation.
+- Board node: smart canvas.
+- Tool nodes: assets, recording, image modifier.
+
+The bottom toolbar groups node creation into prompt, generator, input/output, and modifier menus, plus a Smart Canvas button. Prompt nodes hold only prompt text and connect to generation nodes; music and speech prompts carry tag shortcuts and connect to their matching generator, and a speech prompt can also select reference nodes.
+
+## AI generation
+
+- Send requests directly from the browser to OpenRouter (`https://openrouter.ai/api/v1`) with a user-provided API key; there is no application server in the request path.
+- Generate text, images (text-to-image and reference-image editing), video, speech, and music.
+- Image generation supports count, resolution (`1K` / `2K` / `4K` / auto), aspect ratio, quality, and transparent backgrounds, keeps each image's original ratio, and records prompt, model, size, quality, count, and references for retries.
+- Video generation supports OpenAI-compatible video endpoints, first-and-last-frame or general-reference mode, a 4–30 second duration, and resuming a remote task after a page refresh.
+- Speech and music generation use preset OpenRouter models and MP3 output.
+- Generated results are placed on the canvas without an automatic connection back to the generator node.
+
+## Image tools
+
+- Crop and split images into new image nodes.
+- Edit a local mask and either export the nodes to the canvas or generate immediately.
+- Resize with local upscale / downscale presets or AI enhance through the configured image model.
+- Remove background with a local model (downloaded on first use).
+- Analyse an image: dominant-colour palette, EXIF, and perceptual hash, plus smart-crop by ratio.
+- Extract text (OCR) through the configured text model and create a text node.
+- Segment with a local MobileSAM model (about 45 MB, cached in the browser) and insert a transparent-background image node.
+- Capture the first, last, or current frame of a video node as a new image node.
+
+## Smart canvas
+
+- A fixed-ratio board with a `1K` / `2K` / `4K` composite resolution.
+- Background: transparent, white, black, or a custom colour with an opacity value.
+- Drag image nodes onto the board to place them; placed nodes stay editable, move with the board, and the board renders behind them.
+- Layer panel: reorder front/back, show or hide, and set each layer's blend mode (16 Photoshop-equivalent modes) and opacity.
+- Add text annotations directly on the board.
+- Auto arrange templates: grid, single row, single column, and feature image.
+- Nested boards render recursively and compose recursively.
+- Preview composite flattens the board into one image; Save as image node adds the composite as a new image node.
+- A board connected to a generation node contributes its flattened composite as a reference image.
+
+## Assets
+
+- My Assets is a browser-local library for text, image, and video assets with tags, search, and manual groups.
+- The assets node binds a local folder (File System Access API), lists up to 200 images, videos, audio, and text files, and inserts them onto the canvas by click or drag.
+- Dragging an image onto the assets node saves it into the bound folder.
+
+## Recording and image modifier
+
+- Recording captures microphone audio with the browser `MediaRecorder` and creates an audio node next to the recording node.
+- Image modifier applies filter parameters and tone parameters (black point, white point, gamma, exposure, highlights, shadows) plus an editable tone curve, then bakes the result into a new image node. Dropping an image onto the modifier can bake immediately.
+
+## Local canvas MCP
+
+- The web app itself exposes the active browser canvas over a Streamable HTTP MCP endpoint at `/mcp` on the same port as the canvas; there is no separate process.
+- Read the active canvas, selection, nodes, connections, and generation status, and apply structured operations.
+- Create and edit every built-in node type, connect nodes, run generation, arrange a smart canvas board, and place or remove board layers.
+- Settings → Agent lists one permission toggle per operation type and keeps an audit log with replay.
+- There is no in-app chat assistant: an external MCP client drives the canvas through the headless bridge.
+
+## Plugin system
+
+- Install, enable, update, and uninstall remote node plugins by URL.
+- An official plugin registry is available from the plugin panel.
+- A TypeScript SDK lets you build canvas node plugins with panels, resource inputs, and optional AI generation.
+- Built-in examples: Markdown, SVG, HTML, 3D panorama, and sticky note.
+
+## Configuration
+
+- Enter an OpenRouter API key in Settings; it is stored in the browser and used by the browser to call OpenRouter directly.
+- Settings tabs: API, Appearance (language, theme, default canvas background), Generation (default canvas image count), Local models, Local storage, Cost, Agent, and About.
+- The Cost tab sums the stored generation cost records when OpenRouter returns usage information.
+
+## Current limitations
+
+- Canvas projects, My Assets, and generation records are stored in the browser; there is no built-in cloud sync.
+- The API key is stored in the browser and requests go directly to OpenRouter; use it only on a trusted device.
+- The provider is fixed to OpenRouter; custom OpenAI-compatible Base URLs and custom call scripts are not part of the current build.
+- The canvas is designed for desktop use; mobile touch is not fully polished.
+
+See [How the Local Canvas MCP Connection Works](/docs/development/local-canvas-mcp) and the [Canvas Node Guide](/docs/canvas/canvas-node-manual) for details.

@@ -1,0 +1,10 @@
+{
+  "title": "项目介绍",
+  "root": true,
+  "defaultOpen": true,
+  "pages": [
+    "quick-start",
+    "features",
+    "[在线体验](https://canvas.best/)"
+  ]
+}

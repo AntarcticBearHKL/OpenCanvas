@@ -1,0 +1,48 @@
+---
+title: How the Local Canvas MCP Connection Works
+description: How the web app exposes the active canvas to MCP clients over HTTP and SSE on the same port
+---
+
+# How the Local Canvas MCP Connection Works
+
+The canvas MCP is part of the web app itself. When you run the frontend (`npm run dev`, or `npm run start` for a production preview), the same Vite server on `http://127.0.0.1:3000` also exposes the browser bridge and a Streamable HTTP MCP endpoint at `/mcp`. There is no separate package or process to start.
+
+```text
+MCP client (opencode, ...)      Browser canvas
+              \                    /
+        web app server (HTTP + SSE, port 3000)
+```
+
+## Browser bridge
+
+The canvas page connects automatically on the same origin — no token, no manual connect:
+
+```text
+GET  /events?clientId=xxx        (SSE)
+POST /canvas/state?clientId=xxx
+POST /canvas/activate?clientId=xxx
+POST /canvas/result?clientId=xxx
+```
+
+Snapshots contain the canvas ID and title, nodes, edges, selected node IDs, and viewport. The server keeps the latest snapshot in memory, so read tools return structured state rather than the DOM.
+
+For a node creation, the MCP client calls a tool, the server converts it to `canvas_apply_ops`, sends an SSE `tool_call`, and the browser applies operations such as `add_node`, `update_node`, `delete_node`, `delete_connections`, `connect_nodes`, `set_viewport`, `select_nodes`, `run_generation`, `arrange_board`, and `place_on_board`. The browser posts the result to `/canvas/result`, which completes the MCP call.
+
+## HTTP MCP
+
+MCP clients connect to the Streamable HTTP endpoint on the same port:
+
+```text
+POST http://127.0.0.1:3000/mcp
+```
+
+The server creates one `McpServer` per initialized session and routes later requests by the `mcp-session-id` header. It advertises the `opencanvas-mcp` server name and exposes 32 canvas tools: site-level tools are forwarded to the browser, canvas read tools are answered from the latest snapshot, and the remaining canvas tools are translated into `canvas_apply_ops`. `canvas_create_node` and `canvas_apply_ops` accept every built-in node type (text, prompt, music prompt, speech prompt, image, video, audio, config, image generation, speech generation, music generation, smart canvas, assets, recording, image modifier).
+
+## Security boundary
+
+- The service is mounted on the web app's own server and shares its port; it is not a separate listener.
+- Bridge and MCP requests are accepted only from the same origin or localhost; non-browser MCP clients (no `Origin` header) are allowed. There is no token or config file.
+- The MCP client does not directly access the DOM or own the canvas state.
+- The hosted website does not store local login, API keys, or local file permissions.
+
+In short, reads flow from browser snapshots through the web app server to the MCP client; writes flow from the MCP client through the SSE bridge back to browser React state.

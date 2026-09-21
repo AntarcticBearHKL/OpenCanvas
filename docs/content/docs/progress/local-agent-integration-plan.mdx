@@ -1,0 +1,34 @@
+---
+title: Local Canvas MCP Plan
+description: Completed plan that originally exposed the active browser canvas to local MCP clients through canvas-mcp (now merged into the web app)
+---
+
+# Local Canvas MCP Plan
+
+> Note: this plan is complete and closed. It started as a separate `canvas-mcp` package; the final implementation merged the canvas MCP into the web app, whose own server exposes the browser bridge and `/mcp` on the same port (3000) as the canvas, with no separate package, no Codex/Claude chat, no Skills, no approvals, no attachments and no token. The sections below are kept only as the original design record.
+
+## Goal
+
+Allow locally authenticated MCP clients to read and modify the active browser canvas without moving canvas data, credentials, or local permissions to a hosted backend.
+
+## Architecture
+
+`canvas-mcp` is the single local bridge. The browser synchronizes structured canvas state to it over authenticated HTTP and SSE, and the same Express server exposes an HTTP MCP endpoint at `/mcp`. Writes remain structured, reviewable, and undoable in the browser.
+
+The service is divided into canvas state and tool handling, HTTP/SSE transport, and MCP exposure. It is canvas-only: chat, CLI adapters, approvals, and attachments are not part of it.
+
+## Tool design
+
+Tools cover state and selection reads, node creation and updates, connections, batch operations, viewport and selection changes, and text, image, video, or audio generation. High-level tools convert to a small set of canvas operations before the browser applies them.
+
+## Security
+
+- Bind to localhost and require a generated connection token.
+- Pin the accepted browser origin.
+- Keep local credentials and file permissions out of the hosted site.
+- Make writes undoable in the browser.
+- Never redirect a pending tool call to another tab when its initiating page disconnects.
+
+## Status
+
+Done. The MCP bridge shipped inside the web app: an MCP client can connect to the active canvas, read state and selection, apply visible node operations, start a generation workflow, return structured errors, and remain isolated across tabs. Chat, Codex, Claude, approval, attachment and Skill features were removed, and only the headless bridge plus the Settings → Agent permission/audit tab remain. No further work is planned in this document; see `pending-test` and `todo` for current status.
