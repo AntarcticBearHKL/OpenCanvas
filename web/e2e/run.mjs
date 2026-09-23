@@ -5,6 +5,8 @@ import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 const BASE = process.env.E2E_BASE || "http://127.0.0.1:3000";
+// The bridge/MCP service is a standalone local Python server, not part of the dev server.
+const AGENT_BRIDGE = process.env.E2E_AGENT_BRIDGE || "http://127.0.0.1:3210";
 const PORT = Number(process.env.E2E_CDP_PORT || 9333);
 const ARTIFACTS = resolve("e2e", "artifacts", new Date().toISOString().replace(/[:.]/g, "-"));
 const CHROME = ["C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome"].find((path) => existsSync(path));
@@ -442,10 +444,16 @@ async function send(socket, id, method, params) {
 async function main() {
     if (!CHROME) throw new Error("Chrome not found on this machine");
     try {
-        const health = await fetch(`${BASE}/health`);
-        if (!health.ok) throw new Error(String(health.status));
+        const app = await fetch(`${BASE}/`);
+        if (!app.ok) throw new Error(String(app.status));
     } catch {
         throw new Error(`Dev server is not reachable at ${BASE} — start it before running the E2E suite`);
+    }
+    try {
+        const bridge = await fetch(`${AGENT_BRIDGE}/health`);
+        if (!bridge.ok) console.log(`agent bridge health returned ${bridge.status} at ${AGENT_BRIDGE}`);
+    } catch {
+        console.log(`agent bridge not reachable at ${AGENT_BRIDGE} (bridge health check skipped)`);
     }
 
     mkdirSync(ARTIFACTS, { recursive: true });

@@ -29,6 +29,7 @@ function parseEventData<T>(event: Event) {
 export function AgentRuntime() {
     const navigate = useNavigate();
     const url = useAgentStore((state) => state.url);
+    const token = useAgentStore((state) => state.token);
     const enabled = useAgentStore((state) => state.enabled);
     const connected = useAgentStore((state) => state.connected);
     const setAgentState = useAgentStore((state) => state.setAgentState);
@@ -57,22 +58,22 @@ export function AgentRuntime() {
             canvasContextRef.current = state.canvasContext;
             if (!useAgentStore.getState().connected) return;
             if (timer) clearTimeout(timer);
-            timer = setTimeout(() => void postState(endpoint, clientIdRef.current, canvasContextRef.current?.snapshot || null), 300);
+            timer = setTimeout(() => void postState(endpoint, clientIdRef.current, canvasContextRef.current?.snapshot || null, token), 300);
         });
         return () => {
             unsubscribe();
             if (timer) clearTimeout(timer);
         };
-    }, [endpoint]);
+    }, [endpoint, token]);
 
     const runToolCall = useCallback(async (endpoint: string, payload: AgentPendingToolCall) => {
         if (isSiteTool(payload.name)) {
             try {
                 const result = await runSiteTool(payload.name, payload.input || {}, navigate, { canvasSnapshot: canvasContextRef.current?.snapshot || null });
-                await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, result });
+                await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, result }, token);
             } catch (error) {
                 const text = error instanceof Error ? error.message : i18n.t("agent.runtime.toolExecutionFailed");
-                await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, error: text });
+                await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, error: text }, token);
             }
             return;
         }
@@ -87,18 +88,18 @@ export function AgentRuntime() {
                 const context = canvasContextRef.current;
                 if (!context) throw new Error(i18n.t("agent.runtime.openCanvasFirst"));
                 result = context.applyOps(input.ops || []);
-                void postState(endpoint, clientIdRef.current, result as CanvasAgentSnapshot);
+                void postState(endpoint, clientIdRef.current, result as CanvasAgentSnapshot, token);
             } else {
                 const snapshot = canvasContextRef.current?.snapshot;
                 if (!snapshot) throw new Error(i18n.t("agent.runtime.openCanvasFirst"));
                 result = snapshot;
             }
-            await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, result });
+            await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, result }, token);
         } catch (error) {
             const text = error instanceof Error ? error.message : i18n.t("agent.runtime.canvasOperationFailed");
-            await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, error: text });
+            await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, error: text }, token);
         }
-    }, [navigate]);
+    }, [navigate, token]);
 
     const handleToolCall = useCallback(async (endpoint: string, payload: AgentPendingToolCall) => {
         // There is no chat UI for manual confirmation, so write tools are always auto-applied.
@@ -111,7 +112,8 @@ export function AgentRuntime() {
         let disposed = false;
         let protocolRejected = false;
         const isCurrentConnection = () => !disposed && clientIdRef.current === clientId;
-        const source = new EventSource(`${endpoint}/events?clientId=${encodeURIComponent(clientId)}`);
+        // EventSource cannot set headers, so the token travels as a query parameter (the server accepts both).
+        const source = new EventSource(`${endpoint}/events?clientId=${encodeURIComponent(clientId)}${token ? `&token=${encodeURIComponent(token)}` : ""}`);
         source.addEventListener("hello", (event) => {
             if (!isCurrentConnection()) return;
             const hello = parseEventData<AgentHelloEvent>(event);
@@ -124,8 +126,8 @@ export function AgentRuntime() {
             }
             connectedRef.current = true;
             setAgentState({ connected: true, activity: i18n.t("agent.runtime.connected"), connectError: "" });
-            void postState(endpoint, clientId, canvasContextRef.current?.snapshot || null);
-            if (document.visibilityState === "visible" && document.hasFocus()) void activateAgentClient(endpoint, clientId);
+            void postState(endpoint, clientId, canvasContextRef.current?.snapshot || null, token);
+            if (document.visibilityState === "visible" && document.hasFocus()) void activateAgentClient(endpoint, clientId, token);
         });
         source.addEventListener("tool_call", (event) => {
             if (!isCurrentConnection()) return;
@@ -152,11 +154,11 @@ export function AgentRuntime() {
             source.close();
             connectedRef.current = false;
         };
-    }, [clientReady, enabled, endpoint, handleToolCall, setAgentState]);
+    }, [clientReady, enabled, endpoint, token, handleToolCall, setAgentState]);
 
     useEffect(() => {
         if (!connected) return;
-        const activate = () => void activateAgentClient(endpoint, clientIdRef.current);
+        const activate = () => void activateAgentClient(endpoint, clientIdRef.current, token);
         const activateVisible = () => {
             if (document.visibilityState === "visible") activate();
         };
@@ -166,7 +168,7 @@ export function AgentRuntime() {
             window.removeEventListener("focus", activate);
             document.removeEventListener("visibilitychange", activateVisible);
         };
-    }, [connected, endpoint]);
+    }, [connected, endpoint, token]);
 
     return null;
 }

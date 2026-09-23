@@ -20,6 +20,7 @@
 - 文本：`canvas_create_text_node`、`canvas_create_text_nodes`
 - 连线与视图：`canvas_connect_nodes`、`canvas_select_nodes`、`canvas_set_viewport`
 - 生成：`canvas_create_config_node`、`canvas_create_image_prompt_flow`、`canvas_create_generation_flow`、`canvas_generate_text`、`canvas_generate_image`、`canvas_generate_video`、`canvas_generate_audio`、`canvas_run_generation`、`generation_get_status`
+- 故事：`canvas_expand_story`（把前提/幕/章/场景展开为下一级故事节点，自动连线并排版）
 - 站点：`site_navigate`、`canvas_list_projects`、`assets_list`、`assets_add`
 
 ## 节点类型

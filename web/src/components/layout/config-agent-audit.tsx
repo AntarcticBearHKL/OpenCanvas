@@ -1,7 +1,9 @@
-import { Button, Empty, Switch } from "antd";
+import { useState } from "react";
+import { Button, Empty, Input, Switch } from "antd";
 import { Eraser, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { AGENT_BRIDGE_URL_DEFAULT, setAgentBridgeUrl, setAgentToken } from "@/constant/runtime-config";
 import { AGENT_OP_TYPES, describeAgentOp } from "@/lib/canvas/agent-permissions";
 import { useAgentAuditStore, type AgentAuditEntry } from "@/stores/use-agent-audit-store";
 import { useAgentStore } from "@/stores/use-agent-store";
@@ -19,6 +21,7 @@ export function ConfigAgentAudit() {
 
     return (
         <div className="space-y-3">
+            <AgentBridgeSettings />
             <div>
                 <div className="text-sm font-semibold">{t("config.agent.title")}</div>
                 <div className="mt-1 text-xs text-muted-foreground">{t("config.agent.permissionHint")}</div>
@@ -59,6 +62,55 @@ export function ConfigAgentAudit() {
                 )}
             </section>
         </div>
+    );
+}
+
+function AgentBridgeSettings() {
+    const url = useAgentStore((state) => state.url);
+    const token = useAgentStore((state) => state.token);
+    const connected = useAgentStore((state) => state.connected);
+    const activity = useAgentStore((state) => state.activity);
+    const connectError = useAgentStore((state) => state.connectError);
+    const setAgentState = useAgentStore((state) => state.setAgentState);
+    const [draftUrl, setDraftUrl] = useState(url);
+    const [draftToken, setDraftToken] = useState(token);
+    const [saved, setSaved] = useState(false);
+
+    const save = () => {
+        const nextUrl = draftUrl.trim() || AGENT_BRIDGE_URL_DEFAULT;
+        const nextToken = draftToken.trim();
+        setAgentBridgeUrl(nextUrl);
+        setAgentToken(nextToken);
+        setAgentState({ url: nextUrl, token: nextToken, enabled: true, connected: false, connectError: "", activity: "正在连接…" });
+        setSaved(true);
+    };
+
+    return (
+        <section className="overflow-hidden rounded-lg border border-border dark:border-border">
+            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 dark:border-border">
+                <div className="text-sm font-semibold">本地 Agent 连接</div>
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={`size-1.5 rounded-full ${connected ? "bg-emerald-500" : "bg-muted-foreground/50"}`} />
+                    {connected ? "已连接" : activity}
+                </span>
+            </div>
+            <div className="space-y-3 px-4 py-3">
+                <label className="block">
+                    <span className="mb-1 block text-xs text-muted-foreground">服务地址</span>
+                    <Input value={draftUrl} onChange={(event) => { setDraftUrl(event.target.value); setSaved(false); }} placeholder={AGENT_BRIDGE_URL_DEFAULT} />
+                </label>
+                <label className="block">
+                    <span className="mb-1 block text-xs text-muted-foreground">访问令牌</span>
+                    <Input.Password value={draftToken} onChange={(event) => { setDraftToken(event.target.value); setSaved(false); }} placeholder="未设置可留空" />
+                </label>
+                <div className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">{connectError || (saved ? "已保存，正在重新连接" : "地址与令牌保存在本地浏览器，无需重新构建")}</span>
+                    <Button size="small" type="primary" onClick={save}>
+                        保存并重连
+                    </Button>
+                </div>
+            </div>
+        </section>
     );
 }
 

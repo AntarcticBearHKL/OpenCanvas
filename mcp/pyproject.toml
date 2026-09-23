@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "canvas-mcp"
+version = "0.1.0"
+description = "Standalone MCP server + browser bridge for the OpenCanvas web canvas"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    "mcp[cli]>=2.2.0",
+    "starlette>=0.40.0",
+    "uvicorn>=0.30.0",
+    "pydantic>=2.7.0",
+]
+
+[project.scripts]
+canvas-mcp = "canvas_mcp.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/canvas_mcp"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/canvas_mcp/agent-instructions.md" = "canvas_mcp/agent-instructions.md"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 140
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# Chinese tool descriptions are ported verbatim, so full-width punctuation is intentional.
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+# Verbatim Chinese tool descriptions exceed the line length by design.
+"src/canvas_mcp/schemas.py" = ["E501"]

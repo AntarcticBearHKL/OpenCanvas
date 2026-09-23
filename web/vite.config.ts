@@ -5,7 +5,6 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
 import { parseChangelog } from "./src/lib/release";
-import { mountCanvasService } from "./server/canvas-service";
 
 const webDir = dirname(fileURLToPath(import.meta.url));
 const localVersion = readFileSync(resolve(webDir, "../VERSION"), "utf8").trim() || "dev";
@@ -39,22 +38,9 @@ function localPluginsManifest(): Plugin {
     };
 }
 
-// Mount the browser bridge and the HTTP MCP endpoint on the same Vite server/port as the canvas.
-function canvasServicePlugin(): Plugin {
-    return {
-        name: "infinite-canvas-service",
-        configureServer(server) {
-            mountCanvasService(server.middlewares);
-        },
-        configurePreviewServer(server) {
-            mountCanvasService(server.middlewares);
-        },
-    };
-}
-
 export default defineConfig({
     base: process.env.VITE_BASE || "/",
-    plugins: [react(), localPluginsManifest(), canvasServicePlugin()],
+    plugins: [react(), localPluginsManifest()],
     worker: {
         format: "es",
     },

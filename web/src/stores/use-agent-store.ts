@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import i18n from "@/i18n";
+import { AGENT_BRIDGE_URL, AGENT_TOKEN } from "@/constant/runtime-config";
 
 import type { CanvasAgentOp, CanvasAgentSnapshot } from "@/lib/canvas/canvas-agent-ops";
 
@@ -11,6 +12,7 @@ type AgentStorePatch = Partial<Omit<AgentStore, "setAgentState" | "setCanvasCont
 type AgentStore = {
     canvasContext: AgentCanvasContext | null;
     url: string;
+    token: string;
     connected: boolean;
     enabled: boolean;
     activity: string;
@@ -21,7 +23,8 @@ type AgentStore = {
 
 export const useAgentStore = create<AgentStore>((set) => ({
     canvasContext: null,
-    url: typeof window === "undefined" ? "" : window.location.origin,
+    url: typeof window === "undefined" ? "" : AGENT_BRIDGE_URL,
+    token: typeof window === "undefined" ? "" : AGENT_TOKEN,
     connected: false,
     enabled: true,
     activity: i18n.t("agent.state.ready"),
