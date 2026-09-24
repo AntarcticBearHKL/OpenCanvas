@@ -43,11 +43,11 @@ export function VersionReleaseModal({ className, style }: VersionReleaseModalPro
             </button>
             <Modal title={t("version.title")} open={open} width={680} centered footer={null} onCancel={() => setOpen(false)} classNames={{ container: "glass-raised !bg-[var(--glass-strong)]" }} styles={{ container: { borderRadius: 0 } }}>
                 <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="rounded-none border border-border p-3 dark:border-border">
+                    <div className="rounded-xl border border-border p-3 dark:border-border">
                         <div className="text-sm text-muted-foreground">{t("version.currentVersion")}</div>
                         <div className="mt-1 text-base font-semibold text-foreground">{APP_VERSION}</div>
                     </div>
-                    <div className="rounded-none border border-border p-3 dark:border-border">
+                    <div className="rounded-xl border border-border p-3 dark:border-border">
                         <div className="flex items-center justify-between gap-3">
                             <div className="text-sm text-muted-foreground">{t("version.latestVersion")}</div>
                             <button

@@ -139,7 +139,7 @@ export function AppConfigPanel() {
                         <div className="space-y-4">
                             <div>
                                 <div className="mb-2 text-sm font-semibold">{t("config.preferences.shortcuts")}</div>
-                                <div className="divide-y divide-border overflow-hidden rounded-none border border-border dark:divide-border dark:border-border glass-card">
+                                <div className="divide-y divide-border overflow-hidden rounded-xl border border-border dark:divide-border dark:border-border glass-card">
                                     <Shortcut keys={["Ctrl / Space", t("canvas.shortcut.drag")]} value={t("canvas.shortcut.toggleTool")} />
                                     <Shortcut keys={[t("canvas.shortcut.wheel")]} value={t("canvas.shortcut.zoom")} />
                                     <Shortcut keys={[t("canvas.shortcut.zoomSlider")]} value={t("canvas.shortcut.preciseZoom")} />
@@ -155,10 +155,10 @@ export function AppConfigPanel() {
                                     <Shortcut keys={[t("canvas.shortcut.dropMedia")]} value={t("canvas.shortcut.upload")} />
                                 </div>
                             </div>
-                            <div className="rounded-none border border-border px-4 py-3.5 dark:border-border glass-card">
+                            <div className="rounded-xl border border-border px-4 py-3.5 dark:border-border glass-card">
                                 <div className="text-sm text-muted-foreground">{t("config.preferences.version")}</div>
                                 <div className="mt-2">
-                                    <VersionReleaseModal className="inline-flex cursor-pointer items-center gap-1.5 rounded-[2px] border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted dark:border-border dark:text-foreground dark:hover:bg-muted" />
+                                    <VersionReleaseModal className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted dark:border-border dark:text-foreground dark:hover:bg-muted" />
                                 </div>
                             </div>
                         </div>
@@ -205,7 +205,7 @@ function Shortcut({ keys, value }: { keys: string[]; value: string }) {
                 {keys.map((key, index) => (
                     <span key={`${key}-${index}`} className="flex items-center gap-1">
                         {index ? <span className="text-xs text-muted-foreground">+</span> : null}
-                        <kbd className="rounded-[2px] border border-border bg-muted/80 px-2 py-1 text-center text-xs font-medium leading-none text-foreground dark:border-border dark:bg-muted/70 dark:text-foreground">{key}</kbd>
+                        <kbd className="rounded-md border border-border bg-muted/80 px-2 py-1 text-center text-xs font-medium leading-none text-foreground dark:border-border dark:bg-muted/70 dark:text-foreground">{key}</kbd>
                     </span>
                 ))}
             </span>

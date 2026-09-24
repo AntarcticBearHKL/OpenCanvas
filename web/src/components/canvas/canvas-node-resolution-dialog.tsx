@@ -79,7 +79,7 @@ export function CanvasNodeResolutionDialog({ dataUrl, open, onClose, onConfirm }
                             key={algorithm}
                             type="button"
                             aria-pressed={active}
-                            className="rounded-none border px-3 py-2 text-left transition hover:bg-hover"
+                            className="rounded-xl border px-3 py-2 text-left transition hover:bg-hover"
                             style={{ borderColor: active ? theme.node.activeStroke : theme.node.stroke }}
                             onClick={() => setParams((current) => ({ ...current, algorithm }))}
                         >
@@ -93,7 +93,7 @@ export function CanvasNodeResolutionDialog({ dataUrl, open, onClose, onConfirm }
     );
 
     const renderOutputSize = () => (
-        <div className="rounded-none border px-4 py-3 text-sm">
+        <div className="rounded-xl border px-4 py-3 text-sm">
             <div className="flex items-center justify-between">
                 <span className="font-medium" style={{ color: theme.node.label }}>{t("canvas.editors.outputSize")}</span>
                 <span className="font-semibold">{outputSize ? `${outputSize.width} x ${outputSize.height} px` : t("canvas.editors.unknown")}</span>
@@ -155,7 +155,7 @@ export function CanvasNodeResolutionDialog({ dataUrl, open, onClose, onConfirm }
                 <div className="font-medium" style={{ color: theme.node.label }}>{t("canvas.editors.resolutionAiPrompt")}</div>
                 <Input.TextArea rows={5} value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} />
             </div>
-            <div className="rounded-none border px-4 py-3 text-sm">
+            <div className="rounded-xl border px-4 py-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
                     <span className="shrink-0 font-medium" style={{ color: theme.node.label }}>{t("canvas.editors.resolutionAiModel")}</span>
                     <span className="min-w-0 truncate font-semibold">{aiModel || t("canvas.editors.resolutionAiModelEmpty")}</span>
@@ -176,9 +176,9 @@ export function CanvasNodeResolutionDialog({ dataUrl, open, onClose, onConfirm }
                     <h2 className="text-xl font-semibold">{t("canvas.imageTools.resolutionTitle")}</h2>
                 </div>
                 <div className="grid gap-6 md:grid-cols-[minmax(260px,1fr)_360px]">
-                    <div className="min-w-0 rounded-none border p-4">
-                        <div className="grid min-h-[280px] place-items-center rounded-[2px] bg-black/5">
-                            <img src={dataUrl} alt="" className="max-h-[320px] max-w-full rounded-[2px] object-contain" draggable={false} />
+                    <div className="min-w-0 rounded-xl border p-4">
+                        <div className="grid min-h-[280px] place-items-center rounded-md bg-black/5">
+                            <img src={dataUrl} alt="" className="max-h-[320px] max-w-full rounded-md object-contain" draggable={false} />
                         </div>
                         <div className="mt-3 flex items-center justify-between text-sm">
                             <span className="font-medium" style={{ color: theme.node.label }}>{t("canvas.editors.source")}</span>

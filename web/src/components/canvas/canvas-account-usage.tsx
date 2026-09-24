@@ -67,7 +67,7 @@ export function CanvasAccountUsage() {
                 type="button"
                 disabled={!apiKey || query.isFetching}
                 onClick={() => void query.refetch()}
-                className="mt-2 flex w-full items-center justify-center gap-1 rounded-[2px] py-1 text-sm transition hover:bg-hover disabled:opacity-40 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
+                className="mt-2 flex w-full items-center justify-center gap-1 rounded-md py-1 text-sm transition hover:bg-hover disabled:opacity-40 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
                 style={{ color: theme.node.text }}
             >
                 <RotateCw className={`size-3.5 ${query.isFetching ? "animate-spin" : ""}`} />
@@ -88,7 +88,7 @@ export function CanvasAccountUsage() {
         >
             <button
                 type="button"
-                className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-muted-foreground transition-colors hover:bg-hover hover:text-foreground dark:text-muted-foreground hover:bg-hover dark:hover:text-white [&_svg]:size-4"
+                className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-hover hover:text-foreground dark:text-muted-foreground hover:bg-hover dark:hover:text-white [&_svg]:size-4"
                 style={{ color: theme.node.text }}
                 aria-label={t("account.open")}
                 title={t("account.open")}

@@ -121,11 +121,11 @@ function MixerStrip({ track, tracks, masterGain, automation, selected, audible, 
             style={{ width: STRIP_WIDTH, borderColor: theme.toolbar.border, background: selected ? theme.toolbar.activeBg : undefined, opacity: audible ? 1 : 0.45 }}
             onPointerDown={() => onSelectTrack(track.id)}
         >
-            <span className="h-1 w-full shrink-0 rounded-[2px]" style={{ background: track.color || theme.node.faint }} />
+            <span className="h-1 w-full shrink-0 rounded-md" style={{ background: track.color || theme.node.faint }} />
             {renaming ? (
                 <input
                     autoFocus
-                    className="w-full shrink-0 rounded-[2px] border bg-transparent px-1 py-0.5 text-sm outline-none"
+                    className="w-full shrink-0 rounded-md border bg-transparent px-1 py-0.5 text-sm outline-none"
                     style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                     value={nameDraft}
                     aria-label={t("canvas.audioStudio.name")}
@@ -142,7 +142,7 @@ function MixerStrip({ track, tracks, masterGain, automation, selected, audible, 
             ) : (
                 <button
                     type="button"
-                    className="w-full shrink-0 truncate rounded-[2px] px-1 py-0.5 text-left text-sm transition hover:bg-hover"
+                    className="w-full shrink-0 truncate rounded-md px-1 py-0.5 text-left text-sm transition hover:bg-hover"
                     style={{ color: theme.node.text }}
                     title={t("canvas.audioStudio.trackRename")}
                     onDoubleClick={() => {

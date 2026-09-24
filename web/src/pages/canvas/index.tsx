@@ -112,10 +112,10 @@ export default function CanvasPage() {
                     {groups.map((group) => (
                         <div key={group.id}>
                             {editingGroupId === group.id ? (
-                                <div className="flex h-9 items-center gap-1 rounded-none border-b border-border bg-muted px-2">
+                                <div className="flex h-9 items-center gap-1 rounded-xl border-b border-border bg-muted px-2">
                                     <Input
                                         size="small"
-                                        className="min-w-0 flex-1 rounded-[2px]"
+                                        className="min-w-0 flex-1 rounded-md"
                                         value={editingGroupName}
                                         onChange={(event) => setEditingGroupName(event.target.value)}
                                         onKeyDown={(event) => {
@@ -128,7 +128,7 @@ export default function CanvasPage() {
                                     <Button type="text" size="small" shape="circle" icon={<X className="size-3.5" />} onClick={() => setEditingGroupId(null)} aria-label={t("common.cancel")} title={t("common.cancel")} />
                                 </div>
                             ) : (
-                                <div className={`group flex h-9 items-center rounded-none border-b border-border px-2 transition ${selectedGroupId === group.id ? "bg-brand-soft shadow-[inset_2px_0_0_0_var(--brand)]" : "hover:bg-hover"}`}>
+                                <div className={`group flex h-9 items-center rounded-xl border-b border-border px-2 transition ${selectedGroupId === group.id ? "bg-brand-soft shadow-[inset_2px_0_0_0_var(--brand)]" : "hover:bg-hover"}`}>
                                     <button
                                         type="button"
                                         onClick={() => setSelectedGroupId(group.id)}

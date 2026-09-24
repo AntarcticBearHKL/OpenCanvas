@@ -49,7 +49,7 @@ export function ModelPicker({ config, value, onChange, capability, models, class
         >
             <SelectTrigger
                 className={cn(
-                    "canvas-composer-model-picker h-8 w-fit max-w-full gap-2 rounded-[2px] border border-input bg-transparent px-3 text-sm font-normal transition-colors",
+                    "canvas-composer-model-picker h-8 w-fit max-w-full gap-2 rounded-md border border-input bg-transparent px-3 text-sm font-normal transition-colors",
                     fullWidth ? "w-full min-w-0 justify-start" : "min-w-[9rem] justify-start",
                     "data-[state=open]:border-ring data-[state=open]:ring-2 data-[state=open]:ring-ring/20",
                     className,
@@ -63,7 +63,7 @@ export function ModelPicker({ config, value, onChange, capability, models, class
             </SelectTrigger>
             <SelectContent
                 data-canvas-no-zoom
-                className="z-[1200] w-80 max-w-[calc(100vw-24px)] rounded-none border border-border/70 glass-raised p-1"
+                className="z-[1200] w-80 max-w-[calc(100vw-24px)] rounded-xl border border-border/70 glass-raised p-1"
                 position="popper"
                 align="start"
                 side="bottom"

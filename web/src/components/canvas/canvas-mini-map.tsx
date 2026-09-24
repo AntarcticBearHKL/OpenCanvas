@@ -118,7 +118,7 @@ export const Minimap = memo(function Minimap({ nodes, viewport, viewportSize, on
     );
 
     return (
-        <div className="absolute bottom-24 left-6 z-50 overflow-hidden rounded-none border glass-card" style={{ width, height, borderColor: theme.toolbar.border }}>
+        <div className="absolute bottom-24 left-6 z-50 overflow-hidden rounded-xl border glass-card" style={{ width, height, borderColor: theme.toolbar.border }}>
             <div
                 ref={containerRef}
                 className="relative h-full w-full cursor-crosshair"

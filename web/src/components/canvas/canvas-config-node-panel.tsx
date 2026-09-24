@@ -45,7 +45,7 @@ export function CanvasConfigNodePanel({ node, isRunning, hasPromptConnection, in
     const hasAnyInput = Boolean(inputSummary.textCount || inputSummary.imageCount || inputSummary.videoCount || inputSummary.audioCount);
     const hasComposerContent = Boolean((node.metadata?.composerContent ?? node.metadata?.prompt ?? "").trim());
     const canGenerate = isAudioGenerationNode ? hasPromptConnection : isImageGenerationNode || isVideoGenerationNode || hasComposerContent || (mode === "audio" ? inputSummary.textCount > 0 : hasAnyInput);
-    const flatButtonClass = "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-[2px] px-2 text-sm transition hover:bg-hover";
+    const flatButtonClass = "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-md px-2 text-sm transition hover:bg-hover";
     const summaryParts = [
         inputSummary.textCount ? `${t("canvas.configNode.prompt")} ${inputSummary.textCount}` : "",
         inputSummary.imageCount ? `${t("canvas.configNode.references")} ${inputSummary.imageCount}` : "",
@@ -71,7 +71,7 @@ export function CanvasConfigNodePanel({ node, isRunning, hasPromptConnection, in
                         <div className="cursor-default" onMouseDown={(event) => event.stopPropagation()}>
                             <Segmented
                                 size="small"
-                                className="canvas-config-mode !rounded-[2px] !p-0.5"
+                                className="canvas-config-mode !rounded-md !p-0.5"
                                 value={mode}
                                 onChange={(value) => onConfigChange(node.id, { generationMode: value as CanvasGenerationMode })}
                                 options={[
@@ -125,7 +125,7 @@ export function CanvasConfigNodePanel({ node, isRunning, hasPromptConnection, in
 
                 <div className="mb-1.5 flex min-w-0 cursor-default items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
                     <ModelPicker
-                        className="canvas-compact-control h-9 min-w-0 flex-1 !rounded-[2px] !border-transparent !bg-transparent hover:!bg-hover"
+                        className="canvas-compact-control h-9 min-w-0 flex-1 !rounded-md !border-transparent !bg-transparent hover:!bg-hover"
                         config={config}
                         value={node.metadata?.model || (node.type === CanvasNodeType.SpeechGeneration ? config.speechModel : mode === "image" ? config.imageModel : mode === "video" ? config.videoModel : mode === "audio" ? config.audioModel : config.textModel)}
                         onChange={(model) => onConfigChange(node.id, { model })}
@@ -138,7 +138,7 @@ export function CanvasConfigNodePanel({ node, isRunning, hasPromptConnection, in
                         <CanvasAudioSettingsPopover
                             config={config}
                             placement="topRight"
-                            buttonClassName="canvas-compact-control !h-9 !w-full !justify-start !rounded-[2px] !px-2"
+                            buttonClassName="canvas-compact-control !h-9 !w-full !justify-start !rounded-md !px-2"
                             onConfigChange={(key, value) => onConfigChange(node.id, audioConfigPatch(key, value))}
                         />
                     ) : mode === "text" ? (
@@ -146,7 +146,7 @@ export function CanvasConfigNodePanel({ node, isRunning, hasPromptConnection, in
                             config={config}
                             count={node.metadata?.textCount || 1}
                             placement="topRight"
-                            buttonClassName="canvas-compact-control !h-9 !w-full !justify-start !rounded-[2px] !px-2"
+                            buttonClassName="canvas-compact-control !h-9 !w-full !justify-start !rounded-md !px-2"
                             onConfigChange={(_, value) => onConfigChange(node.id, { reasoningEffort: value })}
                             onCountChange={(textCount) => onConfigChange(node.id, { textCount })}
                         />

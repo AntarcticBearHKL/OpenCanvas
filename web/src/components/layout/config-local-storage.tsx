@@ -45,7 +45,7 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
 
     return (
         <div className="space-y-3">
-            <section className="rounded-none border border-border p-4 dark:border-border glass-card">
+            <section className="rounded-xl border border-border p-4 dark:border-border glass-card">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <div className="flex items-center gap-2 text-sm font-semibold">
@@ -77,7 +77,7 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
                         </div>
                         <button
                             type="button"
-                            className="mt-4 flex w-full items-center gap-3 rounded-none border border-border px-3 py-2.5 text-left transition hover:bg-muted/70 dark:border-border dark:hover:bg-muted/60"
+                            className="mt-4 flex w-full items-center gap-3 rounded-xl border border-border px-3 py-2.5 text-left transition hover:bg-muted/70 dark:border-border dark:hover:bg-muted/60"
                             onClick={() => setConfigTab("local-models")}
                         >
                             <Eraser className="size-4 shrink-0 text-muted-foreground" />
@@ -92,7 +92,7 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
                 ) : null}
             </section>
             {usage?.databases.map((database) => (
-                <section key={database.name} className="overflow-hidden rounded-none border border-border glass-card">
+                <section key={database.name} className="overflow-hidden rounded-xl border border-border glass-card">
                     <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 dark:border-border">
                         <div className="min-w-0">
                             <div className="truncate text-sm font-semibold">{t("config.localStorage.mainDatabase")}</div>
@@ -120,7 +120,7 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
 
 function StorageMetric({ icon, label, value, hint }: { icon: ReactNode; label: string; value: string; hint: string }) {
     return (
-        <div className="rounded-none bg-muted p-3 dark:bg-muted/70">
+        <div className="rounded-xl bg-muted p-3 dark:bg-muted/70">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">{icon}{label}</div>
             <div className="mt-2 text-xl font-semibold tabular-nums">{value}</div>
             <div className="mt-1 text-xs text-muted-foreground">{hint}</div>

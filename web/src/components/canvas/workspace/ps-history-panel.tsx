@@ -104,7 +104,7 @@ export function PsHistoryPanel({ history, onRestore, onSnapshot }: { history: Ps
                             style={index === history.index ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText, borderColor: theme.toolbar.border, boxShadow: `inset 2px 0 0 0 ${theme.node.accent}` } : { borderColor: theme.toolbar.border, color: index > history.index ? theme.node.muted : theme.node.text }}
                             onClick={() => onRestore(index)}
                         >
-                            <span className="size-4 shrink-0 rounded-[2px] border" style={{ borderColor: theme.toolbar.border, background: index === history.index ? theme.node.activeStroke : "transparent" }} />
+                            <span className="size-4 shrink-0 rounded-md border" style={{ borderColor: theme.toolbar.border, background: index === history.index ? theme.node.activeStroke : "transparent" }} />
                             <span className="min-w-0 flex-1 truncate">{entry.name}</span>
                             <span className="shrink-0 tabular-nums" style={index === history.index ? undefined : { color: theme.node.muted }}>
                                 {index + 1}

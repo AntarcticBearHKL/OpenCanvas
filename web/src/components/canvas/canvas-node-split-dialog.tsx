@@ -158,14 +158,14 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
                     <p className="mt-2 text-sm leading-5" style={{ color: theme.node.muted }}>{t("canvas.editors.splitHint")}</p>
                 </div>
                 <div className="grid gap-6 md:grid-cols-[minmax(260px,1fr)_280px]">
-                    <div className="min-w-0 rounded-none border p-4">
+                    <div className="min-w-0 rounded-xl border p-4">
                         <div
                             ref={viewport.viewportRef}
                             {...viewport.panHandlers}
-                            className={`relative isolate h-[340px] min-h-[300px] rounded-[2px] bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
+                            className={`relative isolate h-[340px] min-h-[300px] rounded-md bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
                         >
                             <div className="relative" style={viewport.contentStyle}>
-                                <div ref={previewRef} className="absolute isolate overflow-hidden rounded-[2px] bg-black [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
+                                <div ref={previewRef} className="absolute isolate overflow-hidden rounded-md bg-black [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
                                     <div className="absolute left-0 top-0 [backface-visibility:hidden]" style={viewport.mediaStyle}>
                                         <img src={dataUrl} alt="" className="block h-full w-full object-contain" draggable={false} />
                                     </div>
@@ -211,7 +211,7 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
                                 {t("canvas.editors.resetLines")}
                             </Button>
                         </div>
-                        <div className="rounded-none border px-4 py-3 text-sm">
+                        <div className="rounded-xl border px-4 py-3 text-sm">
                             <div className="flex items-center justify-between">
                                 <span className="font-medium" style={{ color: theme.node.label }}>{t("canvas.editors.pieceCount")}</span>
                                 <span className="font-semibold">{t("canvas.editors.pieces", { count: total })}</span>

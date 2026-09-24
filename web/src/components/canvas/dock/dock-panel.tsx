@@ -26,7 +26,7 @@ type ResizeState = { edge: DockEdge; startX: number; startY: number; size: numbe
 type DragState = { id: string; moved: boolean; startX: number; startY: number };
 
 const DRAG_THRESHOLD = 6;
-const DROP_ZONE_CLASS = "pointer-events-none absolute rounded-[2px] border border-dashed";
+const DROP_ZONE_CLASS = "pointer-events-none absolute rounded-md border border-dashed";
 const SPLITTER_CLASS = "group/splitter relative shrink-0 before:absolute before:inset-0 before:m-auto before:transition hover:before:bg-hover";
 /** Below these widths the docks give width back to the centre surface instead of keeping the saved size. */
 const DOCK_WIDTH_STEPS: { query: string; side: number; bottom: number }[] = [
@@ -172,7 +172,7 @@ export function DockArea({ defs, layout, renderPanel, onActivate, onMove, onResi
                             style={{ borderColor: theme.node.activeStroke, background: drag.target === edge ? theme.toolbar.activeBg : undefined }}
                         />
                     ))}
-                    <span className="pointer-events-none fixed z-50 rounded-[2px] border px-2 py-1 text-xs" style={{ left: drag.x + 12, top: drag.y + 12, borderColor: theme.toolbar.border, background: theme.toolbar.panel, color: theme.node.text }}>
+                    <span className="pointer-events-none fixed z-50 rounded-md border px-2 py-1 text-xs" style={{ left: drag.x + 12, top: drag.y + 12, borderColor: theme.toolbar.border, background: theme.toolbar.panel, color: theme.node.text }}>
                         {t(defs.find((def) => def.id === drag.id)?.labelKey ?? drag.id)}
                     </span>
                 </div>

@@ -30,9 +30,9 @@ type PsLayersPanelProps = {
 
 type DropPosition = "before" | "after" | "into";
 
-const PANEL_ACTION_CLASS = "grid size-6 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover disabled:opacity-25 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent";
-const ROW_ACTION_CLASS = "grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover";
-const FOOTER_ACTION_CLASS = "flex h-6 min-w-0 items-center gap-1 rounded-[2px] px-1.5 text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent";
+const PANEL_ACTION_CLASS = "grid size-6 shrink-0 place-items-center rounded-md transition hover:bg-hover disabled:opacity-25 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent";
+const ROW_ACTION_CLASS = "grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover";
+const FOOTER_ACTION_CLASS = "flex h-6 min-w-0 items-center gap-1 rounded-md px-1.5 text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent";
 
 export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId, onSelect, maskTarget, maskView, onMaskTarget, onLayerCommand }: PsLayersPanelProps) {
     const { t } = useTranslation();
@@ -294,7 +294,7 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
                                 </button>
                                 <button
                                     type="button"
-                                    className="shrink-0 rounded-[2px]"
+                                    className="shrink-0 rounded-md"
                                     aria-label={t("canvas.ps.layerTarget")}
                                     title={t("canvas.ps.layerTarget")}
                                     onClick={(event) => {
@@ -308,7 +308,7 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
                                 {layer.maskStorageKey && masks[layer.id] ? (
                                     <button
                                         type="button"
-                                        className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-[2px]"
+                                        className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-md"
                                         style={{ background: theme.node.infoSoft, boxShadow: isSelected && maskTarget ? `inset 0 0 0 2px ${theme.node.info}` : undefined }}
                                         aria-label={t("canvas.ps.maskTarget")}
                                         title={t("canvas.ps.maskHint")}
@@ -394,14 +394,14 @@ function LayerThumb({ layer, url, theme, active }: { layer: CanvasPsLayer; url?:
     if (layer.kind === "group" || layer.kind === "text") {
         const Icon = layer.kind === "group" ? Folder : Type;
         return (
-            <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-[2px]" style={ring}>
+            <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-md" style={ring}>
                 <Icon className="size-3.5" style={{ color: theme.node.muted }} />
             </span>
         );
     }
     const Fallback = layer.kind === "pixel" ? Brush : layer.kind === "shape" ? Shapes : layer.kind === "adjustment" ? SlidersHorizontal : ImageIcon;
     return (
-        <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-[2px]" style={ring}>
+        <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-md" style={ring}>
             {url ? <img src={url} alt="" draggable={false} className="h-full w-full object-cover" /> : <Fallback className="size-3.5" style={{ color: theme.node.muted }} />}
         </span>
     );

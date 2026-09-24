@@ -118,7 +118,7 @@ const FLAT_ACTION_CLASS = STUDIO_ICON_BUTTON_CLASS;
 // One control height for the transport and options rows: 28px, the icon-button size (size-7) and the content box of STUDIO_OPTIONS_CLASS (min-h-9 minus py-1).
 const CONTROL_CLASS = "!h-7";
 const CONTROL_GROUP_CLASS = "flex h-7 shrink-0 items-center gap-1.5";
-const COMPACT_ACTION_CLASS = "grid size-6 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover hover:opacity-100 hover:bg-hover";
+const COMPACT_ACTION_CLASS = "grid size-6 shrink-0 place-items-center rounded-md transition hover:bg-hover hover:opacity-100 hover:bg-hover";
 const TOOL_CLASS = STUDIO_TOOL_BUTTON_CLASS;
 const LIST_ACTION_CLASS = STUDIO_LIST_ROW_CLASS;
 const FOCUS_RING_CLASS = "[&_*:focus-visible]:[outline:1px_solid_var(--audio-focus)] [&_*:focus-visible]:outline-offset-1";
@@ -639,7 +639,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     );
 
     const unlockAudio = useCallback(async () => {
-        // Must stay inside the user gesture; a suspended context (autoplay policy, tab had been backgrounded-[2px]) is resumed here too.
+        // Must stay inside the user gesture; a suspended context (autoplay policy, tab had been backgrounded) is resumed here too.
         if (Tone.getContext().state !== "running") {
             try {
                 await Tone.start();
@@ -1796,7 +1796,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                     {markers.length ? (
                         markers.map((marker) => (
                             <div key={marker.id} className="flex items-center gap-1.5 px-1 py-0.5">
-                                <button type="button" className="w-14 shrink-0 rounded-[2px] px-0.5 text-left text-xs tabular-nums transition hover:bg-hover" style={{ color: theme.node.muted }} onClick={() => seek(marker.time)}>
+                                <button type="button" className="w-14 shrink-0 rounded-md px-0.5 text-left text-xs tabular-nums transition hover:bg-hover" style={{ color: theme.node.muted }} onClick={() => seek(marker.time)}>
                                     {formatAudioTime(marker.time)}
                                 </button>
                                 <input
@@ -2021,7 +2021,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                     <Search className="size-3.5" />
                                 </button>
                             </div>
-                            <button type="button" className="flex items-center gap-1.5 rounded-[2px] px-1.5 py-1 text-left transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent" style={{ color: theme.node.text }} disabled={exporting} onClick={() => void runExport(() => onOutput(project))}>
+                            <button type="button" className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-left transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent" style={{ color: theme.node.text }} disabled={exporting} onClick={() => void runExport(() => onOutput(project))}>
                                 <AudioWaveform className="size-3.5" />
                                 {t(exporting ? "canvas.audioStudio.exporting" : "canvas.audioStudio.saveAsNode")}
                             </button>
@@ -2150,7 +2150,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
             </div>
 
             {picker && pickerTrack ? (
-                <div className="thin-scrollbar mx-3 mb-2 max-h-44 shrink-0 overflow-y-auto rounded-none border p-2 glass-raised" style={{ borderColor: theme.toolbar.border }}>
+                <div className="thin-scrollbar mx-3 mb-2 max-h-44 shrink-0 overflow-y-auto rounded-xl border p-2 glass-raised" style={{ borderColor: theme.toolbar.border }}>
                     <div className="flex items-center gap-2 px-1 pb-1">
                         <span className="min-w-0 flex-1 truncate text-sm" style={{ color: theme.node.muted }}>
                             {t("canvas.audioStudio.pickAudio", { track: pickerTrack.name || trackPlaceholder(pickerTrack) })}
@@ -2347,7 +2347,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                             onPointerDown={() => setSelectedTrackId(track.id)}
                                         >
                                             <div className="flex h-6 items-center gap-1">
-                                                <span className="h-3 w-1 shrink-0 rounded-[2px]" style={{ background: track.color || theme.node.faint }} aria-hidden />
+                                                <span className="h-3 w-1 shrink-0 rounded-md" style={{ background: track.color || theme.node.faint }} aria-hidden />
                                                 {trackRole && (track.name.trim() || trackPlaceholder(track) !== trackRole) ? (
                                                     <span className="max-md:hidden shrink-0 text-sm" style={{ color: theme.node.muted }}>
                                                         {trackRole}
@@ -2447,7 +2447,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                                       return (
                                                           <AudioMidiRegionContextMenu key={region.id} onCommand={(command) => handleRegionCommand(command, region.id)}>
                                                               <div
-                                                                  className="absolute top-1 flex select-none flex-col overflow-hidden rounded-[2px] border"
+                                                                  className="absolute top-1 flex select-none flex-col overflow-hidden rounded-md border"
                                                                   style={{
                                                                       left: ticksToSeconds(region.startTicks, ppqn, tempo) * pxPerSecond,
                                                                       height: LANE_HEIGHT - 10,
@@ -2496,7 +2496,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                                 return (
                                                     <AudioClipContextMenu key={clip.id} clip={clip} onCommand={(command) => handleClipCommand(command, clip.id)}>
                                                         <div
-                                                            className="absolute top-1 flex select-none flex-col overflow-hidden rounded-[2px] border"
+                                                            className="absolute top-1 flex select-none flex-col overflow-hidden rounded-md border"
                                                             style={{
                                                                 left: clip.start * pxPerSecond,
                                                                 height: LANE_HEIGHT - 10,
@@ -2600,7 +2600,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                             <span className="text-sm" style={{ color: theme.node.placeholder }}>
                                 {t("canvas.audioStudio.noTracks")}
                             </span>
-                            <button type="button" className="pointer-events-auto flex items-center gap-1.5 rounded-[2px] px-2 py-1 text-sm transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => addTrack()}>
+                            <button type="button" className="pointer-events-auto flex items-center gap-1.5 rounded-md px-2 py-1 text-sm transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => addTrack()}>
                                 <Plus className="size-3.5" />
                                 {t("canvas.audioStudio.addTrack")}
                             </button>
@@ -2740,7 +2740,7 @@ function ClipDialog({ clip, kind, onClose, onPatch }: { clip: CanvasAudioClip; k
                         <span className={labelClass} style={{ color: theme.node.muted }}>
                             {t("canvas.audioStudio.name")}
                         </span>
-                        <input className="min-w-0 flex-1 rounded-[2px] border bg-transparent px-1.5 py-0.5 text-sm outline-none" style={{ borderColor: theme.toolbar.border, color: theme.node.text }} value={form.name} aria-label={t("canvas.audioStudio.name")} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
+                        <input className="min-w-0 flex-1 rounded-md border bg-transparent px-1.5 py-0.5 text-sm outline-none" style={{ borderColor: theme.toolbar.border, color: theme.node.text }} value={form.name} aria-label={t("canvas.audioStudio.name")} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
                     </label>
                     {kind === "properties" ? (
                         <>

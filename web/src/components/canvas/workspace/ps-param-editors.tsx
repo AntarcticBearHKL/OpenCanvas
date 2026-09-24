@@ -30,7 +30,7 @@ export function PsCurveEditor({ points, theme, onChange }: { points: number[]; t
         <svg
             ref={svgRef}
             viewBox="0 0 255 255"
-            className="h-36 w-full touch-none rounded-[2px] border"
+            className="h-36 w-full touch-none rounded-md border"
             style={{ borderColor: theme.toolbar.border, background: theme.toolbar.panel, cursor: "crosshair" }}
             onPointerMove={(event: ReactPointerEvent<SVGSVGElement>) => {
                 if (dragIndex < 0) return;
@@ -101,7 +101,7 @@ export function PsGradientStopsEditor({ stops: source, theme, onChange }: { stop
         <div className="py-1">
             <div
                 ref={barRef}
-                className="relative h-5 w-full cursor-copy rounded-[2px] border"
+                className="relative h-5 w-full cursor-copy rounded-md border"
                 style={{ borderColor: theme.toolbar.border, background: `linear-gradient(to right, ${colors})` }}
                 onPointerDown={(event) => {
                     const box = barRef.current?.getBoundingClientRect();

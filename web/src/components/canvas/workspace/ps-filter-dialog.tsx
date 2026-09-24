@@ -133,7 +133,7 @@ export default function PsFilterDialog({ board, setNodes, nodes, layer, selectio
         <Modal open title={t(filter.labelKey)} okText={t("canvas.ps.apply")} cancelText={t("canvas.ps.cancel")} confirmLoading={busy} onCancel={onClose} onOk={() => void apply()} width={400} classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
             <ImageSettingsTheme theme={theme}>
                 <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-center rounded-[2px] border p-1 glass-card" style={{ borderColor: theme.toolbar.border }}>
+                    <div className="flex items-center justify-center rounded-md border p-1 glass-card" style={{ borderColor: theme.toolbar.border }}>
                         <canvas
                             ref={canvasRef}
                             width={size.width || 1}
@@ -210,7 +210,7 @@ export default function PsFilterDialog({ board, setNodes, nodes, layer, selectio
                     <div className="flex justify-end">
                         <button
                             type="button"
-                            className="rounded-[2px] px-2 py-0.5 text-sm transition hover:bg-hover"
+                            className="rounded-md px-2 py-0.5 text-sm transition hover:bg-hover"
                             style={{ color: theme.node.text }}
                             onClick={() => {
                                 setParams(psFilterParams(type));

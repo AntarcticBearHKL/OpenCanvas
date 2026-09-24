@@ -29,7 +29,7 @@ export const AUTOMATION_PLOT_HEIGHT = AUTOMATION_LANE_HEIGHT - 8;
 
 const POINT_SIZE = 6;
 const POINT_HIT_SIZE = 12;
-const PANEL_ACTION_CLASS = "grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover hover:opacity-100 hover:bg-hover";
+const PANEL_ACTION_CLASS = "grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover hover:opacity-100 hover:bg-hover";
 
 export function automationTargetLabel(t: TFunction, target: string, tracks: CanvasAudioTrack[]) {
     const kind = automationTargetKind(target);
@@ -203,7 +203,7 @@ export function AudioAutomationLane({ lane, tracks, headerWidth, width, pxPerSec
                     {points.map((point, index) => (
                         <AudioAutomationPointMenu key={index} curve={point.curve ?? "linear"} onCommand={(command) => handlePointCommand(index, command)}>
                             <div
-                                className="absolute grid place-items-center rounded-[2px]"
+                                className="absolute grid place-items-center rounded-md"
                                 style={{ left: point.time * pxPerSecond - POINT_HIT_SIZE / 2, top: toY(point.value) - POINT_HIT_SIZE / 2, width: POINT_HIT_SIZE, height: POINT_HIT_SIZE, cursor: "grab" }}
                                 tabIndex={0}
                                 role="button"

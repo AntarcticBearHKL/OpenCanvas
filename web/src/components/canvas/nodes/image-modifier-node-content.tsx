@@ -247,7 +247,7 @@ export function ImageModifierNodeContent({
                     </span>
                     <button
                         type="button"
-                        className="flex h-6 shrink-0 items-center rounded-[2px] px-2 text-sm font-medium transition hover:bg-hover"
+                        className="flex h-6 shrink-0 items-center rounded-md px-2 text-sm font-medium transition hover:bg-hover"
                         style={{ color: theme.node.muted }}
                         onClick={() => {
                             onParamsChange(DEFAULT_IMAGE_MODIFIER_PARAMS);
@@ -270,7 +270,7 @@ export function ImageModifierNodeContent({
                                 {loadFailed ? (
                                     <button
                                         type="button"
-                                        className="flex h-6 items-center rounded-[2px] px-2 text-sm font-medium transition hover:bg-hover"
+                                        className="flex h-6 items-center rounded-md px-2 text-sm font-medium transition hover:bg-hover"
                                         style={{ color: theme.node.text }}
                                         onClick={onClearSource}
                                         onMouseDown={(event) => event.stopPropagation()}
@@ -353,7 +353,7 @@ export function ImageModifierNodeContent({
                                 <span className="truncate">{t("canvas.imageModifier.curve")}</span>
                                 <button
                                     type="button"
-                                    className="flex h-4 shrink-0 items-center rounded-[2px] px-1.5 font-medium transition hover:bg-hover"
+                                    className="flex h-4 shrink-0 items-center rounded-md px-1.5 font-medium transition hover:bg-hover"
                                     style={{ color: theme.node.muted }}
                                     onClick={() => onCurveChange(DEFAULT_IMAGE_MODIFIER_CURVE.map((point) => ({ ...point })))}
                                     onMouseDown={(event) => event.stopPropagation()}
@@ -392,7 +392,7 @@ export function ImageModifierNodeContent({
 
                 <button
                     type="button"
-                    className="flex h-9 w-full shrink-0 items-center justify-between rounded-[2px] border px-3 text-sm font-medium transition hover:bg-hover"
+                    className="flex h-9 w-full shrink-0 items-center justify-between rounded-md border px-3 text-sm font-medium transition hover:bg-hover"
                     style={{ borderColor: emit ? theme.node.activeStroke : theme.node.stroke, color: emit ? theme.node.activeStroke : theme.node.muted }}
                     title={t("canvas.imageModifier.emitTitle")}
                     onClick={() => onEmitChange(!emit)}
@@ -412,7 +412,7 @@ export function ImageModifierNodeContent({
                         setBaking(true);
                         void onGenerate().finally(() => setBaking(false));
                     }}
-                    className="flex h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-[2px] border text-sm font-semibold transition hover:bg-hover disabled:opacity-40"
+                    className="flex h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-md border text-sm font-semibold transition hover:bg-hover disabled:opacity-40"
                     style={{ borderColor: theme.node.accent, background: theme.node.accentSoft, color: theme.node.accentText }}
                 >
                     {baking ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}

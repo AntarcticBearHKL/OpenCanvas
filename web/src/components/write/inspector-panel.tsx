@@ -28,7 +28,7 @@ function LinkChip({ label, onRemove }: { label: string; onRemove: () => void }) 
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     return (
-        <span className="flex min-w-0 items-center gap-1 rounded-[2px] border px-1.5 py-0.5 text-sm" style={{ borderColor: theme.toolbar.border, color: theme.node.text }}>
+        <span className="flex min-w-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-sm" style={{ borderColor: theme.toolbar.border, color: theme.node.text }}>
             <span className="truncate">{label}</span>
             <button type="button" className="shrink-0 text-muted-foreground transition hover:text-danger" aria-label={t("writing.common.delete")} onClick={onRemove}>
                 <X className="size-3" />

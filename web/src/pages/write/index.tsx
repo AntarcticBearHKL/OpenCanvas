@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { App, Button, Empty, Input, Modal, Select, Spin, Table } from "antd";
+import { Button, Empty, Input, Modal, Select, Spin, Table } from "antd";
 import { saveAs } from "file-saver";
 import { Check, Download, FilePlus2, FolderPlus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -16,7 +16,6 @@ import { useWritingStore, type WriteProject } from "@/stores/use-writing-store";
 import type { WriteTemplate } from "@/types/writing";
 
 export default function WritePage() {
-    const { modal } = App.useApp();
     const { t } = useTranslation();
     const navigate = useNavigate();
     const theme = useCanvasTheme();
@@ -43,6 +42,7 @@ export default function WritePage() {
     const [dragId, setDragId] = useState<string | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
     const [armedId, setArmedId] = useState<string | null>(null);
+    const [armedGroupId, setArmedGroupId] = useState<string | null>(null);
     const draggingRef = useRef(false);
 
     useEffect(() => {
@@ -89,15 +89,13 @@ export default function WritePage() {
         setEditingGroupId(null);
     };
     const removeGroup = (groupId: string) => {
+        if (armedGroupId !== groupId) {
+            setArmedGroupId(groupId);
+            return;
+        }
+        setArmedGroupId(null);
         setEditingGroupId(null);
-        modal.confirm({
-            title: t("writing.group.deleteTitle"),
-            content: t("writing.group.deleteDescription"),
-            okText: t("writing.common.delete"),
-            okButtonProps: { danger: true },
-            cancelText: t("writing.common.cancel"),
-            onOk: () => deleteGroup(groupId),
-        });
+        deleteGroup(groupId);
     };
     const handleDrop = () => {
         if (dragId && dropIndex !== null) {
@@ -147,7 +145,7 @@ export default function WritePage() {
                     {groups.map((group) => (
                         <div key={group.id}>
                             {editingGroupId === group.id ? (
-                                <div className="flex h-9 items-center gap-1 rounded-[2px] bg-muted px-2">
+                                <div className="flex h-9 items-center gap-1 rounded-md bg-muted px-2">
                                     <Input
                                         size="small"
                                         className="min-w-0 flex-1"
@@ -163,7 +161,7 @@ export default function WritePage() {
                                     <Button type="text" size="small" shape="circle" icon={<X className="size-3.5" />} onClick={() => setEditingGroupId(null)} aria-label={t("writing.common.cancel")} title={t("writing.common.cancel")} />
                                 </div>
                             ) : (
-                                <div className={`group flex h-9 items-center rounded-none border-b border-border px-2 transition ${selectedGroupId === group.id ? "bg-brand-soft" : "hover:bg-hover"}`} style={selectedGroupId === group.id ? { boxShadow: `inset 2px 0 0 0 ${theme.node.accent}` } : undefined}>
+                                <div className={`group flex h-9 items-center rounded-xl border-b border-border px-2 transition ${selectedGroupId === group.id ? "bg-brand-soft" : "hover:bg-hover"}`} style={selectedGroupId === group.id ? { boxShadow: `inset 2px 0 0 0 ${theme.node.accent}` } : undefined}>
                                     <button
                                         type="button"
                                         onClick={() => setSelectedGroupId(group.id)}
@@ -185,7 +183,17 @@ export default function WritePage() {
                                             aria-label={t("writing.group.rename")}
                                             title={t("writing.group.rename")}
                                         />
-                                        <Button type="text" size="small" shape="circle" icon={<Trash2 className="size-3.5" />} onClick={() => removeGroup(group.id)} aria-label={t("writing.group.delete")} title={t("writing.group.delete")} />
+                                        <Button
+                                            type="text"
+                                            size="small"
+                                            shape="circle"
+                                            danger={armedGroupId === group.id}
+                                            icon={armedGroupId === group.id ? <Check className="size-3.5" /> : <Trash2 className="size-3.5" />}
+                                            onClick={() => removeGroup(group.id)}
+                                            onPointerLeave={() => setArmedGroupId((current) => (current === group.id ? null : current))}
+                                            aria-label={armedGroupId === group.id ? t("writing.group.confirmDelete") : t("writing.group.delete")}
+                                            title={armedGroupId === group.id ? t("writing.group.confirmDelete") : t("writing.group.delete")}
+                                        />
                                     </div>
                                 </div>
                             )}
@@ -229,7 +237,7 @@ export default function WritePage() {
                             <Spin />
                         </div>
                     ) : !selectedGroup ? (
-                        <div className="glass-card flex h-full items-center justify-center rounded-none border">
+                        <div className="glass-card flex h-full items-center justify-center rounded-xl border">
                             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("writing.group.createFirst")} className="py-16">
                                 <Button type="primary" icon={<FolderPlus className="size-4" />} disabled={!hydrated} onClick={addGroup}>
                                     {t("writing.group.create")}
@@ -291,7 +299,7 @@ export default function WritePage() {
                             ]}
                         />
                     ) : (
-                        <div className="glass-card flex h-full items-center justify-center rounded-none border">
+                        <div className="glass-card flex h-full items-center justify-center rounded-xl border">
                             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("writing.group.empty")} className="py-16">
                                 <Button type="primary" icon={<FilePlus2 className="size-4" />} disabled={!hydrated} onClick={openCreate}>
                                     {t("writing.library.create")}

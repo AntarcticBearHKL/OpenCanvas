@@ -38,10 +38,10 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
                     <p className="mt-1 text-sm" style={{ color: theme.node.muted }}>{t("canvas.editors.angleDescription")}</p>
                 </div>
                 <div className="grid gap-6 md:grid-cols-[minmax(260px,1fr)_360px]">
-                    <div className="flex min-h-[300px] min-w-0 flex-col justify-between rounded-none border p-4">
+                    <div className="flex min-h-[300px] min-w-0 flex-col justify-between rounded-xl border p-4">
                         <div className="grid flex-1 place-items-center">
                             <div className="relative">
-                                <img src={dataUrl} alt="" className="size-48 rounded-[2px] object-cover" draggable={false} style={{ transform: previewTransform(params) }} />
+                                <img src={dataUrl} alt="" className="size-48 rounded-md object-cover" draggable={false} style={{ transform: previewTransform(params) }} />
                                 <div className="absolute -bottom-6 left-1/2 h-10 w-24 -translate-x-1/2 rounded-full border bg-black/20 backdrop-blur" />
                             </div>
                         </div>

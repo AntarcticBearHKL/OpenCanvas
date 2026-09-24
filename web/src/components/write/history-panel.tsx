@@ -9,7 +9,7 @@ import { docUnitFor, docUnitNodes } from "@/lib/write/outline";
 import { useWriteUiStore } from "@/stores/use-write-ui-store";
 import { useWritingProject, useWritingStore } from "@/stores/use-writing-store";
 
-const CARD_CLASS = "flex w-52 max-w-[220px] shrink-0 flex-col gap-1 rounded-[2px] border p-2 text-sm";
+const CARD_CLASS = "flex w-52 max-w-[220px] shrink-0 flex-col gap-1 rounded-md border p-2 text-sm";
 
 export function HistoryPanel() {
     const { t } = useTranslation();

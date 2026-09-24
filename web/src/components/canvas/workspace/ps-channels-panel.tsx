@@ -122,11 +122,11 @@ export function PsChannelsPanel({
                     const shown = view === row.key;
                     return (
                         <div key={row.key} className={ROW_CLASS} style={shown ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText, borderColor: theme.toolbar.border, boxShadow: `inset 2px 0 0 0 ${theme.node.accent}` } : { borderColor: theme.toolbar.border }}>
-                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover" aria-label={t("canvas.ps.channelVisibility")} title={t("canvas.ps.channelVisibility")} onClick={() => channelKey && toggle(channelKey)}>
+                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover" aria-label={t("canvas.ps.channelVisibility")} title={t("canvas.ps.channelVisibility")} onClick={() => channelKey && toggle(channelKey)}>
                                 {channelKey ? (visibility[channelKey] ? <Eye className="size-3" /> : <EyeOff className="size-3" />) : <span className="size-3" />}
                             </button>
                             <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left" onClick={() => onView(row.key)}>
-                                <span className="size-4 shrink-0 rounded-[2px] border" style={{ borderColor: theme.toolbar.border, background: row.key === "rgb" ? "linear-gradient(135deg, #ff0000, #00ff00, #0000ff)" : row.key === "r" ? "#ff0000" : row.key === "g" ? "#00ff00" : "#0000ff" }} />
+                                <span className="size-4 shrink-0 rounded-md border" style={{ borderColor: theme.toolbar.border, background: row.key === "rgb" ? "linear-gradient(135deg, #ff0000, #00ff00, #0000ff)" : row.key === "r" ? "#ff0000" : row.key === "g" ? "#00ff00" : "#0000ff" }} />
                                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
                                 {shown ? <Check className="size-3 shrink-0" /> : null}
                             </button>
@@ -145,11 +145,11 @@ export function PsChannelsPanel({
                 {channels.length ? (
                     channels.map((channel) => (
                         <div key={channel.id} className={ROW_CLASS} style={{ borderColor: theme.toolbar.border }}>
-                            <img src={urls[channel.id] || ""} alt="" className="size-5 shrink-0 rounded-[2px] border object-cover" style={{ borderColor: theme.node.info }} />
+                            <img src={urls[channel.id] || ""} alt="" className="size-5 shrink-0 rounded-md border object-cover" style={{ borderColor: theme.node.info }} />
                             {renamingId === channel.id ? (
                                 <input
                                     autoFocus
-                                    className="min-w-0 flex-1 rounded-[2px] border bg-transparent px-1 text-sm"
+                                    className="min-w-0 flex-1 rounded-md border bg-transparent px-1 text-sm"
                                     style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                                     value={nameDraft}
                                     onChange={(event) => setNameDraft(event.target.value)}
@@ -163,10 +163,10 @@ export function PsChannelsPanel({
                                     {channel.name}
                                 </button>
                             )}
-                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover" style={{ color: theme.node.muted }} aria-label={t("canvas.ps.channelLoad")} title={t("canvas.ps.channelLoad")} onClick={() => void loadChannel(channel)}>
+                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover" style={{ color: theme.node.muted }} aria-label={t("canvas.ps.channelLoad")} title={t("canvas.ps.channelLoad")} onClick={() => void loadChannel(channel)}>
                                 <RefreshCw className="size-3" />
                             </button>
-                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover" style={{ color: theme.node.muted }} aria-label={t("canvas.ps.channelDelete")} title={t("canvas.ps.channelDelete")} onClick={() => setChannels(channels.filter((item) => item.id !== channel.id))}>
+                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover" style={{ color: theme.node.muted }} aria-label={t("canvas.ps.channelDelete")} title={t("canvas.ps.channelDelete")} onClick={() => setChannels(channels.filter((item) => item.id !== channel.id))}>
                                 <Trash2 className="size-3" />
                             </button>
                         </div>

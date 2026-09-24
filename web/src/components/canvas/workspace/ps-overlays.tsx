@@ -282,7 +282,7 @@ export function PsTransformHandles({
             {handles.map((handle) => (
                 <div
                     key={handle.index}
-                    className="pointer-events-auto absolute z-20 rounded-[2px]"
+                    className="pointer-events-auto absolute z-20 rounded-md"
                     style={{ width: size, height: size, left: handle.point.x, top: handle.point.y, transform: "translate(-50%, -50%)", background: theme.toolbar.panel, border: `1px solid ${theme.node.activeStroke}`, cursor: "crosshair" }}
                     onPointerDown={(event) => onPointerDown(handle.index, event)}
                     onPointerMove={onPointerMove}

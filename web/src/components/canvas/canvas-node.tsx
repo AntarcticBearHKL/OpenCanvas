@@ -31,9 +31,9 @@ export const selectionBlue = "#2f80ff";
 
 const panelButtonStyle = (theme: CanvasTheme, color: string) => ({ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color });
 const EMPTY_NODES: CanvasNodeData[] = [];
-const batchToggleButtonClass = "absolute right-2.5 top-2.5 z-30 flex h-8 items-center justify-center gap-1.5 rounded-[2px] border px-3 text-sm font-semibold backdrop-blur-md transition hover:scale-[1.02]";
-const expandedImageActionClass = "flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-[2px] border px-1.5 text-sm font-medium backdrop-blur-md transition hover:scale-[1.02]";
-const expandedImageIconClass = "grid h-8 w-8 shrink-0 place-items-center rounded-[2px] border backdrop-blur-md transition hover:scale-[1.02]";
+const batchToggleButtonClass = "absolute right-2.5 top-2.5 z-30 flex h-8 items-center justify-center gap-1.5 rounded-md border px-3 text-sm font-semibold backdrop-blur-md transition hover:scale-[1.02]";
+const expandedImageActionClass = "flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-md border px-1.5 text-sm font-medium backdrop-blur-md transition hover:scale-[1.02]";
+const expandedImageIconClass = "grid h-8 w-8 shrink-0 place-items-center rounded-md border backdrop-blur-md transition hover:scale-[1.02]";
 
 type CanvasNodeProps = {
     data: CanvasNodeData;
@@ -471,7 +471,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                 </div>
 
                 {locked ? (
-                    <div className="pointer-events-none absolute bottom-2 left-2 z-40 flex items-center rounded-[2px] px-1.5 py-0.5 backdrop-blur-md" style={{ background: theme.toolbar.panel, color: theme.node.muted }}>
+                    <div className="pointer-events-none absolute bottom-2 left-2 z-40 flex items-center rounded-md px-1.5 py-0.5 backdrop-blur-md" style={{ background: theme.toolbar.panel, color: theme.node.muted }}>
                         <Lock className="size-3" />
                     </div>
                 ) : null}
@@ -546,7 +546,7 @@ function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "
             <div className="text-sm leading-5" style={{ color: theme.node.danger }}>{node.metadata?.errorDetails || t("canvas.node.failed")}</div>
             <button
                 type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded-[2px] border px-3 text-sm font-medium transition hover:scale-[1.02]"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition hover:scale-[1.02]"
                 style={panelButtonStyle(theme, theme.node.text)}
                 onClick={(event) => {
                     event.stopPropagation();
@@ -678,7 +678,7 @@ function ExpandedTextCard({ node, text, index, onSetPrimary }: { node: CanvasNod
                     <div className="thin-scrollbar h-full overflow-y-auto whitespace-pre-wrap break-words px-4 pb-4 pt-14 font-mono text-sm leading-6" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
                         {text.content}
                     </div>
-                    <button type="button" className="absolute right-2.5 top-2.5 flex h-8 items-center gap-1.5 rounded-[2px] px-2.5 text-sm font-medium transition hover:bg-hover" style={{ color: theme.node.text }} onClick={(event) => (event.stopPropagation(), onSetPrimary())}>
+                    <button type="button" className="absolute right-2.5 top-2.5 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition hover:bg-hover" style={{ color: theme.node.text }} onClick={(event) => (event.stopPropagation(), onSetPrimary())}>
                         <Star className="size-3.5" style={{ color: selectionBlue }} />
                         {t("canvas.node.setPrimaryText")}
                     </button>
@@ -934,11 +934,11 @@ function BatchImageFailureActions({ placement, onRetry, onDelete }: { placement:
     const { t } = useTranslation();
     return (
         <div className={`absolute top-3 z-30 flex items-center gap-1.5 ${placement === "left" ? "left-3" : "right-3"}`}>
-            <button type="button" className="flex h-8 items-center gap-1.5 rounded-[2px] border px-2.5 text-sm font-medium transition hover:scale-[1.02]" style={panelButtonStyle(theme, theme.node.text)} onClick={(event) => (event.stopPropagation(), onRetry())}>
+            <button type="button" className="flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm font-medium transition hover:scale-[1.02]" style={panelButtonStyle(theme, theme.node.text)} onClick={(event) => (event.stopPropagation(), onRetry())}>
                 <RefreshCw className="size-3.5" />
                 {t("canvas.node.retry")}
             </button>
-            <button type="button" className="grid size-8 place-items-center rounded-[2px] border transition hover:scale-[1.02]" style={panelButtonStyle(theme, theme.node.text)} onClick={(event) => (event.stopPropagation(), onDelete())} aria-label={t("common.delete")} title={t("common.delete")}>
+            <button type="button" className="grid size-8 place-items-center rounded-md border transition hover:scale-[1.02]" style={panelButtonStyle(theme, theme.node.text)} onClick={(event) => (event.stopPropagation(), onDelete())} aria-label={t("common.delete")} title={t("common.delete")}>
                 <Trash2 className="size-3.5" />
             </button>
         </div>
@@ -975,7 +975,7 @@ function MediaInfoBar({ node, onInfo }: { node: CanvasNodeData; onInfo?: (node: 
             </span>
             <button
                 type="button"
-                className="pointer-events-auto grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover"
+                className="pointer-events-auto grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover"
                 style={{ color: theme.node.muted }}
                 aria-label={t("canvas.imageTools.info")}
                 title={t("canvas.imageTools.info")}

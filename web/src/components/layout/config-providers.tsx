@@ -79,7 +79,7 @@ export function ConfigProviders() {
                                         placeholder={t("config.providers.presetPlaceholder")}
                                         onChange={(value) => {
                                             const preset = PROVIDER_PRESETS.find((item) => item.id === value);
-                                            if (preset) patch(channel.id, { name: preset.name, baseUrl: preset.baseUrl });
+                                            if (preset) patch(channel.id, { name: preset.name, baseUrl: preset.baseUrl, models: channel.models.length ? channel.models : preset.models.map((model) => ({ ...model })) });
                                         }}
                                         options={PROVIDER_PRESETS.map((preset) => ({ value: preset.id, label: preset.name }))}
                                     />

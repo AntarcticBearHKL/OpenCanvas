@@ -2,6 +2,14 @@
 
 ## Unreleased
 
++ [调整] 整体风格回到圆角矩形的温和版（撤销上一轮的全站去圆角）：卡片 / 面板 / 分区 / 弹层 / 菜单 / 列表行 / 页栏与侧栏统一为 `rounded-xl`（12px），画布节点卡片保持 `rounded-3xl`（≈22px），按钮 / 输入框 / 下拉 / 标签 / 徽标统一为 `rounded-md`（6px），圆形元素（状态点 / 头像 / 加载圈 / 录音键）不变；Ant Design 圆角 token 回到 8 / 6 / 12 / 4，全局 `--radius` 回到 `0.625rem`。**表格与表格内容按要求保持方角** —— 全仓仅剩的 3 处 `rounded-none` 就是两个库页表格与 providers 表格上的 `!rounded-none` 覆盖，原样保留。共 79 个文件、70 处容器圆角 + 216 处控件圆角。
++ [修复] 修复上一轮「去圆角」脚本误伤的一处注释：audio studio 里 "tab had been backgrounded" 中的单词结尾 `rounded` 被当成 Tailwind 类替换成了 `backgrounded-[2px]`（`backgrounded` 正好以 `rounded` 结尾），已还原，并复查确认全仓仅此一处。
+
++ [修复] 修复顶部导航与移动端抽屉里「我的资产」入口又出现、且显示成原始 key `navigation.assets` 的问题：`constant/navigation-tools.ts` 里的 `assets` 条目在素材库移除后被某次改动写了回来，而对应的 `navigation.assets` 文案已随功能删除，于是渲染出原始 key；现已移除该条目与不再使用的 `Images` 图标导入，导航恢复为「我的画布 / 文本创作器 / 配置」三项（桌面顶栏与移动端抽屉共用同一份列表）。
+
++ [新增] 接入 Matilda（Maincode）：新增本地同源代理 `web/matilda-proxy.ts`（Vite dev + preview 中间件），在 Node 侧通过官方 `@maincode-ai/matilda-agent-sdk` 调用 `matilda.maincode.com`，并对外暴露 OpenAI 形状的 `/matilda/v1/responses`、`/matilda/v1/chat/completions` 与 `/matilda/v1/models`，因此浏览器不再被它缺失的 CORS 头拦住；前端只需在设置里粘贴 `mc_live_` 开头的 API key，无需关心模型 id 与能力分类。代理只从请求头透传密钥、不落盘、不写日志，并支持客户端中断时一并中止上游流。注意：SDK 是 Node-only（无 browser 导出、顶层引入 node 内置模块），因此永远不进前端包；生产静态部署需要等价的 Node 函数。
++ [调整] 提供商与模型配置改为「三档预设 + 写死模型清单」，并移除「抓取模型」功能：只保留 OpenRouter（多模态：图片 `openai/gpt-image-2.5-sunburst`、视频 `minimax/hailuo-3-max` / `minimax/hailuo-3`、语音 `fish-audio/s2.1-pro`、音乐 `google/lyria-3-pro-preview`、文本用实时目录逐一核验过的 5 个 id）、DeepSeek（纯文本：`deepseek-v4-pro` / `deepseek-v4-flash`）与 Matilda（纯文本，一个不透明的 `matilda` 条目）。DeepSeek / Matilda 标记为纯文本提供商，其模型一律归类为 `text` 且能力不可编辑，因而不会出现在图片 / 视频 / 音频 / 语音的下拉里；已存渠道的模型列表按预设重置，非预设渠道不会被删除。删除「抓取模型」的原因：实时 OpenRouter 目录（458 个模型）里根本没有本应用使用的图片 / 视频 / 语音 id，抓回来的列表反而不可用。
+
 + [新增] 图片复制到剪贴板：新增共享 `copyImageToClipboard`（接受 `blob:` / `data:` / `http(s):` 图片，非 PNG 自动转成 PNG，失败返回 false 不抛异常）；图片节点双击预览弹窗、智能画布合成预览弹窗、图片节点悬停工具栏、多图节点展开面板里的每张图卡片都补上「下载 + 复制」一对按钮，并按需求全部改为**纯图标**（保留 `aria-label` / `title` 可访问性），复制成功 / 失败各有提示。同时清掉图片快捷工具里已失效的 `saveAsset`（素材库移除后遗留的死 id），并把快捷工具配置存储键由 `canvas-image-quick-tools-v14` 升到 `v15`，让既有配置也能拿到新的 `copy` 工具；图片节点的悬停工具栏补上原先缺失的下载项（此前只有视频 / 音频有），下载与复制配对完整。
 + [修复] 修复画布节点被误改成方角的问题：节点外壳恢复为圆角矩形（`rounded-3xl`），节点内的内容容器、批量叠层与缩放手柄本就继承外壳圆角因而一并恢复；面板、弹层、对话框、列表与库页表格仍保持方角的表格风格。
 

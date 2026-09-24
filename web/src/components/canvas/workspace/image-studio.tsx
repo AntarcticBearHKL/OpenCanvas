@@ -1571,7 +1571,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                         <span className="flex shrink-0 items-center gap-1.5">
                             <span>{t("canvas.ps.pathActive", { name: activePath?.name || t("canvas.ps.none") })}</span>
                             {pattern ? <span>{t("canvas.ps.patternActive", { name: pattern.name })}</span> : null}
-                            <button type="button" className="rounded-[2px] px-1.5 py-0.5 transition hover:bg-hover" onClick={() => setPattern(null)}>
+                            <button type="button" className="rounded-md px-1.5 py-0.5 transition hover:bg-hover" onClick={() => setPattern(null)}>
                                 {t("canvas.ps.patternClear")}
                             </button>
                         </span>
@@ -1579,7 +1579,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                     {transformMode ? (
                         <>
                             <Segmented size="small" value={transformMode} options={PS_TRANSFORM_MODES.map((mode) => ({ value: mode, label: t(`canvas.ps.transform.${mode}`) }))} onChange={(value) => setTransformMode(value as PsTransformMode)} />
-                            <button type="button" className="shrink-0 rounded-[2px] px-1.5 py-0.5 transition hover:bg-hover" onClick={() => setTransformMode(null)}>
+                            <button type="button" className="shrink-0 rounded-md px-1.5 py-0.5 transition hover:bg-hover" onClick={() => setTransformMode(null)}>
                                 {t("canvas.ps.transformDone")}
                             </button>
                         </>
@@ -1769,7 +1769,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                                     : CORNERS.map((corner) => (
                                           <div
                                               key={corner}
-                                              className="pointer-events-auto absolute rounded-[2px]"
+                                              className="pointer-events-auto absolute rounded-md"
                                               style={{
                                                   width: handleSize,
                                                   height: handleSize,

@@ -257,10 +257,10 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
                 <div
                     ref={viewport.viewportRef}
                     {...viewport.panHandlers}
-                    className={`relative h-[min(68vh,720px)] min-h-[360px] rounded-none border border-black/10 bg-transparent dark:border-white/10 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
+                    className={`relative h-[min(68vh,720px)] min-h-[360px] rounded-xl border border-black/10 bg-transparent dark:border-white/10 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
                 >
                     <div className="relative" style={viewport.contentStyle}>
-                        <div ref={viewport.stageRef} className="absolute isolate overflow-hidden rounded-[2px] bg-transparent select-none [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
+                        <div ref={viewport.stageRef} className="absolute isolate overflow-hidden rounded-md bg-transparent select-none [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
                             {image ? (
                                 <>
                                     <canvas ref={attachMaskCanvas} width={image.width} height={image.height} className="hidden" />
@@ -295,7 +295,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
                               className={`pointer-events-none fixed left-0 top-0 z-[1100] rounded-full border-2 ${brushAdjusting ? "border-[#fbbf24] bg-black/10" : "border-white/90 bg-black/5"} ${brushVisible ? "" : "invisible"} shadow-[0_0_0_1px_rgba(0,0,0,.8)]`}
                               style={{ aspectRatio: 1 }}
                           >
-                              {brushAdjusting ? <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[2px] bg-black/75 px-1.5 py-0.5 text-xs font-semibold text-white">{brushSize}px</span> : null}
+                              {brushAdjusting ? <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-black/75 px-1.5 py-0.5 text-xs font-semibold text-white">{brushSize}px</span> : null}
                           </div>,
                           document.body,
                       )
@@ -317,7 +317,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
                         </Button>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-[2px] border border-black/10 px-2 py-1 dark:border-white/10">
+                    <div className="flex items-center justify-between rounded-md border border-black/10 px-2 py-1 dark:border-white/10">
                         <Tooltip title={t("canvas.editors.undoMaskTitle")}>
                             <Button type="text" icon={<Undo2 className="size-4" />} disabled={!historySize} aria-label={t("canvas.editors.undoMask")} onClick={undoMask} />
                         </Tooltip>

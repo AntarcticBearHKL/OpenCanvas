@@ -117,7 +117,7 @@ export function CanvasToolbar({
     return (
         <div ref={rootRef} className="pointer-events-none absolute bottom-5 left-0 right-0 z-50 flex justify-center px-3">
             {tip ? <DockTip label={tip} x={tipX} theme={theme} /> : null}
-            <div ref={wrapRef} className={`thin-scrollbar pointer-events-auto flex h-14 max-w-full items-center gap-1 overflow-x-auto rounded-none border px-2 [&>*]:shrink-0 glass-surface`} style={dockStyle}>
+            <div ref={wrapRef} className={`thin-scrollbar pointer-events-auto flex h-14 max-w-full items-center gap-1 overflow-x-auto rounded-xl border px-2 [&>*]:shrink-0 glass-surface`} style={dockStyle}>
                 <ToolbarButton
                     id="tool-export"
                     label={t("canvas.exportCanvas")}
@@ -297,7 +297,7 @@ export function CanvasToolbar({
 
             {createMenu ? (
                 <div
-                    className="pointer-events-auto absolute bottom-[72px] z-30 w-[220px] -translate-x-1/2 rounded-none border p-2 glass-raised"
+                    className="pointer-events-auto absolute bottom-[72px] z-30 w-[220px] -translate-x-1/2 rounded-xl border p-2 glass-raised"
                     style={{ left: createMenuX || "50%", borderColor: theme.toolbar.border, color: theme.toolbar.item }}
                 >
                     <div className="px-1.5 pb-1.5 text-sm font-medium" style={{ color: theme.node.label }}>{t(createMenu === "prompt" ? "canvas.toolbar.promptGroup" : createMenu === "generator" ? "canvas.toolbar.generatorGroup" : createMenu === "modifiers" ? "canvas.toolbar.modifiersGroup" : "canvas.toolbar.inputOutputGroup")}</div>
@@ -306,7 +306,7 @@ export function CanvasToolbar({
                             <button
                                 key={`${item.type}-${item.label}`}
                                 type="button"
-                                className="flex w-full items-center gap-2.5 rounded-[2px] px-2 py-1.5 text-left text-sm transition"
+                                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition"
                                 style={{ color: theme.toolbar.item }}
                                 onMouseEnter={(event) => (event.currentTarget.style.background = theme.toolbar.itemHover)}
                                 onMouseLeave={(event) => (event.currentTarget.style.background = "transparent")}
@@ -315,7 +315,7 @@ export function CanvasToolbar({
                                     setCreateMenu(null);
                                 }}
                             >
-                                <span className="grid size-7 shrink-0 place-items-center rounded-[2px] text-base" style={{ background: theme.toolbar.itemHover }}>
+                                <span className="grid size-7 shrink-0 place-items-center rounded-md text-base" style={{ background: theme.toolbar.itemHover }}>
                                     {item.icon}
                                 </span>
                                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
@@ -327,7 +327,7 @@ export function CanvasToolbar({
 
             {extensionsOpen && extensionDefs.length ? (
                 <div
-                    className="thin-scrollbar pointer-events-auto absolute bottom-[72px] z-30 max-h-[50vh] w-[240px] -translate-x-1/2 overflow-y-auto rounded-none border p-2 glass-raised"
+                    className="thin-scrollbar pointer-events-auto absolute bottom-[72px] z-30 max-h-[50vh] w-[240px] -translate-x-1/2 overflow-y-auto rounded-xl border p-2 glass-raised"
                     style={{ left: extPanelX || "50%", borderColor: theme.toolbar.border, color: theme.toolbar.item }}
                 >
                     <div className="px-1.5 pb-1.5 text-sm font-medium" style={{ color: theme.node.label }}>{t("canvas.toolbar.extensions")}</div>
@@ -336,7 +336,7 @@ export function CanvasToolbar({
                             <button
                                 key={def.type}
                                 type="button"
-                                className="flex w-full items-center gap-2.5 rounded-[2px] px-2 py-1.5 text-left text-sm transition"
+                                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition"
                                 style={{ color: theme.toolbar.item }}
                                 onMouseEnter={(event) => (event.currentTarget.style.background = theme.toolbar.itemHover)}
                                 onMouseLeave={(event) => (event.currentTarget.style.background = "transparent")}
@@ -345,7 +345,7 @@ export function CanvasToolbar({
                                     setExtensionsOpen(false);
                                 }}
                             >
-                                <span className="grid size-7 shrink-0 place-items-center rounded-[2px] text-base" style={{ background: theme.toolbar.itemHover }}>
+                                <span className="grid size-7 shrink-0 place-items-center rounded-md text-base" style={{ background: theme.toolbar.itemHover }}>
                                     {def.icon}
                                 </span>
                                 <span className="min-w-0 flex-1 truncate">{def.title}</span>
@@ -357,7 +357,7 @@ export function CanvasToolbar({
 
             {zoomOpen ? (
                 <div
-                    className="pointer-events-auto absolute bottom-[72px] z-30 w-[248px] -translate-x-1/2 rounded-none border p-2.5 glass-raised"
+                    className="pointer-events-auto absolute bottom-[72px] z-30 w-[248px] -translate-x-1/2 rounded-xl border p-2.5 glass-raised"
                     style={{ left: zoomPanelX || "50%", borderColor: theme.toolbar.border, color: theme.toolbar.item }}
                 >
                     <div className="flex items-center justify-between gap-3 px-1 pb-2">
@@ -468,7 +468,7 @@ function PanelAction({ icon, label, active, onClick, theme }: { icon: ReactNode;
     return (
         <button
             type="button"
-            className="flex w-full items-center gap-2.5 rounded-[2px] px-2 py-1.5 text-left text-sm transition"
+            className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition"
             style={active ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.toolbar.item }}
             onMouseEnter={(event) => {
                 if (!active) event.currentTarget.style.background = theme.toolbar.itemHover;
@@ -486,7 +486,7 @@ function PanelAction({ icon, label, active, onClick, theme }: { icon: ReactNode;
 
 function DockTip({ label, x, theme }: { label: string; x: number; theme: CanvasTheme }) {
     return (
-        <span className="absolute bottom-[calc(100%+8px)] -translate-x-1/2 rounded-[2px] px-2 py-1 text-xs" style={{ left: x, background: theme.node.text, color: theme.node.panel }}>
+        <span className="absolute bottom-[calc(100%+8px)] -translate-x-1/2 rounded-md px-2 py-1 text-xs" style={{ left: x, background: theme.node.text, color: theme.node.panel }}>
             {label}
         </span>
     );

@@ -133,7 +133,7 @@ export function CodexPanel() {
                                     <span className="flex min-w-0 items-center gap-1">
                                         <span className="truncate">{entry.name}</span>
                                         {entry.aliases.slice(0, 2).map((alias) => (
-                                            <span key={alias} className="max-w-16 shrink-0 truncate rounded-[2px] border px-1 text-xs" style={{ borderColor: theme.toolbar.border, color: theme.node.muted }}>
+                                            <span key={alias} className="max-w-16 shrink-0 truncate rounded-md border px-1 text-xs" style={{ borderColor: theme.toolbar.border, color: theme.node.muted }}>
                                                 {alias}
                                             </span>
                                         ))}

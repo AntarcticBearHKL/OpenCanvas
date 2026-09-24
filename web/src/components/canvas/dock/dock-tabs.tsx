@@ -56,7 +56,7 @@ export function DockTabs<T extends string>({ tabs, value, onChange }: { tabs: Do
                             {...tab.handlers}
                             aria-pressed={active}
                             onClick={() => onChange(tab.id)}
-                            className="min-w-0 shrink-0 cursor-pointer rounded-[2px] px-2 py-1 text-xs font-medium transition"
+                            className="min-w-0 shrink-0 cursor-pointer rounded-md px-2 py-1 text-xs font-medium transition"
                             style={active ? { background: theme.toolbar.accentBg, color: theme.toolbar.accentText, boxShadow: `inset 0 0 0 1px ${theme.node.accent}` } : { color: theme.toolbar.item }}
                             onMouseEnter={(event) => {
                                 if (!active) event.currentTarget.style.background = theme.toolbar.itemHover;
@@ -78,7 +78,7 @@ export function DockTabs<T extends string>({ tabs, value, onChange }: { tabs: Do
                 >
                     <button
                         type="button"
-                        className="mr-1.5 grid size-6 shrink-0 cursor-pointer place-items-center rounded-[2px] transition hover:bg-black/5 dark:hover:bg-white/10"
+                        className="mr-1.5 grid size-6 shrink-0 cursor-pointer place-items-center rounded-md transition hover:bg-black/5 dark:hover:bg-white/10"
                         style={{ color: theme.toolbar.accentText, background: theme.toolbar.accentBg }}
                         aria-label={t("canvas.dock.more")}
                         title={t("canvas.dock.more")}

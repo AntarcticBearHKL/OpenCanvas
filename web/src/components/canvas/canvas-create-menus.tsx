@@ -23,7 +23,7 @@ export function ConnectionCreateMenu({
     const { t } = useTranslation();
     return (
         <div
-            className="absolute z-[120] w-[300px] rounded-none border p-3 glass-raised"
+            className="absolute z-[120] w-[300px] rounded-xl border p-3 glass-raised"
             data-connection-create-menu
             style={{ left: pending.position.x, top: pending.position.y, borderColor: theme.toolbar.border, color: theme.node.text }}
             onMouseDown={(event) => event.stopPropagation()}
@@ -33,7 +33,7 @@ export function ConnectionCreateMenu({
                 <span className="text-sm font-medium" style={{ color: theme.node.muted }}>
                     {t("canvas.createMenu.fromNode")}
                 </span>
-                <button type="button" className="grid size-7 place-items-center rounded-[2px] text-base transition hover:bg-hover" onClick={onClose} aria-label={t("canvas.createMenu.close")}>
+                <button type="button" className="grid size-7 place-items-center rounded-md text-base transition hover:bg-hover" onClick={onClose} aria-label={t("canvas.createMenu.close")}>
                     ×
                 </button>
             </div>
@@ -53,11 +53,11 @@ function ConnectionCreateOption({ theme, icon, title, description, onClick }: { 
     return (
         <button
             type="button"
-            className="flex h-16 w-full cursor-pointer items-center gap-3 rounded-none px-3 text-left transition hover:bg-hover"
+            className="flex h-16 w-full cursor-pointer items-center gap-3 rounded-xl px-3 text-left transition hover:bg-hover"
             style={{ color: theme.node.text }}
             onClick={onClick}
         >
-            <span className="grid size-11 shrink-0 place-items-center rounded-[2px]" style={{ color: theme.node.muted }}>
+            <span className="grid size-11 shrink-0 place-items-center rounded-md" style={{ color: theme.node.muted }}>
                 {icon}
             </span>
             <span className="min-w-0 flex-1">

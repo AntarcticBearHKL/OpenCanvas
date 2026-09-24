@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { App, Button, Input, Select } from "antd";
-import { Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Button, Input, Select } from "antd";
+import { Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { ModelPicker } from "@/components/model-picker";
-import { fetchProviderModels } from "@/lib/provider-presets";
+import { isTextOnlyBaseUrl } from "@/lib/provider-presets";
 import { decodeChannelModel, modelOptionLabel, selectableModelsByCapability, useConfigStore, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 
 const CAPABILITIES: ModelCapability[] = ["text", "image", "audio", "speech", "video"];
@@ -17,20 +17,7 @@ const MODEL_FIELDS: { capability: ModelCapability; field: "textModel" | "imageMo
     { capability: "video", field: "videoModel" },
 ];
 
-const CAPABILITY_KEYWORDS: [ModelCapability, string[]][] = [
-    ["video", ["video", "sora", "veo", "kling", "wan", "hailuo"]],
-    ["speech", ["tts", "speech", "voice", "fish-audio", "sovits", "elevenlabs", "cosyvoice", "kokoro"]],
-    ["audio", ["audio", "music", "sound", "lyria"]],
-    ["image", ["seedream", "gpt-image", "image", "dall-e", "dalle", "imagen", "flux", "sdxl", "stable-diffusion", "midjourney"]],
-];
-
-function guessCapability(name: string): ModelCapability {
-    const value = name.toLowerCase();
-    return CAPABILITY_KEYWORDS.find(([, keywords]) => keywords.some((keyword) => value.includes(keyword)))?.[0] || "text";
-}
-
 export function ConfigModels() {
-    const { message } = App.useApp();
     const { t } = useTranslation();
     const config = useConfigStore((state) => state.config);
     const updateConfig = useConfigStore((state) => state.updateConfig);
@@ -52,21 +39,12 @@ export function ConfigModels() {
     const addModel = (channelId: string, name: string, capability: ModelCapability) => {
         const value = name.trim();
         if (!value) return;
-        commitChannels(config.channels.map((channel) => (channel.id === channelId && !channel.models.some((model) => model.name === value) ? { ...channel, models: [...channel.models, { name: value, capability }] } : channel)));
-    };
-
-    const fetchModels = async (channelId: string) => {
-        const channel = config.channels.find((item) => item.id === channelId);
-        if (!channel) return;
-        try {
-            const ids = await fetchProviderModels(channel.baseUrl, channel.apiKey);
-            const existing = new Set(channel.models.map((model) => model.name));
-            const added = ids.filter((id) => !existing.has(id)).map((id) => ({ name: id, capability: guessCapability(id) }));
-            commitChannels(config.channels.map((item) => (item.id === channel.id ? { ...item, models: [...item.models, ...added] } : item)));
-            message.success(t("config.models.fetchSuccess", { count: added.length }));
-        } catch {
-            message.error(t("config.models.fetchFailed"));
-        }
+        commitChannels(
+            config.channels.map((channel) => {
+                if (channel.id !== channelId || channel.models.some((model) => model.name === value)) return channel;
+                return { ...channel, models: [...channel.models, { name: value, capability: isTextOnlyBaseUrl(channel.baseUrl) ? "text" : capability }] };
+            }),
+        );
     };
 
     return (
@@ -81,7 +59,7 @@ export function ConfigModels() {
                     return decoded ? [{ value, decoded }] : [];
                 });
                 return (
-                    <section key={capability} className="rounded-none border border-border p-4 dark:border-border glass-card">
+                    <section key={capability} className="rounded-xl border border-border p-4 dark:border-border glass-card">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="text-sm font-semibold">{t(`settingsPanels.model.capabilities.${capability}`)}</div>
                             <div className="flex min-w-0 items-center gap-2">
@@ -90,25 +68,32 @@ export function ConfigModels() {
                             </div>
                         </div>
                         <div className="mt-3 space-y-2">
-                            {models.map(({ value, decoded }) => (
-                                <div key={value} className="flex items-center gap-2">
-                                    <span className="min-w-0 flex-1 truncate text-sm" title={modelOptionLabel(config, value)}>
-                                        {modelOptionLabel(config, value)}
-                                    </span>
-                                    <Select
-                                        size="small"
-                                        className="w-28 shrink-0"
-                                        value={capability}
-                                        aria-label={t("config.models.capability")}
-                                        onChange={(next) => changeCapability(decoded.channelId, decoded.model, next)}
-                                        options={CAPABILITIES.map((item) => ({ value: item, label: t(`settingsPanels.model.capabilities.${item}`) }))}
-                                    />
-                                    <Button size="small" type="text" danger icon={<Trash2 className="size-4" />} onClick={() => removeModel(decoded.channelId, decoded.model)} aria-label={t("config.models.remove")} />
-                                </div>
-                            ))}
+                            {models.map(({ value, decoded }) => {
+                                const channel = config.channels.find((item) => item.id === decoded.channelId);
+                                return (
+                                    <div key={value} className="flex items-center gap-2">
+                                        <span className="min-w-0 flex-1 truncate text-sm" title={modelOptionLabel(config, value)}>
+                                            {modelOptionLabel(config, value)}
+                                        </span>
+                                        {isTextOnlyBaseUrl(channel?.baseUrl || "") ? (
+                                            <span className="w-28 shrink-0 text-sm text-muted-foreground">{t("settingsPanels.model.capabilities.text")}</span>
+                                        ) : (
+                                            <Select
+                                                size="small"
+                                                className="w-28 shrink-0"
+                                                value={capability}
+                                                aria-label={t("config.models.capability")}
+                                                onChange={(next) => changeCapability(decoded.channelId, decoded.model, next)}
+                                                options={CAPABILITIES.map((item) => ({ value: item, label: t(`settingsPanels.model.capabilities.${item}`) }))}
+                                            />
+                                        )}
+                                        <Button size="small" type="text" danger icon={<Trash2 className="size-4" />} onClick={() => removeModel(decoded.channelId, decoded.model)} aria-label={t("config.models.remove")} />
+                                    </div>
+                                );
+                            })}
                             {models.length ? null : <div className="text-sm text-muted-foreground">{t("config.models.empty")}</div>}
                         </div>
-                        <AddModelRow onAdd={(channelId, name) => addModel(channelId, name, capability)} onFetch={fetchModels} />
+                        <AddModelRow onAdd={(channelId, name) => addModel(channelId, name, capability)} />
                     </section>
                 );
             })}
@@ -116,7 +101,7 @@ export function ConfigModels() {
     );
 }
 
-function AddModelRow({ onAdd, onFetch }: { onAdd: (channelId: string, name: string) => void; onFetch: (channelId: string) => void }) {
+function AddModelRow({ onAdd }: { onAdd: (channelId: string, name: string) => void }) {
     const { t } = useTranslation();
     const channels = useConfigStore((state) => state.config.channels);
     const [channelId, setChannelId] = useState(channels[0]?.id || "");
@@ -134,9 +119,6 @@ function AddModelRow({ onAdd, onFetch }: { onAdd: (channelId: string, name: stri
             <Input size="small" className="w-56" value={name} onChange={(event) => setName(event.target.value)} onPressEnter={submit} placeholder={t("config.models.modelId")} />
             <Button size="small" type="primary" icon={<Plus className="size-3.5" />} onClick={submit} disabled={!channel || !name.trim()}>
                 {t("config.models.addModel")}
-            </Button>
-            <Button size="small" icon={<RefreshCw className="size-3.5" />} disabled={!channel} onClick={() => channel && onFetch(channel.id)}>
-                {t("config.models.fetchModels")}
             </Button>
         </div>
     );

@@ -13,7 +13,7 @@ const FLAT_BUTTON_CLASS = STUDIO_FLAT_BUTTON_CLASS;
 
 function PsPathThumbnail({ path, color }: { path: CanvasPsPath; color: string }) {
     const points = path.anchors;
-    if (!points.length) return <span className="size-7 shrink-0 rounded-[2px] border border-dashed" />;
+    if (!points.length) return <span className="size-7 shrink-0 rounded-md border border-dashed" />;
     const xs = points.map((point) => point.x);
     const ys = points.map((point) => point.y);
     const x = Math.min(...xs);
@@ -94,7 +94,7 @@ export function PsPathsPanel({
                 {paths.length ? (
                     paths.map((path) => (
                         <div key={path.id} className="flex w-full items-center gap-1 border-b px-1 py-0.5 text-sm transition hover:bg-hover" style={path.id === activeId ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText, borderColor: theme.toolbar.border, boxShadow: `inset 2px 0 0 0 ${theme.node.accent}` } : { borderColor: theme.toolbar.border }}>
-                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover" aria-label={t("canvas.ps.pathVisibility")} title={t("canvas.ps.pathVisibility")} onClick={() => patch(path.id, { visible: !path.visible })}>
+                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover" aria-label={t("canvas.ps.pathVisibility")} title={t("canvas.ps.pathVisibility")} onClick={() => patch(path.id, { visible: !path.visible })}>
                                 {path.visible ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
                             </button>
                             <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left" onClick={() => onActive(path.id)}>
@@ -102,7 +102,7 @@ export function PsPathsPanel({
                                 {renamingId === path.id ? (
                                     <input
                                         autoFocus
-                                        className="min-w-0 flex-1 rounded-[2px] border bg-transparent px-1 text-sm"
+                                        className="min-w-0 flex-1 rounded-md border bg-transparent px-1 text-sm"
                                         style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                                         value={nameDraft}
                                         onChange={(event) => setNameDraft(event.target.value)}

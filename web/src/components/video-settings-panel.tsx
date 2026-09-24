@@ -29,7 +29,7 @@ type VideoSettingsPanelProps = {
     className?: string;
 };
 
-export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = true, showMode = true, showSize = true, className = "w-[320px] space-y-4 rounded-none px-1 py-0.5" }: VideoSettingsPanelProps) {
+export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = true, showMode = true, showSize = true, className = "w-[320px] space-y-4 rounded-xl px-1 py-0.5" }: VideoSettingsPanelProps) {
     const { t } = useTranslation();
     const capability = videoModelCapability(config.model || config.videoModel);
     const seconds = videoModelDuration(config.videoSeconds, capability);
@@ -79,7 +79,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
                             <button
                                 key={item.value}
                                 type="button"
-                                className="flex h-[72px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[2px] border bg-transparent text-sm transition hover:opacity-80"
+                                className="flex h-[72px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border bg-transparent text-sm transition hover:opacity-80"
                                 style={{ borderColor: selectedRatio === item.value ? theme.node.text : theme.node.stroke, color: theme.node.text }}
                                 onMouseDown={(event) => event.stopPropagation()}
                                 onClick={() => applySize(resolution, item.value)}
@@ -192,7 +192,7 @@ function SecondsInput({ value, min, max, theme, onCommit }: { value: number; min
     };
 
     return (
-        <label className="flex h-9 w-[68px] shrink-0 overflow-hidden rounded-[2px] text-sm" style={{ background: theme.node.fill, color: theme.node.text }}>
+        <label className="flex h-9 w-[68px] shrink-0 overflow-hidden rounded-md text-sm" style={{ background: theme.node.fill, color: theme.node.text }}>
             <input
                 type="number"
                 min={min}
@@ -212,7 +212,7 @@ function SecondsInput({ value, min, max, theme, onCommit }: { value: number; min
 
 function DimensionInput({ prefix, value, disabled, theme, onChange }: { prefix: string; value: number; disabled: boolean; theme: CanvasTheme; onChange: (value: number | null) => void }) {
     return (
-        <label className="flex h-9 overflow-hidden rounded-[2px] text-sm" style={{ background: theme.node.fill, color: theme.node.text, opacity: disabled ? 0.55 : 1 }}>
+        <label className="flex h-9 overflow-hidden rounded-md text-sm" style={{ background: theme.node.fill, color: theme.node.text, opacity: disabled ? 0.55 : 1 }}>
             <span className="grid w-9 place-items-center" style={{ color: theme.node.muted }}>
                 {prefix}
             </span>

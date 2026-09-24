@@ -20,8 +20,8 @@ import type { LucideIcon } from "lucide-react";
 const SAVE_DELAY = 600;
 const AI_MODES: WriteAiMode[] = ["continue", "rewrite", "expand", "condense", "polish", "dialogue"];
 
-const FLOATING_MENU_CLASS = `absolute z-50 overflow-hidden rounded-none border ${frostedSurfaceClass}`;
-const MENU_ROW_CLASS = "flex w-full min-w-0 items-center gap-2 rounded-[2px] px-2 py-1.5 text-left text-sm transition hover:bg-hover";
+const FLOATING_MENU_CLASS = `absolute z-50 overflow-hidden rounded-xl border ${frostedSurfaceClass}`;
+const MENU_ROW_CLASS = "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-hover";
 const PROSE_COLUMN_CLASS = "mx-auto w-full max-w-[720px] px-6 py-8";
 const PROSE_CLASS = [
     "[&_.ProseMirror]:text-[15px] [&_.ProseMirror]:leading-7",
@@ -33,7 +33,7 @@ const PROSE_CLASS = [
     "[&_.ProseMirror_li_p]:my-0",
     "[&_.ProseMirror_blockquote]:my-3 [&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:[border-color:var(--prose-border)] [&_.ProseMirror_blockquote]:pl-3 [&_.ProseMirror_blockquote]:opacity-80",
     "[&_.ProseMirror_hr]:my-5 [&_.ProseMirror_hr]:h-px [&_.ProseMirror_hr]:border-0 [&_.ProseMirror_hr]:[background-color:var(--prose-border)]",
-    "[&_.ProseMirror_pre]:my-3 [&_.ProseMirror_pre]:overflow-x-auto [&_.ProseMirror_pre]:rounded-[2px] [&_.ProseMirror_pre]:p-3 [&_.ProseMirror_pre]:[background-color:var(--prose-fill)] [&_.ProseMirror_pre]:text-xs",
+    "[&_.ProseMirror_pre]:my-3 [&_.ProseMirror_pre]:overflow-x-auto [&_.ProseMirror_pre]:rounded-md [&_.ProseMirror_pre]:p-3 [&_.ProseMirror_pre]:[background-color:var(--prose-fill)] [&_.ProseMirror_pre]:text-xs",
     "[&_.ProseMirror_p.is-empty::before]:pointer-events-none",
     "[&_.ProseMirror_p.is-empty::before]:float-left",
     "[&_.ProseMirror_p.is-empty::before]:h-0",
@@ -485,7 +485,7 @@ export function ProseEditor() {
                             placeholder={t("writing.editor.codexPlaceholder")}
                             onChange={(event) => setCodexQuery(event.target.value)}
                             onBlur={() => window.setTimeout(() => setCodexOpen(false), 120)}
-                            className="mb-1 w-full rounded-[2px] bg-transparent px-2 py-1 text-sm outline-none"
+                            className="mb-1 w-full rounded-md bg-transparent px-2 py-1 text-sm outline-none"
                             style={{ color: theme.node.text, border: `1px solid ${theme.toolbar.border}` }}
                         />
                         <div className="thin-scrollbar max-h-52 overflow-y-auto">
@@ -521,7 +521,7 @@ export function ProseEditor() {
                             <button
                                 key={mode}
                                 type="button"
-                                className="rounded-[2px] px-1.5 py-1 text-sm font-medium whitespace-nowrap transition hover:bg-hover"
+                                className="rounded-md px-1.5 py-1 text-sm font-medium whitespace-nowrap transition hover:bg-hover"
                                 style={{ color: theme.node.accentText }}
                                 onClick={() => runAi(mode, true)}
                             >

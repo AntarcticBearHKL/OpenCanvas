@@ -17,7 +17,7 @@ export function UserStatusActions({ showConfig = true, variant = "default" }: Us
     const theme = useThemeStore((state) => state.theme);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const canvasTheme = canvasThemes[theme];
-    const naturalIconClass = "inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-muted-foreground transition-colors hover:bg-hover hover:text-foreground dark:text-muted-foreground hover:bg-hover dark:hover:text-white [&_svg]:size-4";
+    const naturalIconClass = "inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-hover hover:text-foreground dark:text-muted-foreground hover:bg-hover dark:hover:text-white [&_svg]:size-4";
     const iconStyle: CSSProperties | undefined = variant === "canvas" ? { color: canvasTheme.node.text } : undefined;
 
     return (

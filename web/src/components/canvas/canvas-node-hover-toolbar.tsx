@@ -255,13 +255,13 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
                             {node.metadata?.videoTaskId ? <InfoRow label={t("canvas.nodeToolbar.videoTaskId")} value={node.metadata.videoTaskId} /> : null}
                             {imageBytes ? <InfoRow label={t("canvas.nodeToolbar.imageSize")} value={formatBytes(imageBytes)} /> : null}
                             {node.metadata?.errorDetails ? (
-                                <div className="rounded-[2px] border p-3" style={{ borderColor: theme.node.stroke, color: theme.node.danger }}>
+                                <div className="rounded-md border p-3" style={{ borderColor: theme.node.stroke, color: theme.node.danger }}>
                                     {node.metadata.errorDetails}
                                 </div>
                             ) : null}
                         </div>
                     ) : (
-                        <pre className="thin-scrollbar h-full overflow-auto rounded-[2px] border p-3 text-sm leading-5" style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke, color: theme.node.text }}>
+                        <pre className="thin-scrollbar h-full overflow-auto rounded-md border p-3 text-sm leading-5" style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke, color: theme.node.text }}>
                             {json}
                         </pre>
                     )}

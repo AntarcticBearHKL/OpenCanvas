@@ -26,7 +26,7 @@ export function ConfigAgentAudit() {
                 <div className="text-sm font-semibold">{t("config.agent.title")}</div>
                 <div className="mt-1 text-sm text-muted-foreground">{t("config.agent.permissionHint")}</div>
             </div>
-            <section className="overflow-hidden rounded-none border border-border dark:border-border glass-card">
+            <section className="overflow-hidden rounded-xl border border-border dark:border-border glass-card">
                 <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 dark:border-border">
                     <div className="text-sm font-semibold">{t("config.agent.permissions")}</div>
                     <Button size="small" icon={<RotateCcw className="size-3.5" />} onClick={resetPermissions}>
@@ -42,7 +42,7 @@ export function ConfigAgentAudit() {
                     ))}
                 </div>
             </section>
-            <section className="overflow-hidden rounded-none border border-border dark:border-border glass-card">
+            <section className="overflow-hidden rounded-xl border border-border dark:border-border glass-card">
                 <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 dark:border-border">
                     <div className="text-sm font-semibold">{t("config.agent.audit")}</div>
                     <Button size="small" icon={<Eraser className="size-3.5" />} disabled={!records.length} onClick={clear}>
@@ -86,7 +86,7 @@ function AgentBridgeSettings() {
     };
 
     return (
-        <section className="overflow-hidden rounded-none border border-border dark:border-border glass-card">
+        <section className="overflow-hidden rounded-xl border border-border dark:border-border glass-card">
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 dark:border-border">
                 <div className="text-sm font-semibold">本地 Agent 连接</div>
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -122,7 +122,7 @@ function AuditRow({ record, replayAgentEntry }: { record: AgentAuditEntry; repla
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">{t("config.agent.opCount", { count: record.ops.length })}</span>
                     {record.blocked ? <span className="text-xs font-medium text-danger">{t("config.agent.blockedCount", { count: record.blocked })}</span> : null}
-                    {record.replayedFrom ? <span className="rounded-[2px] border border-border px-1.5 py-0.5 text-xs text-muted-foreground dark:border-border">{t("config.agent.replayed")}</span> : null}
+                    {record.replayedFrom ? <span className="rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground dark:border-border">{t("config.agent.replayed")}</span> : null}
                 </div>
                 <div className="mt-0.5 truncate text-xs text-muted-foreground">{new Date(record.at).toLocaleString()}</div>
                 <div className="mt-0.5 truncate text-xs text-muted-foreground">{record.ops.slice(0, 2).map(describeAgentOp).join(" · ")}</div>

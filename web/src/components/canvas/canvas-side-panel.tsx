@@ -62,7 +62,7 @@ export function CanvasSidePanel() {
                 data-canvas-no-zoom
             >
                 <div className="flex items-center px-3 pt-3.5 md:hidden">
-                    <button type="button" onClick={closePanel} className="ml-auto grid size-7 place-items-center rounded-[2px] transition hover:bg-hover" aria-label={t("canvas.collapsePanel")}>
+                    <button type="button" onClick={closePanel} className="ml-auto grid size-7 place-items-center rounded-md transition hover:bg-hover" aria-label={t("canvas.collapsePanel")}>
                         <PanelLeftClose className="size-4" />
                     </button>
                 </div>

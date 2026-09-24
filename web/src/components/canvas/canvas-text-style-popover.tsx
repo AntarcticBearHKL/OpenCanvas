@@ -45,7 +45,7 @@ export function CanvasTextStylePopover({ metadata, onChange }: CanvasTextStylePo
     return (
         <>
             <button ref={buttonRef} type="button" className="group relative flex h-12 items-center whitespace-nowrap px-1.5" style={{ color: theme.node.text }} aria-label={t("canvas.nodeToolbar.textStyle")} onClick={() => setOpen((current) => !current)}>
-                <span className="flex h-9 items-center gap-2 rounded-[2px] px-2.5 transition group-hover:bg-hover" style={open ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : undefined}>
+                <span className="flex h-9 items-center gap-2 rounded-md px-2.5 transition group-hover:bg-hover" style={open ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : undefined}>
                     <Type className="size-4" />
                     <span>{t("canvas.nodeToolbar.textStyle")}</span>
                 </span>

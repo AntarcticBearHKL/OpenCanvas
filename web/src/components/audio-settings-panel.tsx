@@ -19,7 +19,7 @@ type AudioSettingsPanelProps = {
     variant?: "speech" | "music";
 };
 
-export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-[320px] space-y-4 rounded-none px-1 py-0.5", variant = "speech" }: AudioSettingsPanelProps) {
+export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-[320px] space-y-4 rounded-xl px-1 py-0.5", variant = "speech" }: AudioSettingsPanelProps) {
     const { t } = useTranslation();
     const isMusic = variant === "music";
     const speechModel = speechModelOf(config.model);
@@ -81,7 +81,7 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
                                 <textarea
                                     value={config.audioInstructions || ""}
                                     placeholder={t("settingsPanels.audio.instructionsPlaceholder")}
-                                    className="thin-scrollbar h-20 w-full resize-none rounded-[2px] border bg-transparent px-3 py-2 text-sm leading-5 outline-none"
+                                    className="thin-scrollbar h-20 w-full resize-none rounded-md border bg-transparent px-3 py-2 text-sm leading-5 outline-none"
                                     style={{ borderColor: theme.node.stroke, color: theme.node.text }}
                                     onChange={(event) => onConfigChange("audioInstructions", event.target.value)}
                                     onMouseDown={(event) => event.stopPropagation()}

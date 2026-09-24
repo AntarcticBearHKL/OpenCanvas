@@ -184,7 +184,7 @@ export function OutlinePanel() {
                                             autoFocus
                                             value={renaming.title}
                                             aria-label={node.title}
-                                            className="min-w-0 flex-1 rounded-[2px] bg-transparent px-1 text-sm outline-none"
+                                            className="min-w-0 flex-1 rounded-md bg-transparent px-1 text-sm outline-none"
                                             style={{ boxShadow: `inset 0 0 0 1px ${theme.node.activeStroke}` }}
                                             onChange={(event) => setRenaming({ id: node.id, title: event.target.value })}
                                             onBlur={commitRename}

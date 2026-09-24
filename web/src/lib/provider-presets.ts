@@ -1,20 +1,55 @@
-export const PROVIDER_PRESETS: { id: string; name: string; baseUrl: string }[] = [
-    { id: "openrouter", name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1" },
-    { id: "openai", name: "OpenAI", baseUrl: "https://api.openai.com/v1" },
-    { id: "groq", name: "Groq", baseUrl: "https://api.groq.com/openai/v1" },
-    { id: "deepseek", name: "DeepSeek", baseUrl: "https://api.deepseek.com/v1" },
-    { id: "gemini", name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
-    { id: "moonshot", name: "Moonshot", baseUrl: "https://api.moonshot.cn/v1" },
-    { id: "zhipu", name: "Zhipu GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4" },
-    { id: "siliconflow", name: "SiliconFlow", baseUrl: "https://api.siliconflow.cn/v1" },
-    { id: "cohere", name: "Cohere", baseUrl: "https://api.cohere.ai/compatibility/v1" },
-    { id: "ollama", name: "Ollama (local)", baseUrl: "http://localhost:11434/v1" },
+export type ProviderPresetModel = {
+    name: string;
+    capability: "text" | "image" | "audio" | "speech" | "video";
+};
+
+export type ProviderPreset = {
+    id: string;
+    name: string;
+    baseUrl: string;
+    textOnly: boolean;
+    models: ProviderPresetModel[];
+};
+
+export const PROVIDER_PRESETS: ProviderPreset[] = [
+    {
+        id: "openrouter",
+        name: "OpenRouter",
+        baseUrl: "https://openrouter.ai/api/v1",
+        textOnly: false,
+        models: [
+            { name: "deepseek/deepseek-v4-pro", capability: "text" },
+            { name: "z-ai/glm-5.3", capability: "text" },
+            { name: "qwen/qwen3-max", capability: "text" },
+            { name: "moonshotai/kimi-k2-thinking", capability: "text" },
+            { name: "openai/gpt-oss-120b", capability: "text" },
+            { name: "openai/gpt-image-2.5-sunburst", capability: "image" },
+            { name: "minimax/hailuo-3-max", capability: "video" },
+            { name: "minimax/hailuo-3", capability: "video" },
+            { name: "fish-audio/s2.1-pro", capability: "speech" },
+            { name: "google/lyria-3-pro-preview", capability: "audio" },
+        ],
+    },
+    {
+        id: "deepseek",
+        name: "DeepSeek",
+        baseUrl: "https://api.deepseek.com/v1",
+        textOnly: true,
+        models: [
+            { name: "deepseek-v4-pro", capability: "text" },
+            { name: "deepseek-v4-flash", capability: "text" },
+        ],
+    },
+    {
+        id: "matilda",
+        name: "Matilda (Maincode)",
+        baseUrl: "/matilda/v1",
+        textOnly: true,
+        models: [{ name: "matilda", capability: "text" }],
+    },
 ];
 
-export async function fetchProviderModels(baseUrl: string, apiKey: string) {
-    const url = `${baseUrl.trim().replace(/\/+$/, "")}/models`;
-    const response = await fetch(url, { headers: apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : undefined });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = (await response.json()) as { data?: { id?: string }[] };
-    return (data.data || []).map((item) => item.id?.trim()).filter((id): id is string => Boolean(id));
+export function isTextOnlyBaseUrl(baseUrl: string): boolean {
+    const normalized = baseUrl.trim().replace(/\/+$/, "").toLowerCase();
+    return PROVIDER_PRESETS.some((preset) => preset.textOnly && preset.baseUrl.toLowerCase() === normalized);
 }

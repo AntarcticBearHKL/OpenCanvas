@@ -52,6 +52,7 @@
         "zustand": "^5.0.12"
     },
     "devDependencies": {
+        "@maincode-ai/matilda-agent-sdk": "^0.2.1",
         "@tailwindcss/postcss": "^4",
         "@types/file-saver": "^2.0.7",
         "@types/node": "^20",

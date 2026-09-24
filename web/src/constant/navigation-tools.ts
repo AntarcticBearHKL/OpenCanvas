@@ -1,4 +1,4 @@
-import { Images, PenLine, Settings2, Workflow } from "lucide-react";
+import { PenLine, Settings2, Workflow } from "lucide-react";
 
 export const navigationTools = [
     {
@@ -8,10 +8,6 @@ export const navigationTools = [
     {
         slug: "write",
         icon: PenLine,
-    },
-    {
-        slug: "assets",
-        icon: Images,
     },
     {
         slug: "config",

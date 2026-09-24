@@ -73,7 +73,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
 
     return (
         <div
-            className="rounded-none border p-3 glass-card"
+            className="rounded-xl border p-3 glass-card"
             style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
             onWheel={(event) => event.stopPropagation()}
         >
@@ -84,7 +84,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                         references={mentionReferences}
                         onChange={updatePrompt}
                         onSubmit={submit}
-                        className="thin-scrollbar h-40 w-full cursor-text resize-none rounded-none px-3 py-2 text-sm leading-5 outline-none"
+                        className="thin-scrollbar h-40 w-full cursor-text resize-none rounded-xl px-3 py-2 text-sm leading-5 outline-none"
                         style={{ background: "transparent", color: theme.node.text }}
                         placeholder={t(`canvas.promptPanel.${promptPlaceholderKey}`)}
                     />
@@ -163,7 +163,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                             value={prompt}
                             references={mentionReferences}
                             onChange={updatePrompt}
-                            className="thin-scrollbar h-[52dvh] min-h-80 w-full cursor-text overflow-y-auto rounded-none border p-4 text-[15px] leading-6 outline-none"
+                            className="thin-scrollbar h-[52dvh] min-h-80 w-full cursor-text overflow-y-auto rounded-xl border p-4 text-[15px] leading-6 outline-none"
                             style={{ background: "transparent", borderColor: theme.toolbar.border, color: theme.node.text }}
                             placeholder={t(`canvas.promptPanel.${promptPlaceholderKey}`)}
                         />

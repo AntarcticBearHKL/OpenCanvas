@@ -76,10 +76,10 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
                 <div
                     ref={viewport.viewportRef}
                     {...viewport.panHandlers}
-                    className={`relative h-[min(62vh,620px)] min-h-[340px] rounded-[2px] bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
+                    className={`relative h-[min(62vh,620px)] min-h-[340px] rounded-md bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
                 >
                     <div className="relative" style={viewport.contentStyle}>
-                        <div ref={boxRef} className="absolute isolate overflow-hidden rounded-[2px] bg-black select-none [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
+                        <div ref={boxRef} className="absolute isolate overflow-hidden rounded-md bg-black select-none [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
                             <div className="absolute left-0 top-0 [backface-visibility:hidden]" style={viewport.mediaStyle}>
                                 <img src={dataUrl} alt="" className="block h-full w-full object-contain opacity-90" draggable={false} />
                             </div>
@@ -117,7 +117,7 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
                     <span className="w-full text-center text-sm sm:ml-2 sm:w-auto sm:text-left" style={{ color: theme.node.muted }}>{t("canvas.editors.cropHint")}</span>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2px] border px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border px-3 py-2">
                     <div className="flex flex-wrap items-center gap-3 text-sm" style={{ color: theme.node.text }}>
                         <span>{t("canvas.editors.cropSize", { size: cropSize ? `${cropSize.width} x ${cropSize.height}` : t("canvas.editors.unknown") })}</span>
                         <span>{t("canvas.editors.ratio", { ratio: cropSize ? formatRatio(cropSize.width, cropSize.height) : t("canvas.editors.unknown") })}</span>

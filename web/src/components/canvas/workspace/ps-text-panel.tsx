@@ -15,7 +15,7 @@ type PsTextPanelProps = { board: CanvasNodeData; setNodes: Dispatch<SetStateActi
 
 const ROW_CLASS = STUDIO_PANEL_ROW_CLASS;
 const LABEL_CLASS = STUDIO_PANEL_LABEL_CLASS;
-const TOGGLE_CLASS = "grid size-6 shrink-0 place-items-center rounded-[2px] text-sm font-semibold transition hover:bg-hover";
+const TOGGLE_CLASS = "grid size-6 shrink-0 place-items-center rounded-md text-sm font-semibold transition hover:bg-hover";
 
 export default function PsTextPanel({ board, setNodes, layer, paths }: PsTextPanelProps) {
     const { t } = useTranslation();
@@ -51,7 +51,7 @@ export default function PsTextPanel({ board, setNodes, layer, paths }: PsTextPan
                         <button
                             key={item}
                             type="button"
-                            className="rounded-[2px] px-1.5 py-0.5 text-sm transition hover:bg-hover"
+                            className="rounded-md px-1.5 py-0.5 text-sm transition hover:bg-hover"
                             style={tab === item ? { background: theme.node.accentSoft, color: theme.node.accent, boxShadow: `inset 0 0 0 1px ${theme.node.accent}` } : { color: theme.node.muted }}
                             onClick={() => setTab(item)}
                         >

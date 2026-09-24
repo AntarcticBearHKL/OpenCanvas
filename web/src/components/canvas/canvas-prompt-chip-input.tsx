@@ -283,7 +283,7 @@ function MentionMenu({ rect, references, activeIndex, theme, onSelect }: { rect:
     return createPortal(
         <div
             data-canvas-resource-mention-menu="true"
-            className="fixed z-[1100] max-h-56 w-64 overflow-y-auto rounded-none border p-1 glass-raised"
+            className="fixed z-[1100] max-h-56 w-64 overflow-y-auto rounded-xl border p-1 glass-raised"
             style={{ left, top, borderColor: theme.toolbar.border, color: theme.node.text }}
             onPointerDown={stopCanvasInteraction}
             onMouseDown={stopCanvasInteraction}
@@ -294,7 +294,7 @@ function MentionMenu({ rect, references, activeIndex, theme, onSelect }: { rect:
                     key={reference.id}
                     ref={index === activeIndex ? activeItemRef : undefined}
                     type="button"
-                    className="flex w-full min-w-0 items-center gap-2 rounded-[2px] px-2 py-1.5 text-left text-sm transition"
+                    className="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition"
                     style={{ background: index === activeIndex ? theme.toolbar.activeBg : "transparent", color: index === activeIndex ? theme.toolbar.activeText : theme.node.text }}
                     onPointerDown={(event) => {
                         event.preventDefault();
@@ -320,11 +320,11 @@ function MentionMenu({ rect, references, activeIndex, theme, onSelect }: { rect:
 }
 
 function ReferencePreview({ reference }: { reference: CanvasResourceReference }) {
-    if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-9 rounded-[2px] object-cover" />;
-    if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-9 rounded-[2px] bg-black object-cover" muted preload="metadata" />;
+    if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-9 rounded-md object-cover" />;
+    if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-9 rounded-md bg-black object-cover" muted preload="metadata" />;
     const Icon = reference.kind === "audio" ? Music2 : reference.kind === "video" ? Video : reference.kind === "image" ? ImageIcon : FileText;
     return (
-        <span className="grid size-9 shrink-0 place-items-center rounded-[2px] bg-black/10">
+        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-black/10">
             <Icon className="size-4" />
         </span>
     );
@@ -338,8 +338,8 @@ function createReferenceChip(reference: CanvasResourceReference, theme: (typeof 
         const image = document.createElement("img");
         image.src = reference.previewUrl;
         image.alt = reference.title;
-        image.className = "size-6 rounded-[2px] object-cover";
-        wrapper.className = "mx-px inline-flex size-6 items-center justify-center overflow-hidden rounded-[2px] align-middle";
+        image.className = "size-6 rounded-md object-cover";
+        wrapper.className = "mx-px inline-flex size-6 items-center justify-center overflow-hidden rounded-md align-middle";
         wrapper.appendChild(image);
         wrapper.addEventListener("click", (event) => {
             event.preventDefault();
@@ -347,7 +347,7 @@ function createReferenceChip(reference: CanvasResourceReference, theme: (typeof 
             onImagePreview(reference.previewUrl || "");
         });
     } else {
-        wrapper.className = "mx-px inline-flex h-6 max-w-40 items-center justify-center overflow-hidden rounded-[2px] border px-1 text-sm leading-none align-middle";
+        wrapper.className = "mx-px inline-flex h-6 max-w-40 items-center justify-center overflow-hidden rounded-md border px-1 text-sm leading-none align-middle";
         Object.assign(wrapper.style, { background: theme.toolbar.panel, borderColor: theme.node.stroke, color: theme.node.text } as CSSProperties);
         wrapper.title = reference.text || reference.title;
         const text = document.createElement("span");

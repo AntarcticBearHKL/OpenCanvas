@@ -70,7 +70,7 @@ export function WriteProjectRow({ project }: { project: WriteProject }) {
                     {project.title}
                 </button>
             )}
-            <span className="shrink-0 rounded-[2px] border border-border px-1.5 py-0.5 text-xs text-muted-foreground">{t(WRITE_TEMPLATES[project.template].labelKey)}</span>
+            <span className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground">{t(WRITE_TEMPLATES[project.template].labelKey)}</span>
             <p className="hidden shrink-0 whitespace-nowrap text-sm text-muted-foreground lg:block dark:text-muted-foreground" style={{ margin: 0 }}>
                 {t("writing.studio.wordCount", { count: writeProjectWordCount(project) })}
                 <span className="mx-1.5">·</span>

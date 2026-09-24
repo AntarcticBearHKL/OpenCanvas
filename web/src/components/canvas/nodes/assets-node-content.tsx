@@ -76,14 +76,14 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                     }}
                 />
                 {source === "folder" && (
-                    <button type="button" className="flex h-7 shrink-0 items-center gap-1 rounded-[2px] px-2 text-sm font-medium transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => void bindFolder(node.id)} onMouseDown={(event) => event.stopPropagation()}>
+                    <button type="button" className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-sm font-medium transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => void bindFolder(node.id)} onMouseDown={(event) => event.stopPropagation()}>
                         <FolderInput className="size-3.5" />
                         {bound ? t("canvas.assets.rebind") : t("canvas.assets.bind")}
                     </button>
                 )}
                 <button
                     type="button"
-                    className="grid size-7 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover"
+                    className="grid size-7 shrink-0 place-items-center rounded-md transition hover:bg-hover"
                     style={{ color: theme.node.text }}
                     aria-label={t("canvas.assets.refresh")}
                     title={t("canvas.assets.refresh")}
@@ -119,7 +119,7 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                                         </button>
                                         <button
                                             type="button"
-                                            className="grid size-5 shrink-0 place-items-center rounded-[2px] opacity-0 transition group-hover/row:opacity-100 hover:bg-hover"
+                                            className="grid size-5 shrink-0 place-items-center rounded-md opacity-0 transition group-hover/row:opacity-100 hover:bg-hover"
                                             style={{ color: theme.node.text }}
                                             aria-label={t("canvas.assets.preview")}
                                             title={t("canvas.assets.preview")}
@@ -152,7 +152,7 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                     <div className="flex min-w-0 items-center gap-0.5" onMouseDown={(event) => event.stopPropagation()}>
                         <button
                             type="button"
-                            className="grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent"
+                            className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent"
                             style={{ color: theme.node.text }}
                             aria-label={t("canvas.assets.back")}
                             title={t("canvas.assets.back")}
@@ -169,7 +169,7 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                                     {index === crumbs.length - 1 ? (
                                         <span className="truncate">{segment}</span>
                                     ) : (
-                                        <button type="button" className="min-w-0 truncate rounded-[2px] px-0.5 transition hover:bg-hover" onClick={() => void goToDepth(node.id, index)} onMouseDown={(event) => event.stopPropagation()}>
+                                        <button type="button" className="min-w-0 truncate rounded-md px-0.5 transition hover:bg-hover" onClick={() => void goToDepth(node.id, index)} onMouseDown={(event) => event.stopPropagation()}>
                                             {segment}
                                         </button>
                                     )}
@@ -215,7 +215,7 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                                         </button>
                                         <button
                                             type="button"
-                                            className="grid size-5 shrink-0 place-items-center rounded-[2px] opacity-0 transition group-hover/row:opacity-100 hover:bg-hover"
+                                            className="grid size-5 shrink-0 place-items-center rounded-md opacity-0 transition group-hover/row:opacity-100 hover:bg-hover"
                                             style={{ color: theme.node.text }}
                                             aria-label={t("canvas.assets.preview")}
                                             title={t("canvas.assets.preview")}

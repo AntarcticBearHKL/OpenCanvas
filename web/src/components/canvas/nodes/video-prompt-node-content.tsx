@@ -55,7 +55,7 @@ export function VideoPromptNodeContent({ node, nodes, references, maxFrameImages
                         <button
                             key={item}
                             type="button"
-                            className="h-6 cursor-pointer rounded-[2px] px-2 text-sm transition hover:bg-hover"
+                            className="h-6 cursor-pointer rounded-md px-2 text-sm transition hover:bg-hover"
                             style={mode === item ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
                             onMouseDown={(event) => event.stopPropagation()}
                             onPointerDown={(event) => event.stopPropagation()}
@@ -83,7 +83,7 @@ export function VideoPromptNodeContent({ node, nodes, references, maxFrameImages
                     references={references}
                     onChange={(value) => onContentChange(node.id, value)}
                     containerClassName="min-h-0 flex-1"
-                    className="thin-scrollbar h-full min-h-0 w-full cursor-text rounded-[2px] px-2 py-1.5 text-sm leading-6"
+                    className="thin-scrollbar h-full min-h-0 w-full cursor-text rounded-md px-2 py-1.5 text-sm leading-6"
                     style={{ background: "transparent", color: theme.node.text }}
                     placeholder={t("canvas.promptPanel.video")}
                 />
@@ -109,7 +109,7 @@ export function VideoPromptNodeContent({ node, nodes, references, maxFrameImages
                                         <button
                                             key={item}
                                             type="button"
-                                            className="h-6 cursor-pointer rounded-[2px] px-2 text-sm transition hover:bg-hover"
+                                            className="h-6 cursor-pointer rounded-md px-2 text-sm transition hover:bg-hover"
                                             style={frameSlot === item ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
                                             onMouseDown={(event) => event.stopPropagation()}
                                             onPointerDown={(event) => event.stopPropagation()}
@@ -246,7 +246,7 @@ function SlotClearButton({ label, onClear }: { label: string; onClear: () => voi
     return (
         <button
             type="button"
-            className="absolute right-0.5 top-0.5 grid size-5 cursor-pointer place-items-center rounded-[2px]"
+            className="absolute right-0.5 top-0.5 grid size-5 cursor-pointer place-items-center rounded-md"
             style={{ background: "rgba(0,0,0,0.55)", color: "#fff" }}
             title={label}
             aria-label={label}

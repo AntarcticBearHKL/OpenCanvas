@@ -119,7 +119,7 @@ export default function PsAdjustmentEditor({ type, params, onChange }: PsAdjustm
             <>
                 {select("canvas.ps.adjust.channel", "channel", "rgb", channelOptions(true))}
                 <PsCurveEditor points={numbers(params, "points", PS_CURVE_IDENTITY)} theme={theme} onChange={(points) => onChange({ points })} />
-                <button type="button" className="mt-1 rounded-[2px] px-2 py-0.5 text-sm transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => onChange({ points: [...PS_CURVE_IDENTITY] })}>
+                <button type="button" className="mt-1 rounded-md px-2 py-0.5 text-sm transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => onChange({ points: [...PS_CURVE_IDENTITY] })}>
                     {t("canvas.ps.adjust.curveReset")}
                 </button>
             </>

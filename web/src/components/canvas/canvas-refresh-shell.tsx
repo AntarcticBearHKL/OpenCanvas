@@ -9,25 +9,25 @@ export function CanvasRefreshShell() {
                 }}
             />
 
-            <div className="absolute bottom-5 left-1/2 z-50 flex h-14 -translate-x-1/2 items-center gap-1 rounded-none border px-2 glass-surface" style={{ borderColor: "var(--border)" }} aria-hidden="true">
+            <div className="absolute bottom-5 left-1/2 z-50 flex h-14 -translate-x-1/2 items-center gap-1 rounded-xl border px-2 glass-surface" style={{ borderColor: "var(--border)" }} aria-hidden="true">
                 {Array.from({ length: 7 }).map((_, index) => (
-                    <div key={index} className="size-8 rounded-[2px] bg-current opacity-10" />
+                    <div key={index} className="size-8 rounded-md bg-current opacity-10" />
                 ))}
             </div>
 
-            <div className="absolute bottom-24 left-6 z-50 h-40 w-[240px] rounded-[2px] border glass-card" style={{ borderColor: "var(--border)" }} aria-hidden="true">
-                <div className="absolute left-7 top-7 h-5 w-12 rounded-[2px] bg-current opacity-10" />
-                <div className="absolute left-28 top-16 h-6 w-16 rounded-[2px] bg-current opacity-10" />
-                <div className="absolute bottom-7 left-16 h-8 w-20 rounded-[2px] bg-current opacity-10" />
-                <div className="absolute inset-5 rounded-[2px] border border-current opacity-15" />
+            <div className="absolute bottom-24 left-6 z-50 h-40 w-[240px] rounded-md border glass-card" style={{ borderColor: "var(--border)" }} aria-hidden="true">
+                <div className="absolute left-7 top-7 h-5 w-12 rounded-md bg-current opacity-10" />
+                <div className="absolute left-28 top-16 h-6 w-16 rounded-md bg-current opacity-10" />
+                <div className="absolute bottom-7 left-16 h-8 w-20 rounded-md bg-current opacity-10" />
+                <div className="absolute inset-5 rounded-md border border-current opacity-15" />
             </div>
 
-            <div className="absolute bottom-5 left-5 z-50 flex h-14 w-[260px] items-center gap-2 rounded-none border px-2 glass-surface" style={{ borderColor: "var(--border)" }} aria-hidden="true">
-                <div className="size-8 rounded-[2px] bg-current opacity-10" />
-                <div className="size-8 rounded-[2px] bg-current opacity-10" />
+            <div className="absolute bottom-5 left-5 z-50 flex h-14 w-[260px] items-center gap-2 rounded-xl border px-2 glass-surface" style={{ borderColor: "var(--border)" }} aria-hidden="true">
+                <div className="size-8 rounded-md bg-current opacity-10" />
+                <div className="size-8 rounded-md bg-current opacity-10" />
                 <div className="h-1 flex-1 rounded-full bg-current opacity-10" />
-                <div className="h-4 w-10 rounded-[2px] bg-current opacity-10" />
-                <div className="size-8 rounded-[2px] bg-current opacity-10" />
+                <div className="h-4 w-10 rounded-md bg-current opacity-10" />
+                <div className="size-8 rounded-md bg-current opacity-10" />
             </div>
         </main>
     );

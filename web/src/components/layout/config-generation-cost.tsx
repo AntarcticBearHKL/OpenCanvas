@@ -18,7 +18,7 @@ export function ConfigGenerationCost() {
 
     return (
         <div className="space-y-3">
-            <section className="rounded-none border border-border p-4 dark:border-border glass-card">
+            <section className="rounded-xl border border-border p-4 dark:border-border glass-card">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                         <div className="text-sm text-muted-foreground">{t("config.cost.total")}</div>
@@ -31,7 +31,7 @@ export function ConfigGenerationCost() {
                     </Button>
                 </div>
             </section>
-            <section className="overflow-hidden rounded-none border border-border glass-card">
+            <section className="overflow-hidden rounded-xl border border-border glass-card">
                 <div className="border-b border-border px-4 py-3 text-sm font-semibold dark:border-border">{t("config.cost.byModel")}</div>
                 <div className="divide-y divide-border dark:divide-border">
                     {groupByModel(records).map((group) => (
@@ -45,7 +45,7 @@ export function ConfigGenerationCost() {
                     ))}
                 </div>
             </section>
-            <section className="overflow-hidden rounded-none border border-border glass-card">
+            <section className="overflow-hidden rounded-xl border border-border glass-card">
                 <div className="border-b border-border px-4 py-3 text-sm font-semibold dark:border-border">{t("config.cost.recent")}</div>
                 <div className="divide-y divide-border dark:divide-border">
                     {records.slice(0, RECENT_COST_LIMIT).map((record) => (

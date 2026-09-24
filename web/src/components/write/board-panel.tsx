@@ -67,7 +67,7 @@ export function BoardPanel() {
                         return (
                             <section
                                 key={status}
-                                className="flex w-52 shrink-0 flex-col overflow-hidden rounded-[2px] border"
+                                className="flex w-52 shrink-0 flex-col overflow-hidden rounded-md border"
                                 style={{ borderColor: theme.toolbar.border, background: overStatus === status ? theme.toolbar.activeBg : theme.canvas.background }}
                                 onDragOver={(event) => {
                                     if (!dragId) return;
@@ -112,7 +112,7 @@ export function BoardPanel() {
                                                     if (draggingRef.current) return;
                                                     selectOutline(docUnitFor(project, node.id)?.id ?? node.id);
                                                 }}
-                                                className={`flex w-full shrink-0 cursor-grab flex-col gap-1 rounded-[2px] border p-1.5 text-left text-sm transition active:cursor-grabbing ${dragId === node.id ? "scale-[.98] border-dashed" : ""}`}
+                                                className={`flex w-full shrink-0 cursor-grab flex-col gap-1 rounded-md border p-1.5 text-left text-sm transition active:cursor-grabbing ${dragId === node.id ? "scale-[.98] border-dashed" : ""}`}
                                                 style={{ borderColor: selectedOutlineId === node.id ? theme.node.activeStroke : theme.node.stroke, background: theme.node.panel, color: theme.node.text }}
                                             >
                                                 <span className="flex min-w-0 items-center gap-1.5">

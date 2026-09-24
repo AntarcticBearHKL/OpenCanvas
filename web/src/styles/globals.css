@@ -62,7 +62,7 @@
 
 :root {
     /* Mirrors canvasThemes.light in web/src/lib/canvas-theme.ts; CSS cannot import TS. */
-    --radius: 0rem;
+    --radius: 0.625rem;
     --glass: rgba(248, 246, 241, 0.72);
     --glass-strong: rgba(248, 246, 241, 0.9);
     --border: #cdc6ba;

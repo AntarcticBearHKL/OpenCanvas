@@ -36,6 +36,20 @@ description: 当前版本已实现但仍需人工验证的变更项
 - 顶部导航「我的画布」图标由斜向箭头改为节点 + 连线图标。
 - 确认素材库移除后的残留已清干净：不再有 `assets.*` i18n 命名空间，也没有代码调用已删除的文案（节点类型名改走 `canvas.nodeTypes.*`，节点卡片与节点工具栏不会再显示原始 key），文档里也不再把它当作现有功能描述（只有 CHANGELOG 历史条目、AGENTS.md 的说明和 pending-test 的「已移除」条目会提到它）。
 
+## 圆角风格已恢复（表格保持方角）
+
+- 上一轮的全站去圆角已撤销：卡片 / 面板 / 分区 / 弹层 / 菜单 / 列表行 / 页栏与侧栏回到 `rounded-xl`（12px），按钮 / 输入框 / 下拉 / 标签 / 徽标回到 `rounded-md`（6px），画布节点卡片保持 `rounded-3xl`（≈22px），圆形元素保持圆形。Ant Design 圆角 token 回到 8 / 6 / 12 / 4，全局 `--radius` 回到 `0.625rem`。磨砂玻璃本身未改动。
+- **表格与表格内容按要求保持方角。** 全仓仅剩的 `rounded-none` 就是三处刻意的覆盖 —— 画布库表格、写作库表格与 providers 表格上的 `!rounded-none`。如果表格也要圆角，每个表格一行就能改。
+- 同时修掉上一轮去圆角脚本误伤的一处注释：audio studio 里 "tab had been backgrounded" 被改成了 `backgrounded-[2px]`（`backgrounded` 恰好以 `rounded` 结尾）。全仓复查确认仅此一处。
+
+## 提供商、写死模型与 Matilda
+
+- 现在只提供三个提供商：OpenRouter、DeepSeek 与 Matilda（Maincode）。每个渠道的模型列表来自预设 —— OpenRouter 承载多模态那套（图片 `openai/gpt-image-2.5-sunburst`、视频 `minimax/hailuo-3-max` / `minimax/hailuo-3`、语音 `fish-audio/s2.1-pro`、音乐 `google/lyria-3-pro-preview`，以及 5 个文本 id），DeepSeek 承载 `deepseek-v4-pro` / `deepseek-v4-flash`。
+- 「抓取模型」功能已移除：不再调 `GET {base}/models`，也没有每个提供商的抓取按钮。删掉它是对的 —— 实时 OpenRouter 目录（458 个模型）里根本没有本应用的图片 / 视频 / 语音 id，抓回来的列表反而不可用。
+- DeepSeek 与 Matilda 是纯文本提供商：它们的模型一律归类为 `text`，能力控件对它们只读，也永远不会出现在图片 / 视频 / 音频 / 语音的下拉里。其它提供商的既有渠道不受影响，只有能匹配到预设的渠道会被重置模型列表。
+- Matilda 通过本地同源代理运行（`web/matilda-proxy.ts`，已在 `vite.config.ts` 里为 dev 与 preview 注册）。代理在 Node 侧驱动官方 `@maincode-ai/matilda-agent-sdk`，并把它重新暴露为 OpenAI 形状的 `/matilda/v1/responses`、`/matilda/v1/chat/completions` 与 `/matilda/v1/models`，所以你只需要在 Matilda 渠道里粘贴 `mc_live_...` 密钥，不用管模型 id 和能力分类。
+- 需要你确认的几点：(a) Matilda 的正常链路**没有用真实密钥测过**（这台机器上没有密钥 —— SSE 翻译是用 mock 重放 SDK 的真实事件名校验的，线上只探到它的 401 行为）；(b) 如果 Matilda 渠道已经存成了旧的绝对地址 `https://matilda.maincode.com/api/v1`，请重新选一次「Matilda (Maincode)」预设（或删掉该渠道）；(c) `npm run dev` 能用代理，但 `npm run start` 用的是旧的 `dist`，静态生产部署需要等价的 Node 函数；(d) 只带图片的 Matilda 请求会返回明确的 400，而不是编一个答案。
+
 ## 复制图片到剪贴板与节点圆角
 
 - 新增共享 `copyImageToClipboard`：接受 `blob:` / `data:` / `http(s):` 图片，非 PNG 会转成 PNG（剪贴板实际只稳定接受 `image/png`），浏览器不支持或写入被拒时返回 false 而不是抛异常。

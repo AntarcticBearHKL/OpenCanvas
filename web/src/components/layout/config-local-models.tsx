@@ -41,7 +41,7 @@ export function ConfigLocalModels() {
                 const downloading = state.status === "downloading";
                 const deletable = state.status === "ready" || state.status === "error";
                 return (
-                    <section key={model.id} className="rounded-none border border-border p-4 dark:border-border glass-card">
+                    <section key={model.id} className="rounded-xl border border-border p-4 dark:border-border glass-card">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2 text-sm font-semibold">

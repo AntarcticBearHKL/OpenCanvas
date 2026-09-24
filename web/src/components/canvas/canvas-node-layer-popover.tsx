@@ -53,14 +53,14 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
     };
 
     return (
-        <div className="rounded-none border p-2.5 text-sm glass-card" style={{ borderColor: theme.toolbar.border, color: theme.node.text }}>
+        <div className="rounded-xl border p-2.5 text-sm glass-card" style={{ borderColor: theme.toolbar.border, color: theme.node.text }}>
             {stackIndex >= 0 ? (
                 <>
                     <div className="text-center text-sm font-medium" style={{ color: theme.node.label }}>{t("canvas.nodeToolbar.layerCount", { current: stack.length - stackIndex, total: stack.length })}</div>
                     <div className="mt-2 grid grid-cols-2 gap-1.5">
                         <button
                             type="button"
-                            className="flex h-8 items-center justify-center gap-1 rounded-[2px] text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
+                            className="flex h-8 items-center justify-center gap-1 rounded-md text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
                             aria-label={t("canvas.nodeToolbar.bringForward")}
                             title={t("canvas.nodeToolbar.bringForward")}
                             disabled={!canRaise}
@@ -71,7 +71,7 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                         </button>
                         <button
                             type="button"
-                            className="flex h-8 items-center justify-center gap-1 rounded-[2px] text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
+                            className="flex h-8 items-center justify-center gap-1 rounded-md text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
                             aria-label={t("canvas.nodeToolbar.sendBackward")}
                             title={t("canvas.nodeToolbar.sendBackward")}
                             disabled={!canLower}
@@ -89,7 +89,7 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                     value={typeFilter}
                     onChange={(event) => setTypeFilter(event.target.value)}
                     aria-label={t("canvas.nodeList.filter")}
-                    className="h-7 min-w-0 flex-1 rounded-[2px] border bg-transparent px-1.5 text-sm outline-none"
+                    className="h-7 min-w-0 flex-1 rounded-md border bg-transparent px-1.5 text-sm outline-none"
                     style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                 >
                     <option value="all">{t("canvas.nodeList.filterAll")}</option>
@@ -104,7 +104,7 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
             <div className="thin-scrollbar mt-1.5 overflow-y-auto" style={{ maxHeight: maxListHeight }}>
                 {listed.length ? (
                     listed.map((item) => (
-                        <div key={item.id} className="flex items-center gap-1.5 rounded-[2px] px-1 py-1 transition hover:bg-hover" style={selectedIds.has(item.id) ? { background: theme.toolbar.activeBg } : undefined}>
+                        <div key={item.id} className="flex items-center gap-1.5 rounded-md px-1 py-1 transition hover:bg-hover" style={selectedIds.has(item.id) ? { background: theme.toolbar.activeBg } : undefined}>
                             <input
                                 type="checkbox"
                                 className="size-3.5 shrink-0"
@@ -118,7 +118,7 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                             </span>
                             <button
                                 type="button"
-                                className="grid size-6 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover hover:opacity-100"
+                                className="grid size-6 shrink-0 place-items-center rounded-md transition hover:bg-hover hover:opacity-100"
                                 style={{ color: isNodeLocked(item) ? theme.node.activeStroke : theme.node.text }}
                                 aria-label={t(isNodeLocked(item) ? "canvas.nodeToolbar.unlock" : "canvas.nodeToolbar.lock")}
                                 title={t(isNodeLocked(item) ? "canvas.nodeToolbar.unlock" : "canvas.nodeToolbar.lock")}
@@ -128,7 +128,7 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                             </button>
                             <button
                                 type="button"
-                                className="grid size-6 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover hover:opacity-100"
+                                className="grid size-6 shrink-0 place-items-center rounded-md transition hover:bg-hover hover:opacity-100"
                                 style={{ color: isNodeHidden(item) ? theme.node.activeStroke : theme.node.text }}
                                 aria-label={t(isNodeHidden(item) ? "canvas.nodeToolbar.show" : "canvas.nodeToolbar.hide")}
                                 title={t(isNodeHidden(item) ? "canvas.nodeToolbar.show" : "canvas.nodeToolbar.hide")}
@@ -151,12 +151,12 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                     }}
                     placeholder={t("canvas.nodeList.renamePlaceholder")}
                     aria-label={t("canvas.nodeList.renamePlaceholder")}
-                    className="h-7 min-w-0 flex-1 rounded-[2px] border bg-transparent px-2 text-sm outline-none"
+                    className="h-7 min-w-0 flex-1 rounded-md border bg-transparent px-2 text-sm outline-none"
                     style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                 />
                 <button
                     type="button"
-                    className="h-7 shrink-0 rounded-[2px] px-2 text-sm font-medium transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
+                    className="h-7 shrink-0 rounded-md px-2 text-sm font-medium transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
                     disabled={!selectedIds.size || !titleDraft.trim()}
                     onClick={applyRename}
                 >

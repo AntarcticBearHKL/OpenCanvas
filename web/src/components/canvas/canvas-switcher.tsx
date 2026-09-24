@@ -10,7 +10,7 @@ import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 
 import { CanvasImportDialog } from "./canvas-import-dialog";
 
-const headerButtonClass = "flex h-6 shrink-0 items-center gap-1 rounded-[2px] px-1.5 text-sm font-medium transition hover:bg-hover";
+const headerButtonClass = "flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-sm font-medium transition hover:bg-hover";
 
 export function CanvasSwitcherTab({ theme }: { theme: CanvasTheme }) {
     const { t } = useTranslation();
@@ -113,10 +113,10 @@ export function CanvasSwitcherTab({ theme }: { theme: CanvasTheme }) {
                         const armed = armedId === project.id;
                         return (
                             <Fragment key={project.id}>
-                                {dropIndex === index ? <div className="h-0.5 rounded-none" style={{ background: theme.node.activeStroke }} /> : null}
+                                {dropIndex === index ? <div className="h-0.5 rounded-xl" style={{ background: theme.node.activeStroke }} /> : null}
                                 <div
                                     className={cn(
-                                        "group flex w-full min-w-0 items-center gap-2 rounded-none px-2 py-1.5 transition",
+                                        "group flex w-full min-w-0 items-center gap-2 rounded-xl px-2 py-1.5 transition",
                                         !isCurrent && "hover:bg-hover",
                                     )}
                                     style={{
@@ -160,7 +160,7 @@ export function CanvasSwitcherTab({ theme }: { theme: CanvasTheme }) {
                                     </button>
                                     <button
                                         type="button"
-                                        className={cn("flex h-5 shrink-0 items-center rounded-[2px] transition hover:bg-hover", armed ? "gap-1 px-1 text-sm" : "w-5 justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100")}
+                                        className={cn("flex h-5 shrink-0 items-center rounded-md transition hover:bg-hover", armed ? "gap-1 px-1 text-sm" : "w-5 justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100")}
                                         style={{ color: armed ? theme.node.blocked : theme.node.text }}
                                         title={t(armed ? "canvas.project.confirmDelete" : "canvas.project.delete")}
                                         aria-label={t(armed ? "canvas.project.confirmDelete" : "canvas.project.delete")}
@@ -176,7 +176,7 @@ export function CanvasSwitcherTab({ theme }: { theme: CanvasTheme }) {
                 ) : (
                     <div className="py-3 text-center text-sm" style={{ color: theme.node.muted }}>{t("canvas.switcher.empty")}</div>
                 )}
-                {dropIndex === items.length ? <div className="h-0.5 rounded-none" style={{ background: theme.node.activeStroke }} /> : null}
+                {dropIndex === items.length ? <div className="h-0.5 rounded-xl" style={{ background: theme.node.activeStroke }} /> : null}
             </div>
             <CanvasImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
         </div>

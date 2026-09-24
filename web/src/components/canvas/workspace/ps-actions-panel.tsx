@@ -78,7 +78,7 @@ export function PsActionsPanel({ recorder }: { recorder: PsActionRecorder }) {
                 </div>
                 <div className="flex items-center gap-1 py-0.5">
                     <input
-                        className="min-w-0 flex-1 rounded-[2px] border bg-transparent px-1.5 py-0.5 text-sm"
+                        className="min-w-0 flex-1 rounded-md border bg-transparent px-1.5 py-0.5 text-sm"
                         style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                         value={name}
                         maxLength={32}
@@ -103,13 +103,13 @@ export function PsActionsPanel({ recorder }: { recorder: PsActionRecorder }) {
                 {actions.length ? (
                     actions.map((action) => (
                         <div key={action.id} className="flex w-full items-center gap-1 border-b px-1 py-0.5 text-sm" style={{ borderColor: theme.toolbar.border }}>
-                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover" style={{ color: theme.node.muted }} disabled={Boolean(recorder.playingId)} aria-label={t("canvas.ps.actionPlay")} title={t("canvas.ps.actionPlay")} onClick={() => void recorder.play(action.id, action.steps)}>
+                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover" style={{ color: theme.node.muted }} disabled={Boolean(recorder.playingId)} aria-label={t("canvas.ps.actionPlay")} title={t("canvas.ps.actionPlay")} onClick={() => void recorder.play(action.id, action.steps)}>
                                 <Play className="size-3" />
                             </button>
                             {renamingId === action.id ? (
                                 <input
                                     autoFocus
-                                    className="min-w-0 flex-1 rounded-[2px] border bg-transparent px-1 text-sm"
+                                    className="min-w-0 flex-1 rounded-md border bg-transparent px-1 text-sm"
                                     style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                                     defaultValue={action.name}
                                     onBlur={(event) => {
@@ -125,7 +125,7 @@ export function PsActionsPanel({ recorder }: { recorder: PsActionRecorder }) {
                             <span className="shrink-0 tabular-nums" style={{ color: theme.node.muted }}>
                                 {t("canvas.ps.actionSteps", { count: action.steps.length })}
                             </span>
-                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover" style={{ color: theme.node.danger }} aria-label={t("canvas.ps.presetDelete")} title={t("canvas.ps.presetDelete")} onClick={() => removeAction(action.id)}>
+                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover" style={{ color: theme.node.danger }} aria-label={t("canvas.ps.presetDelete")} title={t("canvas.ps.presetDelete")} onClick={() => removeAction(action.id)}>
                                 <Trash2 className="size-3" />
                             </button>
                         </div>

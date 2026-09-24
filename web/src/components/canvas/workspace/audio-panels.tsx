@@ -39,9 +39,9 @@ const FLAT_BUTTON_CLASS = STUDIO_FLAT_BUTTON_CLASS;
 export function AudioMeter({ trackId, register, className = "" }: { trackId: string; register: (trackId: string, channel: number, element: HTMLElement | null) => void; className?: string }) {
     const theme = useCanvasTheme();
     return (
-        <span className={`flex shrink-0 items-stretch gap-px rounded-[2px] ${className}`} aria-hidden>
+        <span className={`flex shrink-0 items-stretch gap-px rounded-md ${className}`} aria-hidden>
             {[0, 1].map((channel) => (
-                <span key={channel} className="relative w-[2px] overflow-hidden rounded-[2px]" style={{ background: theme.toolbar.border }}>
+                <span key={channel} className="relative w-[2px] overflow-hidden rounded-md" style={{ background: theme.toolbar.border }}>
                     <span
                         ref={(element) => register(trackId, channel, element)}
                         className="absolute inset-x-0 bottom-0 top-0 origin-bottom"
@@ -58,7 +58,7 @@ export function AudioToggle({ label, active, activeColor, activeBackground, onCl
     return (
         <button
             type="button"
-            className={`grid shrink-0 place-items-center rounded-[2px] text-sm font-medium transition hover:bg-hover ${className}`}
+            className={`grid shrink-0 place-items-center rounded-md text-sm font-medium transition hover:bg-hover ${className}`}
             style={active ? { background: activeBackground || theme.toolbar.activeBg, color: activeColor || theme.toolbar.activeText } : { color: theme.node.muted }}
             aria-label={label}
             title={label}
@@ -124,7 +124,7 @@ export function AudioValueInput({ label, value, format, parse, onCommit, disable
     };
     return (
         <input
-            className={`min-w-0 rounded-[2px] border bg-transparent px-1 py-0.5 text-right text-sm tabular-nums outline-none transition hover:bg-hover focus:bg-hover disabled:opacity-40 disabled:hover:bg-transparent hover:bg-hover focus:bg-hover ${className}`}
+            className={`min-w-0 rounded-md border bg-transparent px-1 py-0.5 text-right text-sm tabular-nums outline-none transition hover:bg-hover focus:bg-hover disabled:opacity-40 disabled:hover:bg-transparent hover:bg-hover focus:bg-hover ${className}`}
             style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
             value={draft ?? format(value)}
             disabled={disabled}
@@ -207,7 +207,7 @@ export function AudioSendList({ track, tracks, automation, onChange }: { track: 
                             />
                             <button
                                 type="button"
-                                className="shrink-0 rounded-[2px] px-1 text-sm transition hover:bg-hover"
+                                className="shrink-0 rounded-md px-1 text-sm transition hover:bg-hover"
                                 style={send.pre ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
                                 aria-label={t("canvas.audioStudio.sendPre")}
                                 title={t(send.pre ? "canvas.audioStudio.sendPre" : "canvas.audioStudio.sendPost")}
@@ -218,7 +218,7 @@ export function AudioSendList({ track, tracks, automation, onChange }: { track: 
                             </button>
                             <button
                                 type="button"
-                                className="grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover hover:opacity-100 hover:bg-hover"
+                                className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover hover:opacity-100 hover:bg-hover"
                                 style={{ color: theme.node.muted }}
                                 aria-label={t("canvas.audioStudio.sendRemove")}
                                 title={t("canvas.audioStudio.sendRemove")}
@@ -321,7 +321,7 @@ export function AudioInspectorPanel({ tracks, selectedTrackId, clips, selectedCl
                         {t("canvas.audioStudio.name")}
                     </span>
                     <input
-                        className="min-w-0 flex-1 rounded-[2px] border bg-transparent px-1.5 py-0.5 text-sm outline-none"
+                        className="min-w-0 flex-1 rounded-md border bg-transparent px-1.5 py-0.5 text-sm outline-none"
                         style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                         value={track.name}
                         placeholder={t(AUDIO_TRACK_TYPE_LABEL_KEYS[type])}
@@ -445,7 +445,7 @@ export function AudioMediaPoolPanel({ audioNodes, canAdd, onAdd, onGoCanvas }: {
                 <button
                     key={node.id}
                     type="button"
-                    className="flex w-full items-center gap-2 rounded-[2px] px-2 py-1.5 text-left text-sm transition hover:bg-hover disabled:opacity-40 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-hover disabled:opacity-40 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent"
                     style={{ color: theme.node.text }}
                     disabled={!canAdd}
                     title={canAdd ? t("canvas.audioStudio.mediaAdd") : t("canvas.audioStudio.noTracks")}

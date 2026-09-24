@@ -64,7 +64,7 @@ export default function PsAdjustmentsPanel({ board, setNodes, selected, onSelect
                         <button
                             key={type}
                             type="button"
-                            className="grid h-7 place-items-center rounded-[2px] transition hover:bg-hover"
+                            className="grid h-7 place-items-center rounded-md transition hover:bg-hover"
                             style={active ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
                             aria-label={t(PS_ADJUSTMENT_NAME_KEYS[type])}
                             title={t(PS_ADJUSTMENT_NAME_KEYS[type])}

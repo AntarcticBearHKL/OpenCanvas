@@ -226,15 +226,10 @@ export const useWritingStore = create<WritingStore>()(
                 renameGroup: (id, name) =>
                     set((state) => ({ groups: state.groups.map((group) => (group.id === id ? { ...group, name: name.trim() || group.name } : group)) })),
                 deleteGroup: (id) =>
-                    set((state) => {
-                        const groups = state.groups.filter((group) => group.id !== id);
-                        if (!groups.length) {
-                            const group: WriteGroup = { id: nanoid(), name: i18n.t("writing.group.defaultName", { count: 1 }), createdAt: stamp() };
-                            return { groups: [group], projects: state.projects.map((project) => ({ ...project, groupId: group.id })) };
-                        }
-                        const fallback = groups[0].id;
-                        return { groups, projects: state.projects.map((project) => (project.groupId === id ? { ...project, groupId: fallback } : project)) };
-                    }),
+                    set((state) => ({
+                        groups: state.groups.filter((group) => group.id !== id),
+                        projects: state.projects.filter((project) => project.groupId !== id),
+                    })),
                 setProjectGroup: (projectId, groupId) => patchProject(projectId, (project) => ({ ...project, groupId })),
             };
         },

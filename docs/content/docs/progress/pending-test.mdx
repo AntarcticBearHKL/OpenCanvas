@@ -38,6 +38,20 @@ The current release needs manual verification in these areas:
 - The "My Canvases" top-nav icon is a node-and-connection glyph instead of the diagonal expand arrows.
 - Confirm the leftovers of the removed My Assets library are gone: no `assets.*` i18n namespace, no code calling the removed keys (node type names now come from `canvas.nodeTypes.*`, so no raw keys appear on node cards or in the node toolbar), and the docs no longer describe it as an existing feature (only the CHANGELOG history, the AGENTS.md note and the pending-test "library is gone" item mention it).
 
+## Rounded style restored (tables stay square)
+
+- The flat/square pass has been reverted: cards, panels, sections, popovers, menus, list rows, rails and bars are `rounded-xl` (12px) again, controls (buttons / inputs / selects / chips / badges) are `rounded-md` (6px), canvas node cards keep `rounded-3xl` (≈22px), and circles stay circles. Ant Design radii are back to 8 / 6 / 12 / 4 and `--radius` is `0.625rem`. The frosted glass itself is unchanged.
+- **Tables and table content stay square by design.** The only `rounded-none` left in the whole codebase are the three deliberate overrides — `!rounded-none` on the canvas library table, the writing library table and the providers table. If you want the tables rounded as well, that is a one-line change per table.
+- Also fixed a casualty of the earlier de-rounding script: an audio-studio comment saying "tab had been backgrounded" had been rewritten to `backgrounded-[2px]` (the script matched the trailing `rounded` inside the word). It was the only such hit.
+
+## Providers, hardcoded models and Matilda
+
+- Only three providers are offered now: OpenRouter, DeepSeek and Matilda (Maincode). Each channel's model list comes from its preset — OpenRouter carries the multimodal set (image `openai/gpt-image-2.5-sunburst`, video `minimax/hailuo-3-max` / `minimax/hailuo-3`, speech `fish-audio/s2.1-pro`, music `google/lyria-3-pro-preview`, plus five text ids), DeepSeek carries `deepseek-v4-pro` / `deepseek-v4-flash`.
+- The "fetch models" action is gone: no `GET {base}/models` call and no per-provider fetch button. Removing it was the right call — the live OpenRouter catalogue (458 models) does not contain this app's image / video / speech ids at all, so fetching produced a list the app cannot use.
+- DeepSeek and Matilda are text-only: their models are always classified `text`, the capability control is read-only for them, and they never appear in the image / video / audio / speech pickers. Channels for other providers are untouched; only preset-matching channels have their model list reset.
+- Matilda runs through a local same-origin proxy (`web/matilda-proxy.ts`, registered in `vite.config.ts` for dev and preview). The proxy drives the official `@maincode-ai/matilda-agent-sdk` in Node and re-exposes Matilda as OpenAI-shaped `/matilda/v1/responses`, `/matilda/v1/chat/completions` and `/matilda/v1/models`, so you only paste an `mc_live_...` key into the Matilda channel — no model id, no capability choice.
+- Things worth checking on your side: (a) the Matilda happy path has NOT been tested with a real key (none exists on this machine — the SSE translation was verified by replaying the SDK's real event names through a mock, and the live cloud was probed only down to its 401 path); (b) if a Matilda channel was already saved with the old absolute URL `https://matilda.maincode.com/api/v1`, re-select the "Matilda (Maincode)" preset once (or delete that channel); (c) `npm run dev` gets the proxy, but `npm run start` serves a stale `dist`, and a static production deploy would need an equivalent Node function for the proxy; (d) a Matilda request containing only images returns a clear 400 instead of a hallucinated answer.
+
 ## Copy image to clipboard, and rounded nodes
 
 - A shared `copyImageToClipboard` helper accepts a `blob:` / `data:` / `http(s):` image, converts non-PNG images to PNG (the clipboard only takes `image/png` reliably) and returns false instead of throwing when the API is missing or the write is rejected.

@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
+import { isTextOnlyBaseUrl, PROVIDER_PRESETS } from "@/lib/provider-presets";
 
 type ApiCallFormat = "openai";
 export type ModelCapability = "text" | "image" | "audio" | "speech" | "video";
@@ -74,7 +75,16 @@ export const defaultConfig: AiConfig = {
     baseUrl: OPENROUTER_BASE_URL,
     apiKey: "",
     apiFormat: "openai",
-    channels: [{ id: "openrouter", name: "OpenRouter", baseUrl: OPENROUTER_BASE_URL, apiKey: "", apiFormat: "openai", models: [] }],
+    channels: PROVIDER_PRESETS.map(
+        (preset): ModelChannel => ({
+            id: preset.id,
+            name: preset.name,
+            baseUrl: preset.baseUrl,
+            apiKey: "",
+            apiFormat: "openai",
+            models: preset.models.map((model) => ({ ...model })),
+        }),
+    ),
     model: "",
     imageModel: IMAGE_MODEL,
     videoModel: "",
@@ -179,10 +189,10 @@ export const useConfigStore = create<ConfigStore>()(
             configTab: "channels",
             updateConfig: (key, value) =>
                 set((state) => ({
-                    config: {
+                    config: applyPresetModelDefaults({
                         ...state.config,
                         [key]: value,
-                    },
+                    }),
                 })),
             importChannelCredentials: (input) => {
                 const currentConfig = get().config;
@@ -207,7 +217,7 @@ export const useConfigStore = create<ConfigStore>()(
                 const models = modelOptionsFromChannels(channels);
                 return {
                     ...current,
-                    config: {
+                    config: applyPresetModelDefaults({
                         ...config,
                         channelMode: "local",
                         apiFormat: "openai",
@@ -230,7 +240,7 @@ export const useConfigStore = create<ConfigStore>()(
                         videoMode: config.videoMode === "reference" ? "reference" : "frames",
                         canvasImageCount: config.canvasImageCount || "1",
                         canvasBackgroundMode: config.canvasBackgroundMode || "dots",
-                    },
+                    }),
                 };
             },
         },
@@ -243,14 +253,15 @@ export function useEffectiveConfig() {
 }
 
 /** Normalize a mixed list of raw model names or model objects into deduped ChannelModel entries. */
-function normalizeChannelModels(models: Array<string | ChannelModel> | undefined): ChannelModel[] {
+function normalizeChannelModels(models: Array<string | ChannelModel> | undefined, baseUrl: string): ChannelModel[] {
+    const textOnly = isTextOnlyBaseUrl(baseUrl);
     const seen = new Set<string>();
     const result: ChannelModel[] = [];
     for (const item of models || []) {
         const name = (typeof item === "string" ? item : item?.name || "").trim();
         if (!name || seen.has(name)) continue;
         seen.add(name);
-        const capability = typeof item === "string" ? guessCapability(name) : item.capability || guessCapability(name);
+        const capability = textOnly ? "text" : typeof item === "string" ? guessCapability(name) : item.capability || guessCapability(name);
         const script = typeof item === "string" ? undefined : item.script?.trim() || undefined;
         result.push({ name, capability, script });
     }
@@ -258,14 +269,23 @@ function normalizeChannelModels(models: Array<string | ChannelModel> | undefined
 }
 
 function createModelChannel(channel?: Partial<ModelChannel>): ModelChannel {
+    const baseUrl = channel?.baseUrl?.trim() || defaultBaseUrlForApiFormat();
     return {
         id: channel?.id?.trim() || nanoid(),
         name: channel?.name?.trim() || i18n.t("config.channels.newName"),
-        baseUrl: channel?.baseUrl?.trim() || defaultBaseUrlForApiFormat(),
+        baseUrl,
         apiKey: channel?.apiKey || "",
         apiFormat: "openai",
-        models: normalizeChannelModels(channel?.models),
+        models: normalizeChannelModels(channel?.models, baseUrl),
     };
+}
+
+function applyPresetModelDefaults(config: AiConfig): AiConfig {
+    if (config.textModel.trim()) return config;
+    const hasKey = (channel: ModelChannel) => Boolean(channel.apiKey.trim() || config.apiKey.trim());
+    const channel = config.channels.find((item) => hasKey(item) && isTextOnlyBaseUrl(item.baseUrl) && item.models.length === 1 && item.models[0].capability === "text");
+    if (!channel) return config;
+    return { ...config, textModel: encodeChannelModel(channel.id, channel.models[0].name) };
 }
 
 function upsertChannelCredentials(
@@ -274,7 +294,7 @@ function upsertChannelCredentials(
 ): ChannelCredentialsImportResult & { config: AiConfig } {
     const rawBaseUrl = input.baseUrl?.trim() || "";
     if (!rawBaseUrl) return { status: "missing-base-url", config };
-    if (!isHttpBaseUrl(rawBaseUrl)) return { status: "invalid-base-url", config };
+    if (!findPresetByBaseUrl(rawBaseUrl) && !isHttpBaseUrl(rawBaseUrl)) return { status: "invalid-base-url", config };
 
     const apiKey = input.apiKey?.trim() || config.apiKey;
     return { status: "updated", channelName: config.channels[0]?.name || "OpenRouter", config: { ...config, apiKey } };
@@ -345,17 +365,23 @@ export function resolveModelRequestConfig(config: AiConfig, value: string) {
     };
 }
 
+function findPresetByBaseUrl(baseUrl: string) {
+    const normalized = baseUrl.trim().replace(/\/+$/, "").toLowerCase();
+    return PROVIDER_PRESETS.find((preset) => preset.baseUrl.toLowerCase() === normalized);
+}
+
 function normalizeChannels(config: AiConfig) {
     const persistedChannels = Array.isArray(config.channels) ? config.channels : [];
-    const channels = persistedChannels.map((channel, index) =>
-        createModelChannel({
+    const channels = persistedChannels.map((channel, index) => {
+        const preset = findPresetByBaseUrl(channel.baseUrl || "");
+        return createModelChannel({
             ...channel,
             id: channel.id || (index === 0 ? "default" : `channel-${index + 1}`),
             name: channel.name || (index === 0 ? i18n.t("config.channels.defaultName") : i18n.t("config.channels.indexedName", { index: index + 1 })),
-            models: normalizeChannelModels(channel.models),
-        }),
-    );
-    return channels.length ? channels : [createModelChannel({ id: "openrouter", name: "OpenRouter", models: [] })];
+            models: normalizeChannelModels(preset ? preset.models : channel.models, channel.baseUrl || ""),
+        });
+    });
+    return channels.length ? channels : defaultConfig.channels.map((channel) => createModelChannel(channel));
 }
 
 function defaultBaseUrlForApiFormat() {

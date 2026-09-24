@@ -2536,7 +2536,7 @@ function InfiniteCanvasPage() {
             </section>
             {dragGhost ? (
                 <div
-                    className="canvas-drag-ghost pointer-events-none fixed z-[120] flex size-11 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-0.5 rounded-[2px] border"
+                    className="canvas-drag-ghost pointer-events-none fixed z-[120] flex size-11 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-0.5 rounded-md border"
                     style={{ left: dragGhost.x, top: dragGhost.y, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
                 >
                     <GhostIcon className="size-5 shrink-0" />

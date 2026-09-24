@@ -174,7 +174,7 @@ export type CanvasPsLayer = {
     styles?: CanvasPsLayerStyle[]; // optional layer styles (fx); rendered by the shared raster compositor so preview and export always agree.
     text?: string;
     shape?: CanvasPsShapeKind; // shape layers: geometry drawn as SVG in the preview and Path2D in the composite.
-    shapeRadius?: number; // rounded-[2px] rectangle corner radius, layer-local units.
+    shapeRadius?: number; // rounded-md rectangle corner radius, layer-local units.
     shapeSides?: number; // polygon side count, 3..24.
     shapeFill?: string;
     shapeStroke?: string;
