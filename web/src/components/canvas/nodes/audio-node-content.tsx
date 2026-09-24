@@ -17,7 +17,7 @@ export function AudioNodeContent({ node, theme }: AudioNodeContentProps) {
     if (!content)
         return (
             <div className="flex h-full w-full flex-col items-center justify-center gap-2" style={{ color: theme.node.placeholder }}>
-                <Music2 className="size-7 opacity-35" />
+                <Music2 className="size-7" />
                 <span className="text-sm">{t("canvas.node.emptyAudio")}</span>
             </div>
         );
@@ -120,12 +120,12 @@ function AudioTrack({ content, cacheKey, durationMs, title, theme }: { content: 
         <div className="flex h-full w-full flex-col justify-center gap-2.5 px-4 py-3" style={{ color: theme.node.text }}>
             <div className="flex h-6 w-full shrink-0 items-center gap-1.5" style={{ color: theme.node.muted }}>
                 <GripHorizontal className="size-3.5 shrink-0" />
-                {title ? <span className="truncate text-[11px]">{title}</span> : null}
+                {title ? <span className="truncate text-sm">{title}</span> : null}
             </div>
             <div className="flex items-center gap-2">
                 <button
                     type="button"
-                    className="grid size-7 shrink-0 place-items-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                    className="grid size-7 shrink-0 place-items-center rounded-full transition-colors hover:bg-hover"
                     style={{ color: theme.node.text }}
                     aria-label={t(playing ? "canvas.node.pauseAudio" : "canvas.node.playAudio")}
                     onClick={(event) => {
@@ -137,7 +137,7 @@ function AudioTrack({ content, cacheKey, durationMs, title, theme }: { content: 
                 >
                     {playing ? <Pause className="size-4 fill-current" /> : <Play className="size-4 fill-current" />}
                 </button>
-                <span className="text-[11px] tabular-nums" style={{ color: theme.node.muted }}>
+                <span className="text-xs tabular-nums" style={{ color: theme.node.muted }}>
                     {formatAudioTime(current)} / {formatAudioTime(duration)}
                 </span>
             </div>

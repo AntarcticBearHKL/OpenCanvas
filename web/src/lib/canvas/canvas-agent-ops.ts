@@ -10,7 +10,7 @@ export type CanvasAgentOp =
     | { type: "update_node"; id: string; patch?: Partial<CanvasNodeData>; metadata?: CanvasNodeMetadata }
     | { type: "delete_node"; id?: string; ids?: string[]; nodeType?: CanvasNodeTypeId }
     | { type: "delete_connections"; id?: string; ids?: string[]; all?: boolean }
-    | { type: "connect_nodes"; id?: string; fromNodeId: string; toNodeId: string }
+    | { type: "connect_nodes"; id?: string; fromNodeId: string; toNodeId: string; relation?: string }
     | { type: "set_viewport"; viewport: ViewportTransform }
     | { type: "select_nodes"; ids: string[] }
     | { type: "run_generation"; nodeId: string; mode?: "text" | "image" | "video" | "audio"; prompt?: string }
@@ -77,7 +77,7 @@ export function applyCanvasAgentOps(snapshot: CanvasAgentSnapshot, ops?: CanvasA
             const toNode = nodes.find((node) => node.id === op.toNodeId);
             if (!exists && fromNode && toNode && fromNode.type !== CanvasNodeType.ImageGeneration) {
                 const connection = normalizeConnection(op.fromNodeId, op.toNodeId, nodes, "source");
-                if (connection && connection.fromNodeId === op.fromNodeId && connection.toNodeId === op.toNodeId) connections = [...connections, { id: op.id || nanoid(), ...connection }];
+                if (connection && connection.fromNodeId === op.fromNodeId && connection.toNodeId === op.toNodeId) connections = [...connections, { id: op.id || nanoid(), ...connection, ...(op.relation ? { relation: op.relation } : {}) }];
             }
         }
         if (op.type === "set_viewport" && op.viewport) viewport = op.viewport;

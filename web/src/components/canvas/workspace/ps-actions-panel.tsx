@@ -61,24 +61,24 @@ export function PsActionsPanel({ recorder }: { recorder: PsActionRecorder }) {
 
     return (
         <ImageSettingsTheme theme={theme}>
-            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2" style={{ color: theme.node.text }}>
+            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2 glass-card" style={{ color: theme.node.text }}>
                 <div className="flex items-center gap-1 py-1">
                     <button
                         type="button"
                         className={FLAT_BUTTON_CLASS}
-                        style={recorder.recording ? { color: "#dc2626" } : { color: theme.node.text }}
+                        style={recorder.recording ? { color: theme.node.danger } : { color: theme.node.text }}
                         onClick={() => (recorder.recording ? recorder.stop() : recorder.start())}
                     >
                         {recorder.recording ? <Square className="size-3" /> : <Circle className="size-3" />}
                         {recorder.recording ? t("canvas.ps.actionStop") : t("canvas.ps.actionRecord")}
                     </button>
-                    <span className="min-w-0 flex-1 truncate text-[11px]" style={{ color: theme.node.muted }}>
+                    <span className="min-w-0 flex-1 truncate text-sm" style={{ color: theme.node.muted }}>
                         {recorder.recording ? t("canvas.ps.actionRecording", { count: recorder.steps.length }) : t("canvas.ps.actionIdle")}
                     </span>
                 </div>
                 <div className="flex items-center gap-1 py-0.5">
                     <input
-                        className="min-w-0 flex-1 rounded border bg-transparent px-1.5 py-0.5 text-[11px]"
+                        className="min-w-0 flex-1 rounded-[2px] border bg-transparent px-1.5 py-0.5 text-sm"
                         style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                         value={name}
                         maxLength={32}
@@ -102,14 +102,14 @@ export function PsActionsPanel({ recorder }: { recorder: PsActionRecorder }) {
                 </div>
                 {actions.length ? (
                     actions.map((action) => (
-                        <div key={action.id} className="flex w-full items-center gap-1 rounded-md px-1 py-0.5 text-[11px]">
-                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.muted }} disabled={Boolean(recorder.playingId)} aria-label={t("canvas.ps.actionPlay")} title={t("canvas.ps.actionPlay")} onClick={() => void recorder.play(action.id, action.steps)}>
+                        <div key={action.id} className="flex w-full items-center gap-1 border-b px-1 py-0.5 text-sm" style={{ borderColor: theme.toolbar.border }}>
+                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover" style={{ color: theme.node.muted }} disabled={Boolean(recorder.playingId)} aria-label={t("canvas.ps.actionPlay")} title={t("canvas.ps.actionPlay")} onClick={() => void recorder.play(action.id, action.steps)}>
                                 <Play className="size-3" />
                             </button>
                             {renamingId === action.id ? (
                                 <input
                                     autoFocus
-                                    className="min-w-0 flex-1 rounded border bg-transparent px-1 text-[11px]"
+                                    className="min-w-0 flex-1 rounded-[2px] border bg-transparent px-1 text-sm"
                                     style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                                     defaultValue={action.name}
                                     onBlur={(event) => {
@@ -125,17 +125,17 @@ export function PsActionsPanel({ recorder }: { recorder: PsActionRecorder }) {
                             <span className="shrink-0 tabular-nums" style={{ color: theme.node.muted }}>
                                 {t("canvas.ps.actionSteps", { count: action.steps.length })}
                             </span>
-                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.muted }} aria-label={t("canvas.ps.presetDelete")} title={t("canvas.ps.presetDelete")} onClick={() => removeAction(action.id)}>
+                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover" style={{ color: theme.node.danger }} aria-label={t("canvas.ps.presetDelete")} title={t("canvas.ps.presetDelete")} onClick={() => removeAction(action.id)}>
                                 <Trash2 className="size-3" />
                             </button>
                         </div>
                     ))
                 ) : (
-                    <p className="pt-1 text-[11px]" style={{ color: theme.node.placeholder }}>
+                    <p className="pt-1 text-sm glass-card" style={{ color: theme.node.muted }}>
                         {t("canvas.ps.actionEmpty")}
                     </p>
                 )}
-                <p className="pt-1 text-[11px]" style={{ color: theme.node.placeholder }}>
+                <p className="pt-1 text-sm" style={{ color: theme.node.muted }}>
                     {t("canvas.ps.actionScope")}
                 </p>
             </div>

@@ -36,7 +36,7 @@ export function CanvasProjectRow({ project }: { project: CanvasProject }) {
 
     return (
         <div
-            className="flex h-14 w-full cursor-pointer items-center gap-2 border-b border-border px-2 transition last:border-b-0 hover:bg-black/5 dark:hover:bg-white/10"
+            className={`flex h-14 w-full cursor-pointer items-center gap-2 border-b border-border px-2 transition last:border-b-0 ${selected ? "bg-brand-soft hover:bg-brand-soft" : "glass-card hover:bg-hover"}`}
             onClick={() => !editing && open()}
         >
             <input
@@ -44,7 +44,7 @@ export function CanvasProjectRow({ project }: { project: CanvasProject }) {
                 checked={selected}
                 onClick={(event) => event.stopPropagation()}
                 onChange={(event) => toggleSelected(project.id, event.target.checked)}
-                className="size-4 shrink-0 accent-foreground"
+                className="size-4 shrink-0 accent-brand"
                 aria-label={t("canvas.project.select", { name: project.title })}
             />
             {editing ? (
@@ -61,7 +61,7 @@ export function CanvasProjectRow({ project }: { project: CanvasProject }) {
                     {project.title}
                 </button>
             )}
-            <p className="hidden shrink-0 whitespace-nowrap text-xs text-muted-foreground lg:block dark:text-muted-foreground" style={{ margin: 0 }}>
+            <p className="hidden shrink-0 whitespace-nowrap text-sm text-muted-foreground lg:block dark:text-muted-foreground" style={{ margin: 0 }}>
                 {t("canvas.project.stats", { nodes: project.nodes.length, connections: project.connections.length })}
                 <span className="mx-1.5">·</span>
                 {t("canvas.project.updated", { date: new Date(project.updatedAt).toLocaleString(i18n.resolvedLanguage, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) })}
@@ -101,7 +101,7 @@ export function CanvasProjectRow({ project }: { project: CanvasProject }) {
                             size="small"
                             shape={armed ? "default" : "circle"}
                             danger={armed}
-                            className={armed ? "!px-2 !text-xs" : undefined}
+                            className={armed ? "!px-2 !text-sm" : undefined}
                             icon={armed ? undefined : <Trash2 className="size-4" />}
                             onClick={(event) => confirmDelete(project.id, [project.id], event.currentTarget)}
                             onPointerLeave={cancel}

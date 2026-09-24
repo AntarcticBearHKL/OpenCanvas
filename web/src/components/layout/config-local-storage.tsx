@@ -45,14 +45,14 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
 
     return (
         <div className="space-y-3">
-            <section className="rounded-lg border border-border p-4 dark:border-border">
+            <section className="rounded-none border border-border p-4 dark:border-border glass-card">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <div className="flex items-center gap-2 text-sm font-semibold">
                             <Database className="size-4" />
                             {t("config.localStorage.title")}
                         </div>
-                        <div className="mt-1 text-xs text-muted-foreground">{t("config.localStorage.description")}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">{t("config.localStorage.description")}</div>
                     </div>
                     <Button icon={<RefreshCw className="size-4" />} loading={loading} onClick={() => void refresh()}>
                         {t("config.localStorage.refresh")}
@@ -69,7 +69,7 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
                             <StorageMetric icon={<Layers3 className="size-4" />} label={t("config.localStorage.quota")} value={formatStorageBytes(usage.quota)} hint={t("config.localStorage.quotaHint")} />
                         </div>
                         <div className="mt-4">
-                            <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                            <div className="mb-1 flex justify-between text-sm text-muted-foreground">
                                 <span>{t("config.localStorage.quotaProgress")}</span>
                                 <span className="tabular-nums">{percent.toFixed(2)}%</span>
                             </div>
@@ -77,13 +77,13 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
                         </div>
                         <button
                             type="button"
-                            className="mt-4 flex w-full items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-left transition hover:bg-muted/70 dark:border-border dark:hover:bg-muted/60"
+                            className="mt-4 flex w-full items-center gap-3 rounded-none border border-border px-3 py-2.5 text-left transition hover:bg-muted/70 dark:border-border dark:hover:bg-muted/60"
                             onClick={() => setConfigTab("local-models")}
                         >
                             <Eraser className="size-4 shrink-0 text-muted-foreground" />
                             <span className="min-w-0 flex-1">
                                 <span className="block truncate text-sm font-medium">{t("config.localStorage.localModel")}</span>
-                                <span className="mt-0.5 block text-[11px] text-muted-foreground">{t("config.localStorage.localModelHint")}</span>
+                                <span className="mt-0.5 block text-xs text-muted-foreground">{t("config.localStorage.localModelHint")}</span>
                             </span>
                             <span className="shrink-0 text-sm font-medium tabular-nums">{backgroundRemoval.status === "ready" ? t("config.localModels.size") : t(`config.localModels.status.${backgroundRemoval.status}`, { percent: backgroundRemoval.percent })}</span>
                             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -92,11 +92,11 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
                 ) : null}
             </section>
             {usage?.databases.map((database) => (
-                <section key={database.name} className="overflow-hidden rounded-lg border border-border">
+                <section key={database.name} className="overflow-hidden rounded-none border border-border glass-card">
                     <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 dark:border-border">
                         <div className="min-w-0">
                             <div className="truncate text-sm font-semibold">{t("config.localStorage.mainDatabase")}</div>
-                            <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{database.name} · v{database.version}</div>
+                            <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{database.name} · v{database.version}</div>
                         </div>
                         <div className="shrink-0 text-sm font-medium tabular-nums">{formatStorageBytes(database.bytes)}</div>
                     </div>
@@ -105,7 +105,7 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
                             <div key={store.name} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-4 py-3 text-sm">
                                 <div className="min-w-0">
                                     <div className="truncate font-medium">{storeLabel(store.name, t)}</div>
-                                    <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{store.name}</div>
+                                    <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{store.name}</div>
                                 </div>
                                 <div className="text-right text-xs text-muted-foreground tabular-nums">{t("config.localStorage.records", { count: store.records })}</div>
                                 <div className="w-20 text-right font-medium tabular-nums">{formatStorageBytes(store.bytes)}</div>
@@ -120,10 +120,10 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
 
 function StorageMetric({ icon, label, value, hint }: { icon: ReactNode; label: string; value: string; hint: string }) {
     return (
-        <div className="rounded-lg bg-muted p-3 dark:bg-muted/70">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">{icon}{label}</div>
+        <div className="rounded-none bg-muted p-3 dark:bg-muted/70">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">{icon}{label}</div>
             <div className="mt-2 text-xl font-semibold tabular-nums">{value}</div>
-            <div className="mt-1 text-[11px] text-muted-foreground">{hint}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
         </div>
     );
 }

@@ -28,13 +28,13 @@ import { addPsLayer, addPsLayerAbove, commitBoardLayers, duplicatePsLayer, findP
 import { psBucketFill, psBucketPattern, psCanvasToBlob, psPatternFillLayer, psBeginStroke, psBitmapSize, psColorLuminance, psCommitStroke, psDocToLayer, psDrawStroke, psGradientFill, psLoadBoardPixels, psLoadBoardSampler, psLoadLayerPixels, psSampleBoardPixel, psStrokeTo, type PsBoardSampler, type PsBrushOptions, type PsGradientStop, type PsPaintPoint, type PsStroke } from "@/components/canvas/workspace/ps-paint";
 import { psAnchorOffset, psOffsetLayers, psResampleLayerBitmaps, psRotateLayers, psScaleLayers, psTrimBox, type PsCanvasAnchor } from "@/components/canvas/workspace/ps-image-ops";
 import { psPaintPath, psPathPaintSource, psPathToSelection } from "@/components/canvas/workspace/ps-path-ops";
-import { STUDIO_BAR_CLASS, STUDIO_DIVIDER_CLASS, STUDIO_ICON_BUTTON_CLASS, STUDIO_LIST_ROW_CLASS, STUDIO_OPTIONS_CLASS, STUDIO_TOOL_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
+import { STUDIO_BAR_CLASS, STUDIO_DIVIDER_CLASS, STUDIO_ICON_BUTTON_CLASS, STUDIO_LABEL_CLASS, STUDIO_LIST_ROW_CLASS, STUDIO_OPTIONS_CLASS, STUDIO_TOOL_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import { psImageColorAt, psSelectionAll, psSelectionBlob, psSelectionBounds, psSelectionClear, psSelectionCombine, psSelectionCreate, psSelectionFeather, psSelectionInvert, psSelectionPolygon, psSelectionQuick, psSelectionRect, psSelectionToLayerSpace, psSelectionWand, type PsSelectionMode } from "@/components/canvas/workspace/ps-selection";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { CANVAS_BLEND_MODES } from "@/lib/canvas/blend-modes";
 import { createPsPath, psPathAnchor } from "@/lib/canvas/ps-path";
 import { PS_TRANSFORM_MODES, psApplyNumericTransform, psClearTransform, psMoveTransformHandle, psTransformHandlesDoc, type PsNumericTransform, type PsTransformMode } from "@/lib/canvas/ps-transform";
-import { createPsAdjustmentLayer, createPsPixelLayer, createPsShapeLayer, psLayerBox, psTextRenderStyle, psTopLayers, renderPsLayerBitmap, smartCanvasBackground, smartCanvasBackgroundOpacity, smartCanvasFill, smartCanvasLayers, smartCanvasRatio, smartCanvasResolution } from "@/lib/canvas/smart-canvas";
+import { createPsAdjustmentLayer, createPsPixelLayer, createPsShapeLayer, psBoxUnion, psLayerBox, psTextRenderStyle, psTopLayers, renderPsLayerBitmap, smartCanvasBackground, smartCanvasBackgroundOpacity, smartCanvasFill, smartCanvasLayers, smartCanvasRatio, smartCanvasResolution, smartCanvasSizeForRatio } from "@/lib/canvas/smart-canvas";
 import { PS_ADJUSTMENT_NAME_KEYS } from "@/lib/canvas/ps-adjustments";
 import { inferMediaRatio } from "@/lib/media-size";
 import { PS_BRUSH_DEFAULT, type PsActionStep, type PsBrushPreset, type PsPatternPreset } from "@/stores/use-ps-asset-store";
@@ -171,6 +171,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     const cursorRef = useRef<HTMLDivElement>(null);
     const draftRef = useRef<CanvasPsLayer[] | null>(null);
     const fittedRef = useRef("");
+    const userViewRef = useRef(false);
     const [selectedLayerId, setSelectedLayerId] = useState("");
     const [tool, setTool] = useState<PsTool>("move");
     const [paint, setPaint] = useState<PsBrushOptions & { background: string; stop: number }>({ ...PS_BRUSH_DEFAULT, tolerance: 32, color: "#000000", background: "#ffffff", stop: 1 });
@@ -256,6 +257,19 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     }, [board, boards, onSelectBoard]);
 
     useEffect(() => {
+        if (!board) return;
+        const layers = smartCanvasLayers(board);
+        const visible = psTopLayers(layers).filter((layer) => !layer.hidden);
+        if (!visible.length) return;
+        const content = psBoxUnion(visible.map((layer) => psLayerBox(layers, layer)));
+        if (!content) return;
+        if (content.x + content.width <= board.width + 0.5 && content.y + content.height <= board.height + 0.5) return;
+        const size = smartCanvasSizeForRatio(smartCanvasRatio(board));
+        if (size.width + 0.5 < content.x + content.width || size.height + 0.5 < content.y + content.height) return;
+        setNodes((prev) => prev.map((node) => (node.id === board.id ? { ...node, ...size, position: { x: node.position.x + node.width / 2 - size.width / 2, y: node.position.y + node.height / 2 - size.height / 2 } } : node)));
+    }, [board, setNodes]);
+
+    useEffect(() => {
         const element = containerRef.current;
         if (!element) return;
         const observer = new ResizeObserver((entries) => {
@@ -307,12 +321,17 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     useEffect(() => {
         if (!board || !size.w || !size.h) return;
         const key = `${board.id}:${board.width}x${board.height}`;
-        if (fittedRef.current === key) return;
-        fittedRef.current = key;
+        if (fittedRef.current !== key) {
+            fittedRef.current = key;
+            userViewRef.current = false;
+        } else if (userViewRef.current) {
+            return;
+        }
         fit();
     }, [board, size.w, size.h, fit]);
 
     const zoomAt = useCallback((cx: number, cy: number, factor: number) => {
+        userViewRef.current = true;
         setView((prev) => {
             const k = clamp(prev.k * factor, ZOOM_MIN, ZOOM_MAX);
             const ratio = k / prev.k;
@@ -475,6 +494,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     const movePan = (event: ReactPointerEvent<HTMLDivElement>) => {
         const pan = panRef.current;
         if (!pan || pan.pointerId !== event.pointerId) return;
+        userViewRef.current = true;
         setView((prev) => ({ ...prev, x: pan.startView.x + (event.clientX - pan.startClient.x), y: pan.startView.y + (event.clientY - pan.startClient.y) }));
     };
 
@@ -1290,12 +1310,12 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                     <button type="button" className={FLAT_ACTION_CLASS} aria-label={t("canvas.workspace.back")} title={t("canvas.workspace.back")} onClick={onBack} style={{ color: theme.node.text }}>
                         <ArrowLeft className="size-3.5" />
                     </button>
-                    <span className="min-w-0 flex-1 truncate text-xs" style={{ color: theme.node.muted }}>
+                    <span className="min-w-0 flex-1 truncate text-sm" style={{ color: theme.node.muted }}>
                         {t("canvas.workspace.image")}
                     </span>
                 </div>
                 <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 py-8 text-center">
-                    <Layers className="size-7 opacity-40" style={{ color: theme.node.muted }} />
+                    <Layers className="size-7" style={{ color: theme.node.muted }} />
                     <p className="text-sm" style={{ color: theme.node.text }}>
                         {t("canvas.workspace.pickBoard")}
                     </p>
@@ -1312,7 +1332,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                             ))}
                         </div>
                     ) : (
-                        <p className="text-xs" style={{ color: theme.node.muted }}>
+                        <p className="text-sm" style={{ color: theme.node.muted }}>
                             {t("canvas.workspace.noBoards")}
                         </p>
                     )}
@@ -1430,7 +1450,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
 
     return (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col pt-14">
-            <div className={`${STUDIO_BAR_CLASS} h-11`}>
+            <div className={`${STUDIO_BAR_CLASS} h-11 glass-surface`}>
                 <button type="button" className={FLAT_ACTION_CLASS} aria-label={t("canvas.workspace.back")} title={t("canvas.workspace.back")} onClick={onBack} style={{ color: theme.node.text }}>
                     <ArrowLeft className="size-3.5" />
                 </button>
@@ -1458,7 +1478,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                 />
                 <span className={STUDIO_DIVIDER_CLASS} style={{ background: theme.toolbar.border }} />
                 <span className="flex w-20 shrink-0 items-center gap-1">
-                    <span className="w-12 shrink-0 text-center text-[11px] tabular-nums" style={{ color: theme.node.muted }}>
+                    <span className="w-12 shrink-0 text-center text-sm tabular-nums" style={{ color: theme.node.text }}>
                         {Math.round(view.k * 100)}%
                     </span>
                     <button type="button" className={FLAT_ACTION_CLASS} aria-label={t("canvas.ps.fit")} title={t("canvas.ps.fit")} onClick={fit} style={{ color: theme.node.text }}>
@@ -1466,13 +1486,13 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                     </button>
                 </span>
                 <span className="min-w-0 flex-1" />
-                <button type="button" className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-xs transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }} onClick={() => onOutput(board)}>
+                <button type="button" className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => onOutput(board)}>
                     <ImagePlus className="size-3.5" />
                     {t("canvas.smartCanvas.saveAsNode")}
                 </button>
             </div>
 
-            <div className={STUDIO_OPTIONS_CLASS} style={{ color: theme.node.muted, borderColor: theme.toolbar.border }}>
+            <div className={`${STUDIO_OPTIONS_CLASS} glass-surface`} style={{ color: theme.node.muted, borderColor: theme.toolbar.border }}>
                 <ImageSettingsTheme theme={theme}>
                     <PsMenus
                         disabled={false}
@@ -1504,7 +1524,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                     />
                     <DockWindowMenu defs={PS_DOCK_PANELS} layout={dock.layout} onToggle={dock.toggle} onReset={dock.reset} />
                     <span className={STUDIO_DIVIDER_CLASS} style={{ background: theme.toolbar.border }} />
-                    <span className="w-20 shrink-0 truncate font-medium" style={{ color: theme.node.text }}>
+                    <span className={`${STUDIO_LABEL_CLASS} w-20 truncate`} style={{ color: theme.node.text }}>
                         {t(TOOL_LABELS[tool])}
                     </span>
                     {ringTool ? (
@@ -1551,7 +1571,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                         <span className="flex shrink-0 items-center gap-1.5">
                             <span>{t("canvas.ps.pathActive", { name: activePath?.name || t("canvas.ps.none") })}</span>
                             {pattern ? <span>{t("canvas.ps.patternActive", { name: pattern.name })}</span> : null}
-                            <button type="button" className="rounded-md px-1.5 py-0.5 transition hover:bg-black/5 dark:hover:bg-white/10" onClick={() => setPattern(null)}>
+                            <button type="button" className="rounded-[2px] px-1.5 py-0.5 transition hover:bg-hover" onClick={() => setPattern(null)}>
                                 {t("canvas.ps.patternClear")}
                             </button>
                         </span>
@@ -1559,7 +1579,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                     {transformMode ? (
                         <>
                             <Segmented size="small" value={transformMode} options={PS_TRANSFORM_MODES.map((mode) => ({ value: mode, label: t(`canvas.ps.transform.${mode}`) }))} onChange={(value) => setTransformMode(value as PsTransformMode)} />
-                            <button type="button" className="shrink-0 rounded-md px-1.5 py-0.5 transition hover:bg-black/5 dark:hover:bg-white/10" onClick={() => setTransformMode(null)}>
+                            <button type="button" className="shrink-0 rounded-[2px] px-1.5 py-0.5 transition hover:bg-hover" onClick={() => setTransformMode(null)}>
                                 {t("canvas.ps.transformDone")}
                             </button>
                         </>
@@ -1581,7 +1601,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
             </div>
 
             <DockArea defs={PS_DOCK_PANELS} layout={dock.layout} renderPanel={renderPsPanel} onActivate={dock.activate} onMove={dock.move} onResize={dock.resize}>
-                <div className="thin-scrollbar flex shrink-0 flex-col items-center gap-0.5 overflow-y-auto px-1.5 py-1.5">
+                <div className="thin-scrollbar flex shrink-0 flex-col items-center gap-0.5 overflow-y-auto px-1.5 py-1.5 glass-surface">
                     {TOOLS.map((item) => {
                         const Icon = item.icon;
                         const active = tool === item.id;
@@ -1590,7 +1610,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                                 key={item.id}
                                 type="button"
                                 className={TOOL_CLASS}
-                                style={active ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
+                                style={active ? { background: theme.node.accentSoft, color: theme.node.accent, boxShadow: `inset 0 0 0 1px ${theme.node.accent}` } : { color: theme.node.muted }}
                                 aria-label={`${t(item.labelKey)} (${item.hotkey})`}
                                 title={`${t(item.labelKey)} (${item.hotkey})`}
                                 onClick={() => setTool(item.id)}
@@ -1791,12 +1811,6 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                         ) : null}
                     </div>
                     {viewFlags.rulers ? <PsRulers view={view} size={size} theme={theme} onGuidePointerDown={beginGuide} onGuidePointerMove={moveGuide} onGuidePointerUp={endGuide} /> : null}
-                    {boardLayers.length ? null : (
-                        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center" style={{ color: theme.node.placeholder }}>
-                            <Layers className="size-6 opacity-40" />
-                            <span className="text-xs">{t("canvas.ps.emptyLayers")}</span>
-                        </div>
-                    )}
                 </div>
 
             </DockArea>
@@ -1819,11 +1833,12 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
 }
 
 function OptionSlider({ label, value, min, max, suffix = "", onChange }: { label: string; value: number; min: number; max: number; suffix?: string; onChange: (value: number) => void }) {
+    const theme = useCanvasTheme();
     return (
         <label className="flex shrink-0 items-center gap-1.5">
-            <span className="shrink-0">{label}</span>
+            <span className="shrink-0" style={{ color: theme.node.label }}>{label}</span>
             <Slider className="!mx-0 !w-24" min={min} max={max} step={1} value={value} tooltip={{ formatter: (input) => `${input}${suffix}` }} ariaLabelForHandle={label} onChange={onChange} />
-            <span className="w-9 shrink-0 tabular-nums">
+            <span className="w-9 shrink-0 text-sm tabular-nums" style={{ color: theme.node.text }}>
                 {value}
                 {suffix}
             </span>
@@ -1832,9 +1847,10 @@ function OptionSlider({ label, value, min, max, suffix = "", onChange }: { label
 }
 
 function OptionToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+    const theme = useCanvasTheme();
     return (
         <label className="flex shrink-0 items-center gap-1.5">
-            <span className="shrink-0">{label}</span>
+            <span className="shrink-0" style={{ color: theme.node.label }}>{label}</span>
             <Switch size="small" checked={checked} onChange={onChange} />
         </label>
     );

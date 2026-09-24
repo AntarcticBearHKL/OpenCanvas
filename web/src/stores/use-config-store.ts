@@ -7,7 +7,7 @@ import i18n from "@/i18n";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 
 type ApiCallFormat = "openai";
-export type ModelCapability = "image" | "video" | "text" | "audio";
+export type ModelCapability = "text" | "image" | "audio" | "speech" | "video";
 export type ReasoningEffort = "auto" | "low" | "medium" | "high" | "xhigh";
 
 type ChannelModel = {
@@ -16,7 +16,7 @@ type ChannelModel = {
     script?: string;
 };
 
-type ModelChannel = {
+export type ModelChannel = {
     id: string;
     name: string;
     baseUrl: string;
@@ -36,6 +36,7 @@ export type AiConfig = {
     videoModel: string;
     textModel: string;
     audioModel: string;
+    speechModel: string;
     audioVoice: string;
     audioFormat: string;
     audioSpeed: string;
@@ -56,7 +57,7 @@ export type AiConfig = {
     canvasBackgroundMode: CanvasBackgroundMode;
 };
 
-export type ConfigTabKey = "channels" | "appearance" | "generation" | "local-models" | "local-storage" | "cost" | "agent" | "about";
+export type ConfigTabKey = "channels" | "models" | "appearance" | "generation" | "local-models" | "local-storage" | "cost" | "agent" | "about";
 
 type ChannelCredentialsImportResult = {
     status: "created" | "updated" | "missing-base-url" | "invalid-base-url";
@@ -79,6 +80,7 @@ export const defaultConfig: AiConfig = {
     videoModel: "",
     textModel: "",
     audioModel: "",
+    speechModel: "",
     audioVoice: "alloy",
     audioFormat: "mp3",
     audioSpeed: "1",
@@ -116,13 +118,15 @@ const VIDEO_KEYWORDS = ["video", "sora", "veo", "kling", "wan", "hailuo"];
 export function boolConfig(value: string, fallback: boolean) {
     return value ? value === "true" : fallback;
 }
-const AUDIO_KEYWORDS = ["audio", "tts", "speech", "voice", "music", "sound"];
+const SPEECH_KEYWORDS = ["tts", "speech", "voice", "fish-audio", "sovits", "elevenlabs", "cosyvoice", "kokoro"];
+const AUDIO_KEYWORDS = ["audio", "music", "sound", "lyria"];
 const IMAGE_KEYWORDS = ["seedream", "gpt-image", "image", "dall-e", "dalle", "imagen", "flux", "sdxl", "stable-diffusion", "midjourney"];
 
 /** Best-effort default capability for a freshly fetched model name; user can override in the channel editor. */
 function guessCapability(name: string): ModelCapability {
     const value = name.toLowerCase();
     if (VIDEO_KEYWORDS.some((keyword) => value.includes(keyword))) return "video";
+    if (SPEECH_KEYWORDS.some((keyword) => value.includes(keyword))) return "speech";
     if (AUDIO_KEYWORDS.some((keyword) => value.includes(keyword))) return "audio";
     if (IMAGE_KEYWORDS.some((keyword) => value.includes(keyword))) return "image";
     return "text";
@@ -146,8 +150,8 @@ function modelMatchesCapability(config: AiConfig, value: string, capability?: Mo
 }
 
 export function resolveModelForCapability(config: AiConfig, currentModel: string | undefined, capability: ModelCapability) {
-    const defaultModel = capability === "image" ? config.imageModel : capability === "video" ? config.videoModel : capability === "audio" ? config.audioModel : config.textModel;
-    const fallbackModel = capability === "image" ? defaultConfig.imageModel : capability === "video" ? defaultConfig.videoModel : capability === "audio" ? defaultConfig.audioModel : defaultConfig.textModel;
+    const defaultModel = capability === "image" ? config.imageModel : capability === "video" ? config.videoModel : capability === "audio" ? config.audioModel : capability === "speech" ? config.speechModel : config.textModel;
+    const fallbackModel = capability === "image" ? defaultConfig.imageModel : capability === "video" ? defaultConfig.videoModel : capability === "audio" ? defaultConfig.audioModel : capability === "speech" ? defaultConfig.speechModel : defaultConfig.textModel;
     if (currentModel && modelMatchesCapability(config, currentModel, capability)) return currentModel;
     if (defaultModel && modelMatchesCapability(config, defaultModel, capability)) return defaultModel;
     return fallbackModel;
@@ -164,7 +168,7 @@ export function resolveModelScript(config: AiConfig, value: string) {
 }
 
 function isAiConfigReady(config: AiConfig, model: string) {
-    return Boolean(model.trim() && config.apiKey.trim());
+    return Boolean(model.trim() && (resolveModelChannel(config, model)?.apiKey?.trim() || config.apiKey.trim()));
 }
 
 export const useConfigStore = create<ConfigStore>()(
@@ -209,10 +213,11 @@ export const useConfigStore = create<ConfigStore>()(
                         apiFormat: "openai",
                         channels,
                         models,
-                        imageModel: IMAGE_MODEL,
+                        imageModel: normalizeModelOptionValue(config.imageModel || IMAGE_MODEL, channels),
                         videoModel: normalizeModelOptionValue(config.videoModel, channels),
                         textModel: normalizeModelOptionValue(config.textModel || config.model, channels),
                         audioModel: normalizeModelOptionValue(config.audioModel || defaultConfig.audioModel, channels),
+                        speechModel: normalizeModelOptionValue(config.speechModel, channels),
                         audioVoice: config.audioVoice || defaultConfig.audioVoice,
                         audioFormat: config.audioFormat || defaultConfig.audioFormat,
                         audioSpeed: config.audioSpeed || defaultConfig.audioSpeed,
@@ -256,7 +261,7 @@ function createModelChannel(channel?: Partial<ModelChannel>): ModelChannel {
     return {
         id: channel?.id?.trim() || nanoid(),
         name: channel?.name?.trim() || i18n.t("config.channels.newName"),
-        baseUrl: defaultBaseUrlForApiFormat(),
+        baseUrl: channel?.baseUrl?.trim() || defaultBaseUrlForApiFormat(),
         apiKey: channel?.apiKey || "",
         apiFormat: "openai",
         models: normalizeChannelModels(channel?.models),
@@ -302,7 +307,7 @@ export function modelOptionLabel(config: AiConfig, value: string) {
     const decoded = decodeChannelModel(value);
     if (!decoded) return value;
     const channel = config.channels.find((item) => item.id === decoded.channelId);
-    return channel ? `${decoded.model}（${channel.name}）` : decoded.model;
+    return channel ? `${channel.name}/${decoded.model}` : decoded.model;
 }
 
 function modelOptionsFromChannels(channels: ModelChannel[]) {
@@ -321,12 +326,21 @@ function normalizeModelOptionValue(value: string | undefined, channels: ModelCha
     return channel && channel.models.some((item) => item.name === model) ? encodeChannelModel(channel.id, model) : model;
 }
 
+export function resolveModelChannel(config: AiConfig, value: string): ModelChannel | undefined {
+    const decoded = decodeChannelModel(value);
+    if (decoded) return config.channels.find((item) => item.id === decoded.channelId);
+    const name = value.trim();
+    const owner = name ? config.channels.find((item) => item.models.some((model) => model.name === name)) : undefined;
+    return owner || config.channels[0];
+}
+
 export function resolveModelRequestConfig(config: AiConfig, value: string) {
+    const channel = resolveModelChannel(config, value);
     return {
         ...config,
         model: modelOptionName(value || config.model),
-        baseUrl: OPENROUTER_BASE_URL,
-        apiKey: config.apiKey,
+        baseUrl: channel?.baseUrl?.trim() || config.baseUrl || OPENROUTER_BASE_URL,
+        apiKey: channel?.apiKey?.trim() || config.apiKey,
         apiFormat: "openai" as const,
     };
 }

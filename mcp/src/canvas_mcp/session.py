@@ -17,7 +17,7 @@ from canvas_mcp.operations import build_canvas_tool_request
 from canvas_mcp.tools import compact_canvas_state, compact_node, is_tool_name, parse_tool_input
 from canvas_mcp.types import CanvasSnapshot
 
-SITE_TOOLS = frozenset({"site_navigate", "canvas_list_projects", "assets_list", "assets_add", "generation_get_status"})
+SITE_TOOLS = frozenset({"site_navigate", "canvas_list_projects", "generation_get_status"})
 READ_TOOLS = frozenset({"canvas_get_state", "canvas_get_selection", "canvas_export_snapshot"})
 
 REQUEST_TIMEOUT_SECONDS = 30.0

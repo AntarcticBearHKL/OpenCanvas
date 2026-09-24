@@ -41,7 +41,8 @@ export function AssetFilePreview({ file, open, onClose }: { file: File | null; o
             onCancel={onClose}
             footer={null}
             width="auto"
-            styles={{ body: { padding: 0, display: "flex", flexDirection: "column", gap: 12, alignItems: "center", maxHeight: "80vh" } }}
+            classNames={{ container: "glass-raised" }}
+            styles={{ container: { background: "var(--glass-strong)" }, body: { padding: 0, display: "flex", flexDirection: "column", gap: 12, alignItems: "center", maxHeight: "80vh" } }}
         >
             {kind === "image" && url ? <img src={url} alt={file?.name} style={{ maxWidth: "100%", maxHeight: "72vh", objectFit: "contain" }} /> : null}
             {kind === "video" && url ? <video src={url} controls style={{ maxWidth: "100%", maxHeight: "72vh" }} /> : null}

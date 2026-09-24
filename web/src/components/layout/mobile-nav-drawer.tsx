@@ -15,7 +15,7 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
     const { t } = useTranslation();
 
     return (
-        <Drawer title={t("topNav.navigation")} placement="left" size={280} open={open} onClose={onClose} className="md:hidden">
+        <Drawer title={t("topNav.navigation")} placement="left" size={280} open={open} onClose={onClose} className="md:hidden" classNames={{ section: "glass-raised !bg-[var(--glass-strong)]" }}>
             <div className="space-y-1">
                 {navigationTools.map((tool) => {
                     const Icon = tool.icon;
@@ -26,8 +26,8 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
                             to={`/${tool.slug}`}
                             onClick={onClose}
                             className={cn(
-                                "flex items-center gap-3 rounded-lg px-3 py-3 text-base transition",
-                                active ? "bg-muted font-medium text-foreground dark:bg-muted dark:text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground",
+                                "flex items-center gap-3 rounded-none px-3 py-3 text-base transition",
+                                active ? "bg-brand font-semibold text-brand-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
                             )}
                         >
                             <Icon className="size-5" />

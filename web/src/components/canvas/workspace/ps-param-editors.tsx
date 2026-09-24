@@ -9,7 +9,7 @@ import { psFormatGradientStop, psHexToRgb, psParseGradientStops } from "@/lib/ca
 
 const ROW_CLASS = STUDIO_PANEL_ROW_CLASS;
 const LABEL_CLASS = STUDIO_PANEL_LABEL_CLASS;
-const VALUE_CLASS = "w-9 shrink-0 text-right text-[11px] tabular-nums";
+const VALUE_CLASS = "w-9 shrink-0 text-right text-sm tabular-nums";
 
 const psSortPairs = (list: number[]) => {
     const items = Array.from({ length: Math.floor(list.length / 2) }, (_, index) => ({ x: list[index * 2], y: list[index * 2 + 1] }));
@@ -30,7 +30,7 @@ export function PsCurveEditor({ points, theme, onChange }: { points: number[]; t
         <svg
             ref={svgRef}
             viewBox="0 0 255 255"
-            className="h-36 w-full touch-none rounded-md border"
+            className="h-36 w-full touch-none rounded-[2px] border"
             style={{ borderColor: theme.toolbar.border, background: theme.toolbar.panel, cursor: "crosshair" }}
             onPointerMove={(event: ReactPointerEvent<SVGSVGElement>) => {
                 if (dragIndex < 0) return;
@@ -101,7 +101,7 @@ export function PsGradientStopsEditor({ stops: source, theme, onChange }: { stop
         <div className="py-1">
             <div
                 ref={barRef}
-                className="relative h-5 w-full cursor-copy rounded-sm border"
+                className="relative h-5 w-full cursor-copy rounded-[2px] border"
                 style={{ borderColor: theme.toolbar.border, background: `linear-gradient(to right, ${colors})` }}
                 onPointerDown={(event) => {
                     const box = barRef.current?.getBoundingClientRect();
@@ -128,7 +128,7 @@ export function PsGradientStopsEditor({ stops: source, theme, onChange }: { stop
                     />
                 ))}
             </div>
-            <div className={ROW_CLASS} style={{ color: theme.node.muted }}>
+            <div className={ROW_CLASS} style={{ color: theme.node.label }}>
                 <span className={LABEL_CLASS}>{t("canvas.ps.adjust.gradientStops")}</span>
                 <PsColorPicker value={parsed[index].color} ariaLabel={t("canvas.ps.adjust.gradientStops")} onChange={(hex) => update({ color: hex })} />
                 <Slider className="!mx-0 min-w-0 flex-1" min={0} max={100} step={1} value={Math.round(parsed[index].position * 100)} ariaLabelForHandle={t("canvas.ps.adjust.gradientStops")} onChange={(value) => update({ position: value / 100 })} />

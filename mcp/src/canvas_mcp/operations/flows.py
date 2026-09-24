@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
-from canvas_mcp.operations.shared import apply_ops, config_node_op, expand_story_op, generation_mode, run_generation_op, text_node_op
+from canvas_mcp.operations.shared import apply_ops, config_node_op, generation_mode, run_generation_op, text_node_op
 from canvas_mcp.tools import next_canvas_x
 from canvas_mcp.types import CanvasSnapshot
 
@@ -79,7 +79,3 @@ def auto_generate(mode: str) -> Callable[[dict[str, Any], CanvasSnapshot | None]
 
 def run_generation(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> dict[str, Any]:
     return apply_ops([run_generation_op(input_data["nodeId"], generation_mode(input_data.get("mode")), input_data.get("prompt"))])
-
-
-def expand_story(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> dict[str, Any]:
-    return apply_ops([expand_story_op(input_data["nodeId"], input_data.get("instructions"))])

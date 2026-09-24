@@ -3,25 +3,24 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import { useNavigate, useParams } from "react-router-dom";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
-import { Download, Image as ImageIcon, ImagePlus, Music2, Video } from "lucide-react";
+import { ClipboardCopy, Download, Image as ImageIcon, ImagePlus, Music2, Video } from "lucide-react";
 
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
 import { createVideoGenerationTask, isVideoTaskFailed, storeGeneratedVideo, waitForVideoGenerationTask } from "@/services/api/video";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { useLocalModelStore } from "@/stores/use-local-model-store";
-import { resolveImageUrl, uploadImage } from "@/services/image-storage";
+import { cleanupUnusedCanvasImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { removeImageBackground } from "@/services/background-removal";
 import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
-import { getDataUrlByteSize } from "@/lib/image-utils";
 import { canvasThemes } from "@/lib/canvas-theme";
-import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { cropDataUrl, splitDataUrl, upscaleDataUrl, type ImageUpscaleParams } from "@/lib/canvas/canvas-image-data";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 import { fitNodeSize } from "@/lib/canvas/canvas-node-size";
 import { captureVideoFrame, type VideoFramePosition } from "@/lib/canvas/canvas-video-frame";
+import { copyImageToClipboard } from "@/lib/clipboard-image";
 import { App, Button, Modal } from "antd";
 import { NODE_DEFAULT_SIZE, getNodeSpec } from "@/constant/canvas";
 import { ActiveConnectionPath, ConnectionPath } from "@/components/canvas/canvas-connections";
@@ -56,7 +55,6 @@ import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "@/componen
 import { PromptNodePanel } from "@/components/canvas/prompt-node-panel";
 import { SmartCanvasSettingsPopover } from "@/components/canvas/smart-canvas-settings-popover";
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
-import { AssetPickerModal } from "@/components/canvas/asset-picker-modal";
 import { CanvasSidePanel } from "@/components/canvas/canvas-side-panel";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useAgentBridge } from "@/pages/canvas/hooks/use-agent-bridge";
@@ -254,8 +252,6 @@ function InfiniteCanvasPage() {
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const prepareModel = useLocalModelStore((state) => state.prepareModel);
-    const addAsset = useAssetStore((state) => state.addAsset);
-    const cleanupAssetImages = useAssetStore((state) => state.cleanupImages);
     const hydrated = useCanvasStore((state) => state.hydrated);
     const openProject = useCanvasStore((state) => state.openProject);
     const updateProject = useCanvasStore((state) => state.updateProject);
@@ -280,7 +276,6 @@ function InfiniteCanvasPage() {
     const [cutStroke, setCutStroke] = useState<Position[] | null>(null);
     const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
     const [isMiniMapOpen, setIsMiniMapOpen] = useState(false);
-    const [assetPickerOpen, setAssetPickerOpen] = useState(false);
     const [projectLoaded, setProjectLoaded] = useState(false);
     const loadedOnceRef = useRef(false);
     const loadedProjectIdRef = useRef<string | null>(null);
@@ -340,9 +335,9 @@ function InfiniteCanvasPage() {
 
     const cleanupCanvasFiles = useCallback(
         (extra?: unknown) => {
-            cleanupAssetImages({ extra, history: historyRef.current, lastHistory: lastHistoryRef.current });
+            cleanupUnusedCanvasImages({ extra, history: historyRef.current, lastHistory: lastHistoryRef.current });
         },
-        [cleanupAssetImages],
+        [],
     );
 
     const { handleGenerateNode, handleRetryNode, pollVideoNodeTask, confirmStopGeneration, maskEditImageNode, generateAngleNode } = useCanvasGeneration({
@@ -519,7 +514,7 @@ function InfiniteCanvasPage() {
             const { fromNodeId, toNodeId } = connection;
             const exists = connectionsRef.current.some((conn) => conn.fromNodeId === fromNodeId && conn.toNodeId === toNodeId);
             if (!exists) {
-                setConnections((prev) => [...prev, { id: `conn-${Date.now()}`, fromNodeId, toNodeId }]);
+                setConnections((prev) => [...prev, { id: `conn-${Date.now()}`, ...connection }]);
             }
         },
         [message, t],
@@ -538,7 +533,6 @@ function InfiniteCanvasPage() {
             setConnections((prev) => [...prev, { id: nanoid(), ...connection }]);
             setSelectedNodeIds(new Set([newNode.id]));
             setSelectedConnectionId(null);
-            if (type !== CanvasNodeType.Text && type !== CanvasNodeType.Audio) setDialogNodeId(newNode.id);
             setPendingConnectionCreate(null);
             setConnecting(null);
         },
@@ -1151,16 +1145,7 @@ function InfiniteCanvasPage() {
         dragRef.current.hasMoved = false;
         dragRef.current.initialSelectedNodes = [];
         dragRef.current.ghost = null;
-        if (wasClick && clickedNodeId) {
-            const clickedNode = nodesRef.current.find((node) => node.id === clickedNodeId);
-            const clickedDefinition = clickedNode ? getNodeDefinition(clickedNode.type) : undefined;
-            if (clickedDefinition?.hidePanel) {
-                // Clicking a display-only plugin node selects it without opening a lower panel.
-                setDialogNodeId((current) => (current === clickedNodeId ? current : null));
-            } else if (clickedNode) {
-                setDialogNodeId(clickedNodeId);
-            }
-        }
+        if (wasClick && clickedNodeId) setDialogNodeId((current) => (current === clickedNodeId ? current : null));
     }, [applyNodeMetadata, appendAudioNodesToProject, bakeImageModifierNode, collectImageIntoAssets]);
 
     const moveNodeLayer = useCallback((nodeId: string, direction: "up" | "down") => {
@@ -1330,7 +1315,7 @@ function InfiniteCanvasPage() {
         };
     }, [finishNodeDrag, handleGlobalMouseMove, handleGlobalMouseUp, handleGlobalPointerMove]);
 
-    const { handleUploadRequest, handleImageInputChange, handleAssetInsert, insertFolderFile, handleDrop, pasteSystemClipboard } = useCanvasInsertion({
+    const { handleUploadRequest, handleImageInputChange, insertFolderFile, handleDrop, pasteSystemClipboard } = useCanvasInsertion({
         containerRef,
         imageInputRef,
         uploadTargetRef,
@@ -1343,7 +1328,6 @@ function InfiniteCanvasPage() {
         setSelectedNodeIds,
         setSelectedConnectionId,
         setDialogNodeId,
-        setAssetPickerOpen,
     });
 
     useEffect(() => {
@@ -1759,6 +1743,14 @@ function InfiniteCanvasPage() {
         saveAs(image.content, `canvas-image-${node.id}-${image.id}.${imageExtension(image.content)}`);
     }, []);
 
+    const copyImage = useCallback(
+        async (source: string | null | undefined) => {
+            if (await copyImageToClipboard(source)) message.success(t("canvas.imageTools.copied"));
+            else message.error(t("canvas.imageTools.copyFailed"));
+        },
+        [message, t],
+    );
+
     const captureVideoNodeFrame = useCallback(
         async (nodeId: string, position: VideoFramePosition) => {
             const node = nodesRef.current.find((item) => item.id === nodeId);
@@ -1774,7 +1766,7 @@ function InfiniteCanvasPage() {
                 insertDerivedAsset(
                     {
                         source: node,
-                        children: [{ id, image, title: t(`canvas.videoFrames.${position}Title`, { name: node.title || t("assets.kinds.video") }), size, position: { x, y } }],
+                        children: [{ id, image, title: t(`canvas.videoFrames.${position}Title`, { name: node.title || t("canvas.nodeTypes.video") }), size, position: { x, y } }],
                         select: "children",
                         clearSelectedConnection: true,
                         openDialog: id,
@@ -1787,52 +1779,6 @@ function InfiniteCanvasPage() {
             }
         },
         [message, t],
-    );
-
-    const saveNodeAsset = useCallback(
-        async (node: CanvasNodeData) => {
-            if (node.type === CanvasNodeType.Text) {
-                const content = node.metadata?.content?.trim();
-                if (!content) return message.error(t("canvas.projectPage.noTextToSave"));
-                addAsset({ kind: "text", title: node.metadata?.prompt?.slice(0, 24) || t("canvas.projectPage.canvasText"), coverUrl: "", tags: [], source: "Canvas", data: { content }, metadata: { source: "canvas", nodeId: node.id } });
-                message.success(t("common.addedToAssets"));
-                return;
-            }
-            if (node.type === CanvasNodeType.Video) {
-                if (!node.metadata?.content) return message.error(t("canvas.projectPage.noVideoToSave"));
-                addAsset({
-                    kind: "video",
-                    title: node.metadata?.prompt?.slice(0, 24) || t("canvas.projectPage.canvasVideo"),
-                    coverUrl: "",
-                    tags: [],
-                    source: "Canvas",
-                    data: { url: node.metadata.content, storageKey: node.metadata.storageKey, width: node.width, height: node.height, bytes: node.metadata.bytes || 0, mimeType: node.metadata.mimeType || "video/mp4" },
-                    metadata: { source: "canvas", nodeId: node.id, prompt: node.metadata?.prompt },
-                });
-                message.success(t("common.addedToAssets"));
-                return;
-            }
-            if (!node.metadata?.content) return message.error(t("canvas.projectPage.noImageToSave"));
-            const dataUrl = node.metadata.storageKey ? "" : node.metadata.content;
-            addAsset({
-                kind: "image",
-                title: node.metadata?.prompt?.slice(0, 24) || t("canvas.projectPage.canvasImage"),
-                coverUrl: node.metadata.content,
-                tags: [],
-                source: "Canvas",
-                data: {
-                    dataUrl,
-                    storageKey: node.metadata.storageKey,
-                    width: node.metadata.naturalWidth || node.width,
-                    height: node.metadata.naturalHeight || node.height,
-                    bytes: node.metadata.bytes || getDataUrlByteSize(dataUrl),
-                    mimeType: node.metadata.mimeType || "image/png",
-                },
-                metadata: { source: "canvas", nodeId: node.id, prompt: node.metadata?.prompt },
-            });
-            message.success(t("common.addedToAssets"));
-        },
-        [addAsset, message, t],
     );
 
     const cropImageNode = useCallback(async (node: CanvasNodeData, crop: CanvasImageCropRect) => {
@@ -1926,7 +1872,7 @@ function InfiniteCanvasPage() {
                     source: node,
                     children: pieces.map((piece, index) => ({
                         image: images[index],
-                        title: t("canvas.projectPage.splitTitle", { name: node.title || t("assets.kinds.image"), row: piece.row + 1, column: piece.column + 1 }),
+                        title: t("canvas.projectPage.splitTitle", { name: node.title || t("canvas.nodeTypes.image"), row: piece.row + 1, column: piece.column + 1 }),
                         size: { width: cellWidth, height: cellHeight },
                         position: { x: startX + piece.column * (cellWidth + gap), y: startY + piece.row * (cellHeight + gap) },
                         metadata: { prompt: node.metadata?.prompt },
@@ -2305,7 +2251,7 @@ function InfiniteCanvasPage() {
                             onSelectBoard={selectWorkspaceBoard}
                             onBoardChange={handleSmartCanvasChange}
                             onOutput={(target) => void handleSaveBoardAsNode(target)}
-                            onBack={() => handleWorkspaceChange("canvas")}
+                            onBack={() => navigate("/canvas")}
                         />
                     ) : (
                         <AudioStudio
@@ -2317,7 +2263,7 @@ function InfiniteCanvasPage() {
                             onOutput={handleMixdownAudioProject}
                             onExportStems={handleExportAudioStems}
                             onRecorded={handleAudioRecorded}
-                            onBack={() => handleWorkspaceChange("canvas")}
+                            onBack={() => navigate("/canvas")}
                         />
                     )}
                 </Suspense>
@@ -2450,7 +2396,7 @@ function InfiniteCanvasPage() {
                     onGenerateImage={generateImageFromTextNode}
                     onUpload={(node) => handleUploadRequest(node.id)}
                     onDownload={downloadNodeImage}
-                    onSaveAsset={(node) => void saveNodeAsset(node)}
+                    onCopy={(node) => void copyImage(node.metadata?.content)}
                     onMaskEdit={(node) => setMaskEditNodeId(node.id)}
                     onCrop={(node) => setCropNodeId(node.id)}
                     onRemoveBackground={(node) => void removeNodeBackground(node)}
@@ -2486,7 +2432,7 @@ function InfiniteCanvasPage() {
                     canvasTool={canvasTool}
                     canUndo={historyState.canUndo}
                     canRedo={historyState.canRedo}
-                    onAddNode={(type) => createNode(type)}
+                    onAddNode={(type, metadata) => createNode(type, undefined, metadata)}
                     onAddExtensionNode={(type) => createNode(type)}
                     onExport={exportCurrentCanvas}
                     onUndo={undoCanvas}
@@ -2559,10 +2505,11 @@ function InfiniteCanvasPage() {
                 >
                     {previewContent ? (
                         <>
-                            <img src={previewContent} alt={previewNode?.title || t("assets.kinds.image")} style={{ maxWidth: "100%", maxHeight: "72vh", objectFit: "contain" }} />
-                            <Button className="!border-foreground !bg-foreground !text-background hover:!border-foreground hover:!bg-foreground/85 hover:!text-background" icon={<Download className="size-4" />} onClick={() => saveAs(previewContent, `canvas-image-${previewNode?.id}.${imageExtension(previewContent)}`)}>
-                                {t("common.download")}
-                            </Button>
+                            <img src={previewContent} alt={previewNode?.title || t("canvas.nodeTypes.image")} style={{ maxWidth: "100%", maxHeight: "72vh", objectFit: "contain" }} />
+                            <div className="flex items-center gap-2">
+                                <Button className="!border-foreground !bg-foreground !text-background hover:!border-foreground hover:!bg-foreground/85 hover:!text-background" icon={<Download className="size-4" />} aria-label={t("common.download")} title={t("common.download")} onClick={() => saveAs(previewContent, `canvas-image-${previewNode?.id}.${imageExtension(previewContent)}`)} />
+                                <Button className="!border-foreground !bg-foreground !text-background hover:!border-foreground hover:!bg-foreground/85 hover:!text-background" icon={<ClipboardCopy className="size-4" />} aria-label={t("canvas.imageTools.copyTitle")} title={t("canvas.imageTools.copyTitle")} onClick={() => void copyImage(previewContent)} />
+                            </div>
                         </>
                     ) : null}
                 </Modal>
@@ -2580,25 +2527,22 @@ function InfiniteCanvasPage() {
                         <>
                             <img src={boardPreview.dataUrl} alt={boardPreview.title} style={{ maxWidth: "100%", maxHeight: "72vh", objectFit: "contain" }} />
                             <div className="flex items-center gap-2">
-                                <Button className="!border-foreground !bg-foreground !text-background hover:!border-foreground hover:!bg-foreground/85 hover:!text-background" icon={<Download className="size-4" />} onClick={() => saveAs(boardPreview.dataUrl, `smart-canvas-${boardPreview.width}x${boardPreview.height}.png`)}>
-                                    {t("canvas.smartCanvas.download")}
-                                </Button>
+                                <Button className="!border-foreground !bg-foreground !text-background hover:!border-foreground hover:!bg-foreground/85 hover:!text-background" icon={<Download className="size-4" />} aria-label={t("canvas.smartCanvas.download")} title={t("canvas.smartCanvas.download")} onClick={() => saveAs(boardPreview.dataUrl, `smart-canvas-${boardPreview.width}x${boardPreview.height}.png`)} />
+                                <Button className="!border-foreground !bg-foreground !text-background hover:!border-foreground hover:!bg-foreground/85 hover:!text-background" icon={<ClipboardCopy className="size-4" />} aria-label={t("canvas.imageTools.copyTitle")} title={t("canvas.imageTools.copyTitle")} onClick={() => void copyImage(boardPreview.dataUrl)} />
                             </div>
                         </>
                     ) : null}
                 </Modal>
-
-                <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={() => setAssetPickerOpen(false)} />
             </section>
             {dragGhost ? (
                 <div
-                    className="canvas-drag-ghost pointer-events-none fixed z-[120] flex size-11 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-0.5 rounded-xl border"
+                    className="canvas-drag-ghost pointer-events-none fixed z-[120] flex size-11 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-0.5 rounded-[2px] border"
                     style={{ left: dragGhost.x, top: dragGhost.y, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
                 >
                     <GhostIcon className="size-5 shrink-0" />
-                    {ghostNode?.title ? <span className="max-w-[34px] truncate text-[9px] leading-none">{ghostNode.title}</span> : null}
+                    {ghostNode?.title ? <span className="max-w-[40px] truncate text-xs leading-none">{ghostNode.title}</span> : null}
                     {dragGhost.count > 1 ? (
-                        <span className="absolute -right-1.5 -top-1.5 rounded-full border px-1 text-[9px] leading-4" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }}>
+                        <span className="absolute -right-1.5 -top-1.5 rounded-full border px-1 text-xs leading-4" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }}>
                             ×{dragGhost.count}
                         </span>
                     ) : null}

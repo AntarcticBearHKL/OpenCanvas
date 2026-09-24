@@ -26,10 +26,10 @@ function aiHeaders(config: AiConfig) {
 }
 
 export async function requestAudioGeneration(config: AiConfig, prompt: string, options?: RequestOptions, referenceAudios: ReferenceAudio[] = []): Promise<GeneratedAudio> {
-    const requestConfig = resolveModelRequestConfig(config, config.model || config.audioModel);
+    const requestConfig = resolveModelRequestConfig(config, config.model || config.audioModel || config.speechModel);
     const model = requestConfig.model.trim();
     const format = normalizeAudioFormatValue(config.audioFormat);
-    const script = resolveModelScript(config, config.model || config.audioModel);
+    const script = resolveModelScript(config, config.model || config.audioModel || config.speechModel);
     if (script) {
         if (!model) throw new Error(apiText("audioModelRequired"));
         if (!requestConfig.baseUrl.trim()) throw new Error(apiText("baseUrlRequired"));

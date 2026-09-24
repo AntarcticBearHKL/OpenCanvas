@@ -5,6 +5,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import { AUDIO_FADE_SHAPE_LABEL_KEYS, AUDIO_FADE_SHAPE_OPTIONS, AUDIO_SNAP_LABEL_KEYS, AUDIO_SNAP_OPTIONS } from "@/components/canvas/workspace/audio-panels";
+import { STUDIO_MENU_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import type { CanvasAudioAutomationCurve, CanvasAudioClip, CanvasAudioFadeShape, CanvasAudioSnap } from "@/types/canvas";
 
@@ -48,12 +49,13 @@ type AudioMenusProps = AudioMenuFlags & {
     onAutomation: (command: AudioAutomationCommand) => void;
 };
 
-export const AUDIO_MENU_BUTTON_CLASS = "flex h-6 shrink-0 items-center gap-0.5 rounded-md px-1.5 text-xs transition hover:bg-black/5 dark:hover:bg-white/10";
+export const AUDIO_MENU_BUTTON_CLASS = STUDIO_MENU_BUTTON_CLASS;
+export const AUDIO_MENU_POPUP = { className: "glass-raised", style: { background: "var(--glass-strong)" } };
 
 const item = (label: string, hint = ""): ReactNode => (
     <span className="flex w-full min-w-[180px] items-center justify-between gap-6">
         <span>{label}</span>
-        {hint ? <span className="text-[11px] opacity-50">{hint}</span> : null}
+        {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
     </span>
 );
 
@@ -227,6 +229,7 @@ export function AudioClipContextMenu({ clip, onCommand, children }: { clip: Canv
         <Dropdown
             trigger={["contextMenu"]}
             menu={{
+                ...AUDIO_MENU_POPUP,
                 items: audioClipMenuItems(t, clip),
                 onClick: ({ key, domEvent }) => {
                     domEvent.stopPropagation();
@@ -246,6 +249,7 @@ export function AudioTrackContextMenu({ canRemove, exporting = false, onCommand,
         <Dropdown
             trigger={["contextMenu"]}
             menu={{
+                ...AUDIO_MENU_POPUP,
                 items: audioTrackMenuItems(t, canRemove, exporting),
                 onClick: ({ key, domEvent }) => {
                     domEvent.stopPropagation();
@@ -265,6 +269,7 @@ export function AudioLaneContextMenu({ canRemove, midi = false, onCommand, child
         <Dropdown
             trigger={["contextMenu"]}
             menu={{
+                ...AUDIO_MENU_POPUP,
                 items: audioLaneMenuItems(t, canRemove, midi),
                 onClick: ({ key, domEvent }) => {
                     domEvent.stopPropagation();
@@ -284,6 +289,7 @@ export function AudioMidiRegionContextMenu({ onCommand, children }: { onCommand:
         <Dropdown
             trigger={["contextMenu"]}
             menu={{
+                ...AUDIO_MENU_POPUP,
                 items: audioMidiRegionMenuItems(t),
                 onClick: ({ key, domEvent }) => {
                     domEvent.stopPropagation();
@@ -303,6 +309,7 @@ export function AudioRulerContextMenu({ hasRange, canClearCycle, onCommand, chil
         <Dropdown
             trigger={["contextMenu"]}
             menu={{
+                ...AUDIO_MENU_POPUP,
                 items: audioRulerMenuItems(t, hasRange, canClearCycle),
                 onClick: ({ key, domEvent }) => {
                     domEvent.stopPropagation();
@@ -322,6 +329,7 @@ export function AudioAutomationPointMenu({ curve, onCommand, children }: { curve
         <Dropdown
             trigger={["contextMenu"]}
             menu={{
+                ...AUDIO_MENU_POPUP,
                 items: audioAutomationPointMenuItems(t, curve),
                 onClick: ({ key, domEvent }) => {
                     domEvent.stopPropagation();
@@ -349,7 +357,7 @@ export function AudioMenus({ onEdit, onTrack, onClip, onView, onAutomation, ...f
     return (
         <span className="flex shrink-0 items-center gap-0.5">
             {audioMenuGroups(t, flags).map((group) => (
-                <Dropdown key={group.key} menu={{ items: group.items, onClick: ({ key }) => dispatch[group.key](key) }} placement="bottomLeft" styles={{ root: { zIndex: 1300 } }}>
+                <Dropdown key={group.key} menu={{ ...AUDIO_MENU_POPUP, items: group.items, onClick: ({ key }) => dispatch[group.key](key) }} placement="bottomLeft" styles={{ root: { zIndex: 1300 } }}>
                         <Button size="small" type="text" className={AUDIO_MENU_BUTTON_CLASS} style={{ color: theme.node.text }}>
                         {t(group.labelKey)}
                         <ChevronDown className="size-3" />

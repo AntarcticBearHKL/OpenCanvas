@@ -36,7 +36,7 @@ MCP 客户端连接同一个端口上的 Streamable HTTP 端点：
 POST http://127.0.0.1:3000/mcp
 ```
 
-服务端为每个已初始化的会话创建一个 `McpServer`，后续请求按 `mcp-session-id` 请求头路由。它对外声明 `opencanvas-mcp` 服务名并暴露 32 个画布工具：站点级工具转发给浏览器，画布读取类工具用最新快照直接回答，其余画布工具转换成 `canvas_apply_ops`。`canvas_create_node` 与 `canvas_apply_ops` 支持全部内置节点类型（文本、提示词、音乐提示词、语音提示词、图片、视频、音频、生成配置、图片生成、语音生成、音乐生成、智能画布、素材、录音、图片修饰）。
+服务端为每个已初始化的会话创建一个 `McpServer`，后续请求按 `mcp-session-id` 请求头路由。它对外声明 `opencanvas-mcp` 服务名并暴露 30 个画布工具：站点级工具转发给浏览器，画布读取类工具用最新快照直接回答，其余画布工具转换成 `canvas_apply_ops`。`canvas_create_node` 与 `canvas_apply_ops` 支持全部内置节点类型（文本、提示词、音乐提示词、语音提示词、图片、视频、音频、生成配置、图片生成、语音生成、音乐生成、智能画布、素材、录音、图片修饰）。
 
 ## 安全边界
 

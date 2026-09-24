@@ -4,6 +4,7 @@ import { Grid2x2, ListRestart, PanelTop, Redo2, Rows3, Trash2, Undo2, ZoomIn, Zo
 import { useTranslation } from "react-i18next";
 
 import { readImageMeta } from "@/lib/image-utils";
+import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import type { ImageSplitParams } from "@/lib/canvas/canvas-image-data";
 import { useImageEditorViewport } from "@/components/canvas/use-image-editor-viewport";
 
@@ -15,6 +16,7 @@ type ActiveLine = { axis: "horizontal" | "vertical"; index: number } | null;
 
 export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { dataUrl: string; open: boolean; onClose: () => void; onConfirm: (params: CanvasImageSplitParams) => void }) {
     const { t } = useTranslation();
+    const theme = useCanvasTheme();
     const [params, setParams] = useState(defaultParams);
     const [image, setImage] = useState<{ width: number; height: number } | null>(null);
     const [active, setActive] = useState<ActiveLine>(null);
@@ -148,22 +150,22 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
     const confirmParams = { ...params, horizontalLines, verticalLines, rows, columns };
 
     return (
-        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={780} centered destroyOnHidden transitionName="" maskTransitionName="">
+        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={780} centered destroyOnHidden transitionName="" maskTransitionName="" classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
             <div className="space-y-5" data-canvas-no-zoom>
                 <div>
                     <h2 className="text-xl font-semibold">{t("canvas.editors.splitTitle")}</h2>
-                    <p className="mt-1 text-sm opacity-60">{t("canvas.editors.splitDescription", { count: total })}</p>
-                    <p className="mt-2 text-xs leading-5 opacity-55">{t("canvas.editors.splitHint")}</p>
+                    <p className="mt-1 text-sm" style={{ color: theme.node.muted }}>{t("canvas.editors.splitDescription", { count: total })}</p>
+                    <p className="mt-2 text-sm leading-5" style={{ color: theme.node.muted }}>{t("canvas.editors.splitHint")}</p>
                 </div>
                 <div className="grid gap-6 md:grid-cols-[minmax(260px,1fr)_280px]">
-                    <div className="min-w-0 rounded-xl border p-4">
+                    <div className="min-w-0 rounded-none border p-4">
                         <div
                             ref={viewport.viewportRef}
                             {...viewport.panHandlers}
-                            className={`relative isolate h-[340px] min-h-[300px] rounded-lg bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
+                            className={`relative isolate h-[340px] min-h-[300px] rounded-[2px] bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
                         >
                             <div className="relative" style={viewport.contentStyle}>
-                                <div ref={previewRef} className="absolute isolate overflow-hidden rounded-lg bg-black [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
+                                <div ref={previewRef} className="absolute isolate overflow-hidden rounded-[2px] bg-black [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
                                     <div className="absolute left-0 top-0 [backface-visibility:hidden]" style={viewport.mediaStyle}>
                                         <img src={dataUrl} alt="" className="block h-full w-full object-contain" draggable={false} />
                                     </div>
@@ -182,7 +184,7 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
                                 <Tooltip title={t("canvas.editors.zoomOut")}>
                                     <Button type="text" icon={<ZoomOut className="size-4" />} disabled={!viewport.canZoomOut} aria-label={t("canvas.editors.zoomOut")} onClick={viewport.zoomOut} />
                                 </Tooltip>
-                                <button type="button" className="min-w-14 text-center text-xs font-semibold tabular-nums opacity-70" onClick={viewport.resetZoom}>
+                                <button type="button" className="min-w-14 text-center text-xs font-semibold tabular-nums" style={{ color: theme.node.label }} onClick={viewport.resetZoom}>
                                     {Math.round(viewport.zoom * 100)}%
                                 </button>
                                 <Tooltip title={t("canvas.editors.zoomIn")}>
@@ -209,13 +211,13 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
                                 {t("canvas.editors.resetLines")}
                             </Button>
                         </div>
-                        <div className="rounded-xl border px-4 py-3 text-sm">
+                        <div className="rounded-none border px-4 py-3 text-sm">
                             <div className="flex items-center justify-between">
-                                <span className="opacity-60">{t("canvas.editors.pieceCount")}</span>
+                                <span className="font-medium" style={{ color: theme.node.label }}>{t("canvas.editors.pieceCount")}</span>
                                 <span className="font-semibold">{t("canvas.editors.pieces", { count: total })}</span>
                             </div>
                             <div className="mt-2 flex items-center justify-between">
-                                <span className="opacity-60">{t("canvas.editors.averageSize")}</span>
+                                <span className="font-medium" style={{ color: theme.node.label }}>{t("canvas.editors.averageSize")}</span>
                                 <span className="font-semibold">{pieceSize ? `${pieceSize.width} x ${pieceSize.height}` : t("canvas.editors.unknown")}</span>
                             </div>
                         </div>
@@ -230,9 +232,10 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
 }
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: string | number | null) => void }) {
+    const theme = useCanvasTheme();
     return (
         <label className="block space-y-2">
-            <span className="font-medium opacity-75">{label}</span>
+            <span className="font-medium" style={{ color: theme.node.label }}>{label}</span>
             <InputNumber className="w-full" min={1} max={maxGridSize} precision={0} value={value} onChange={onChange} />
         </label>
     );

@@ -22,6 +22,10 @@ export function connectionRelationLabel(connection: CanvasConnection, from: Canv
     return i18n.t(`canvas.relations.${relation}`);
 }
 
+export function inferConnectionRelation(_from: CanvasNodeData, _to: CanvasNodeData): string | undefined {
+    return undefined;
+}
+
 export function connectionGeometry(from: CanvasNodeData, to: CanvasNodeData) {
     const startX = from.position.x + from.width;
     const startY = from.position.y + from.height / 2;

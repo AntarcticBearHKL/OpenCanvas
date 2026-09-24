@@ -3,8 +3,9 @@ import { Check, ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { dockIsVisible, type DockLayout, type DockPanelDef } from "@/components/canvas/dock/dock-layout";
+import { STUDIO_MENU_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
 
-const MENU_BUTTON_CLASS = "flex h-6 shrink-0 items-center gap-0.5 rounded-md px-1.5 text-xs transition hover:bg-black/5 dark:hover:bg-white/10";
+const MENU_BUTTON_CLASS = STUDIO_MENU_BUTTON_CLASS;
 const ITEM_CLASS = "flex w-full min-w-[190px] items-center gap-2";
 
 export function DockWindowMenu({ defs, layout, onToggle, onReset }: { defs: DockPanelDef[]; layout: DockLayout; onToggle: (id: string) => void; onReset: () => void }) {
@@ -18,7 +19,7 @@ export function DockWindowMenu({ defs, layout, onToggle, onReset }: { defs: Dock
                 label: (
                     <span className={ITEM_CLASS}>
                         <Check className={visible ? "size-3.5 shrink-0" : "size-3.5 shrink-0 opacity-0"} />
-                        <Icon className="size-3.5 shrink-0 opacity-60" />
+                        <Icon className="size-3.5 shrink-0 opacity-75" />
                         <span>{t(def.labelKey)}</span>
                     </span>
                 ),

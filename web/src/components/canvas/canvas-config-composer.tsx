@@ -113,20 +113,20 @@ export function CanvasConfigComposer({ nodeId, nodes, value, inputs, onChange, o
     return (
         <div
             data-canvas-no-zoom
-            className={`rounded-2xl border p-3 ${frostedSurfaceClass}`}
-            style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
+            className="rounded-none border p-3 glass-card"
+            style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
             onMouseDown={stopCanvasInteraction}
             onPointerDown={stopCanvasInteraction}
             onWheel={(event) => event.stopPropagation()}
         >
             <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-baseline gap-2">
-                    <div className="shrink-0 text-xs font-semibold">{t("canvas.composer.title")}</div>
-                    <div className="truncate text-[11px] opacity-55">{t("canvas.composer.description")}</div>
+                    <div className="shrink-0 text-sm font-semibold">{t("canvas.composer.title")}</div>
+                    <div className="truncate text-sm" style={{ color: theme.node.muted }}>{t("canvas.composer.description")}</div>
                 </div>
                 <Button size="small" type="text" className="!h-7 !w-7 !min-w-7 !p-0" icon={<X className="size-3.5" />} onClick={onClose} />
             </div>
-            <div className="relative rounded-xl">
+            <div className="relative rounded-none">
                 {!value.trim() ? <div className="pointer-events-none absolute left-3 top-2 text-sm leading-7" style={{ color: theme.node.placeholder }}>{t("canvas.composer.placeholder")}</div> : null}
                 <div
                     ref={editorRef}
@@ -200,13 +200,13 @@ function MentionMenu({ inputs, allInputs, activeIndex, theme, onSelect }: { inpu
     };
 
     return (
-        <div className={`absolute left-2 top-[calc(100%+6px)] z-[90] max-h-56 w-64 overflow-y-auto rounded-2xl border p-1 ${frostedSurfaceClass}`} style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
+        <div className={`absolute left-2 top-[calc(100%+6px)] z-[90] max-h-56 w-64 overflow-y-auto rounded-none border p-1 ${frostedSurfaceClass}`} style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
             {inputs.map((input, index) => (
                 <button
                     key={input.nodeId}
                     ref={index === activeIndex ? activeItemRef : undefined}
                     type="button"
-                    className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition"
+                    className="flex w-full min-w-0 items-center gap-2 rounded-[2px] px-2 py-1.5 text-left text-sm transition"
                     style={{ background: index === activeIndex ? theme.toolbar.activeBg : "transparent", color: index === activeIndex ? theme.toolbar.activeText : theme.node.text }}
                     onMouseDown={(event) => {
                         event.preventDefault();
@@ -217,7 +217,7 @@ function MentionMenu({ inputs, allInputs, activeIndex, theme, onSelect }: { inpu
                     <ResourcePreview input={input} />
                     <span className="min-w-0 flex-1">
                         <span className="block font-medium">{resourceLabel(input, allInputs)}</span>
-                        <span className="block truncate opacity-65">{input.text || input.title}</span>
+                        <span className="block truncate" style={{ color: theme.node.muted }}>{input.text || input.title}</span>
                     </span>
                 </button>
             ))}
@@ -226,11 +226,11 @@ function MentionMenu({ inputs, allInputs, activeIndex, theme, onSelect }: { inpu
 }
 
 function ResourcePreview({ input }: { input: NodeGenerationInput }) {
-    if (input.type === "image" && input.image) return <img src={input.image.dataUrl} alt="" className="size-9 rounded-md object-cover" />;
-    if (input.type === "video" && input.video) return <video src={input.video.url} className="size-9 rounded-md bg-black object-cover" muted preload="metadata" />;
+    if (input.type === "image" && input.image) return <img src={input.image.dataUrl} alt="" className="size-9 rounded-[2px] object-cover" />;
+    if (input.type === "video" && input.video) return <video src={input.video.url} className="size-9 rounded-[2px] bg-black object-cover" muted preload="metadata" />;
     const Icon = input.type === "audio" ? Music2 : input.type === "video" ? Video : input.type === "image" ? ImageIcon : FileText;
     return (
-        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-black/10">
+        <span className="grid size-9 shrink-0 place-items-center rounded-[2px] bg-black/10">
             <Icon className="size-4" />
         </span>
     );
@@ -240,14 +240,14 @@ function createReferenceChip(input: NodeGenerationInput, theme: (typeof canvasTh
     const wrapper = document.createElement("span");
     wrapper.contentEditable = "false";
     wrapper.dataset.referenceNodeId = input.nodeId;
-    wrapper.className = "mx-px inline-flex h-7 max-w-40 items-center justify-center overflow-hidden rounded-md border px-1 text-xs leading-none align-middle";
+    wrapper.className = "mx-px inline-flex h-7 max-w-40 items-center justify-center overflow-hidden rounded-[2px] border px-1 text-sm leading-none align-middle";
     Object.assign(wrapper.style, chipStyle(theme));
     if (input.type === "image" && input.image) {
         const image = document.createElement("img");
         image.src = input.image.dataUrl;
         image.alt = input.title;
-        image.className = "size-6 rounded object-cover";
-        wrapper.className = "mx-px inline-flex size-6 items-center justify-center overflow-hidden rounded align-middle";
+        image.className = "size-6 rounded-[2px] object-cover";
+        wrapper.className = "mx-px inline-flex size-6 items-center justify-center overflow-hidden rounded-[2px] align-middle";
         wrapper.appendChild(image);
         wrapper.addEventListener("click", (event) => {
             event.preventDefault();

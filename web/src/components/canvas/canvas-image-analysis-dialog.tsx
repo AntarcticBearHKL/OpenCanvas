@@ -64,40 +64,40 @@ export function CanvasImageAnalysisDialog({ dataUrl, open, onClose, onCrop }: { 
     };
 
     return (
-        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={820} centered destroyOnHidden>
+        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={820} centered destroyOnHidden classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
             <div className="space-y-5">
                 <h2 className="text-xl font-semibold">{t("canvas.imageAnalysis.title")}</h2>
                 <div className="grid gap-6 md:grid-cols-[minmax(240px,1fr)_360px]">
                     <div className="min-w-0 space-y-4">
-                        <div className="grid min-h-[220px] place-items-center rounded-xl border p-4">
-                            <img src={dataUrl} alt="" className="max-h-[260px] max-w-full rounded-lg object-contain" draggable={false} />
+                        <div className="grid min-h-[220px] place-items-center rounded-none border p-4">
+                            <img src={dataUrl} alt="" className="max-h-[260px] max-w-full rounded-[2px] object-contain" draggable={false} />
                         </div>
                         <div className="space-y-2">
-                            <div className="text-sm font-medium opacity-75">{t("canvas.imageAnalysis.palette")}</div>
+                            <div className="text-sm font-medium" style={{ color: theme.node.label }}>{t("canvas.imageAnalysis.palette")}</div>
                             <div className="flex flex-wrap gap-2">
                                 {palette.length ? (
                                     palette.map((color, index) => (
                                         <div key={`${color}-${index}`} className="flex items-center gap-2">
-                                            <span className="size-7 rounded-md border" style={{ backgroundColor: color, borderColor: theme.node.stroke }} />
-                                            <span className="font-mono text-xs uppercase opacity-70">{color}</span>
+                                            <span className="size-7 rounded-[2px] border" style={{ backgroundColor: color, borderColor: theme.node.stroke }} />
+                                            <span className="font-mono text-sm uppercase" style={{ color: theme.node.text }}>{color}</span>
                                         </div>
                                     ))
                                 ) : (
-                                    <span className="text-xs opacity-55">{t("canvas.editors.loading")}</span>
+                                    <span className="text-sm" style={{ color: theme.node.muted }}>{t("canvas.editors.loading")}</span>
                                 )}
                             </div>
                         </div>
                     </div>
                     <div className="min-w-0 space-y-4">
                         <div className="space-y-2">
-                            <div className="text-sm font-medium opacity-75">{t("canvas.imageAnalysis.exif")}</div>
+                            <div className="text-sm font-medium" style={{ color: theme.node.label }}>{t("canvas.imageAnalysis.exif")}</div>
                             {exifRows.length ? (
-                                <div className="max-h-52 overflow-auto rounded-xl border">
-                                    <table className="w-full text-xs">
+                                <div className="max-h-52 overflow-auto rounded-none border">
+                                    <table className="w-full text-sm">
                                         <tbody>
                                             {exifRows.map((row) => (
                                                 <tr key={row.key} className="border-b border-border/60 last:border-b-0">
-                                                    <td className="w-1/3 break-all px-3 py-2 align-top opacity-60">{row.key}</td>
+                                                    <td className="w-1/3 break-all px-3 py-2 align-top font-medium" style={{ color: theme.node.label }}>{row.key}</td>
                                                     <td className="break-all px-3 py-2 align-top">{row.value}</td>
                                                 </tr>
                                             ))}
@@ -105,15 +105,15 @@ export function CanvasImageAnalysisDialog({ dataUrl, open, onClose, onCrop }: { 
                                     </table>
                                 </div>
                             ) : (
-                                <div className="rounded-xl border px-3 py-2 text-xs opacity-55">{t("canvas.imageAnalysis.exifEmpty")}</div>
+                                <div className="rounded-none border px-3 py-2 text-sm" style={{ color: theme.node.muted }}>{t("canvas.imageAnalysis.exifEmpty")}</div>
                             )}
                         </div>
                         <div className="space-y-2">
-                            <div className="text-sm font-medium opacity-75">{t("canvas.imageAnalysis.hash")}</div>
-                            <div className="rounded-xl border px-3 py-2 font-mono text-xs break-all">{hash || t("canvas.editors.loading")}</div>
+                            <div className="text-sm font-medium" style={{ color: theme.node.label }}>{t("canvas.imageAnalysis.hash")}</div>
+                            <div className="rounded-none border px-3 py-2 font-mono text-sm break-all">{hash || t("canvas.editors.loading")}</div>
                         </div>
                         <div className="space-y-2">
-                            <div className="text-sm font-medium opacity-75">{t("canvas.imageAnalysis.cropRatio")}</div>
+                            <div className="text-sm font-medium" style={{ color: theme.node.label }}>{t("canvas.imageAnalysis.cropRatio")}</div>
                             <Segmented block size="small" value={ratio} options={ratios} onChange={(value) => setRatio(String(value))} />
                         </div>
                         <div className="flex justify-end">

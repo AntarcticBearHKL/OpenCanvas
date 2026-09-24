@@ -1,15 +1,13 @@
 import type { NavigateFunction } from "react-router-dom";
 
 import i18n from "@/i18n";
-import { uploadImage } from "@/services/image-storage";
 import type { CanvasAgentSnapshot } from "@/lib/canvas/canvas-agent-ops";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
-import { useAssetStore } from "@/stores/use-asset-store";
 
-// Execute site-level Agent tools in the browser, including canvas lists, generation status, and asset operations.
+// Execute site-level Agent tools in the browser, including canvas lists and generation status.
 // Their data lives locally in the browser through localforage and Zustand, so this module accesses the relevant stores directly.
 
-const SITE_TOOL_NAMES = ["canvas_list_projects", "generation_get_status", "assets_list", "assets_add"] as const;
+const SITE_TOOL_NAMES = ["canvas_list_projects", "generation_get_status"] as const;
 
 type SiteToolName = (typeof SITE_TOOL_NAMES)[number];
 
@@ -33,10 +31,6 @@ export async function runSiteTool(name: SiteToolName, input: SiteToolInput, navi
             return listCanvasProjects(input);
         case "generation_get_status":
             return getGenerationStatus(input, context.canvasSnapshot);
-        case "assets_list":
-            return listAssets(input);
-        case "assets_add":
-            return addAsset(input);
         default:
             throw new Error(siteText("unknownTool", { name }));
     }
@@ -95,61 +89,6 @@ function listCanvasProjects(input: SiteToolInput) {
         connectionCount: project.connections.length,
     }));
     return { total: filtered.length, page, pageSize, items, hint: siteText("canvasHint") };
-}
-
-function listAssets(input: SiteToolInput) {
-    const { assets, hydrated } = useAssetStore.getState();
-    if (!hydrated) throw new Error(siteText("assetsLoading"));
-    const kind = input.kind === "text" || input.kind === "image" || input.kind === "video" ? input.kind : "all";
-    const keyword = String(input.keyword || "").trim().toLowerCase();
-    const filtered = assets.filter((asset) => {
-        if (kind !== "all" && asset.kind !== kind) return false;
-        if (!keyword) return true;
-        return [asset.title, asset.note, asset.source, ...asset.tags].filter(Boolean).join(" ").toLowerCase().includes(keyword);
-    });
-    const { page, pageSize, start, end } = paginate(input, filtered.length, 20);
-    const items = filtered.slice(start, end).map((asset) => ({
-        id: asset.id,
-        kind: asset.kind,
-        title: asset.title,
-        tags: asset.tags,
-        source: asset.source,
-        note: asset.note,
-        createdAt: asset.createdAt,
-        updatedAt: asset.updatedAt,
-        coverUrl: asset.coverUrl || undefined,
-        content: asset.kind === "text" ? asset.data.content : undefined,
-    }));
-    return { total: filtered.length, page, pageSize, items };
-}
-
-async function addAsset(input: SiteToolInput) {
-    const kind = input.kind;
-    const title = String(input.title || "").trim();
-    if (!title) throw new Error(siteText("assetTitleRequired"));
-    const tags = Array.isArray(input.tags) ? input.tags.filter((tag): tag is string => typeof tag === "string") : [];
-    const source = typeof input.source === "string" ? input.source : "Agent";
-    const note = typeof input.note === "string" ? input.note : undefined;
-    const store = useAssetStore.getState();
-    if (kind === "text") {
-        const content = String(input.content || "").trim();
-        if (!content) throw new Error(siteText("textContentRequired"));
-        const id = store.addAsset({ kind: "text", title, coverUrl: "", tags, source, note, data: { content } });
-        return { ok: true, id, kind: "text" };
-    }
-    if (kind === "image") {
-        const imageUrl = String(input.imageUrl || "").trim();
-        if (!imageUrl) throw new Error(siteText("imageUrlRequired"));
-        let stored;
-        try {
-            stored = await uploadImage(imageUrl);
-        } catch {
-            throw new Error(siteText("imageReadFailed"));
-        }
-        const id = store.addAsset({ kind: "image", title, coverUrl: stored.url, tags, source, note, data: { dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType } });
-        return { ok: true, id, kind: "image" };
-    }
-    throw new Error(siteText("assetKindUnsupported"));
 }
 
 function paginate(input: SiteToolInput, total: number, defaultSize: number) {

@@ -14,25 +14,25 @@ export function AppTopNav() {
     const { t } = useTranslation();
     const { pathname } = useLocation();
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
-    const hideHeader = /^\/canvas\/[^/]+/.test(pathname);
+    const hideHeader = /^\/(canvas|write)\/[^/]+/.test(pathname);
     const slug = pathname.split("/").filter(Boolean)[0];
     const activeToolSlug = navigationTools.some((tool) => tool.slug === slug) ? (slug as NavigationToolSlug) : undefined;
 
     return (
         <>
             {!hideHeader ? (
-                <header className={cn("sticky top-0 z-20 h-14 shrink-0 border-b border-border bg-background/70", frostedSurfaceClass)}>
+                <header className={cn("sticky top-0 z-20 h-14 shrink-0 border-b border-border glass-surface", frostedSurfaceClass)}>
                     <div className="flex h-full items-stretch justify-between gap-3 px-4 sm:gap-5">
                         <div className="flex min-w-0 items-center">
-                            <Link to="/" className="flex h-full min-w-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight text-foreground transition hover:text-muted-foreground dark:text-foreground dark:hover:text-muted-foreground">
+                            <Link to="/" className="flex h-full min-w-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight !text-foreground transition hover:!text-muted-foreground">
                                 <span
-                                    className="size-5 shrink-0 bg-current"
+                                    className="size-5 shrink-0 !bg-brand"
                                     style={{
                                         mask: "url(/logo.svg) center / contain no-repeat",
                                         WebkitMask: "url(/logo.svg) center / contain no-repeat",
                                     }}
                                 />
-                                <span className="truncate text-base font-medium">{t("meta.title")}</span>
+                                <span className="truncate text-base font-semibold">{t("meta.title")}</span>
                             </Link>
 
                             <button
@@ -56,8 +56,8 @@ export function AppTopNav() {
                                             className={cn(
                                                 "relative flex h-full shrink-0 items-center gap-2 text-sm leading-6 transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5",
                                                 active
-                                                    ? "font-medium text-foreground after:bg-foreground"
-                                                    : "text-muted-foreground after:bg-transparent hover:text-foreground",
+                                                    ? "font-semibold !text-foreground after:bg-brand"
+                                                    : "!text-muted-foreground after:bg-transparent hover:!text-foreground",
                                             )}
                                         >
                                             <Icon className="size-4" />

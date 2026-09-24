@@ -3,6 +3,8 @@ import { Button, Modal, Segmented, Slider } from "antd";
 import { RotateCcw, WandSparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { useCanvasTheme } from "@/hooks/use-canvas-theme";
+
 export type CanvasImageAngleParams = {
     horizontalAngle: number;
     pitchAngle: number;
@@ -19,6 +21,7 @@ const defaultParams: CanvasImageAngleParams = {
 
 export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { dataUrl: string; open: boolean; onClose: () => void; onConfirm: (params: CanvasImageAngleParams) => void }) {
     const { t } = useTranslation();
+    const theme = useCanvasTheme();
     const [params, setParams] = useState(defaultParams);
 
     useEffect(() => {
@@ -28,17 +31,17 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
     const update = <Key extends keyof CanvasImageAngleParams>(key: Key, value: CanvasImageAngleParams[Key]) => setParams((current) => ({ ...current, [key]: value }));
 
     return (
-        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={860} centered destroyOnHidden>
+        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={860} centered destroyOnHidden classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
             <div className="space-y-5">
                 <div>
                     <h2 className="text-xl font-semibold">{t("canvas.editors.angleTitle")}</h2>
-                    <p className="mt-1 text-sm opacity-60">{t("canvas.editors.angleDescription")}</p>
+                    <p className="mt-1 text-sm" style={{ color: theme.node.muted }}>{t("canvas.editors.angleDescription")}</p>
                 </div>
                 <div className="grid gap-6 md:grid-cols-[minmax(260px,1fr)_360px]">
-                    <div className="flex min-h-[300px] min-w-0 flex-col justify-between rounded-xl border p-4">
+                    <div className="flex min-h-[300px] min-w-0 flex-col justify-between rounded-none border p-4">
                         <div className="grid flex-1 place-items-center">
                             <div className="relative">
-                                <img src={dataUrl} alt="" className="size-48 rounded-2xl object-cover" draggable={false} style={{ transform: previewTransform(params) }} />
+                                <img src={dataUrl} alt="" className="size-48 rounded-[2px] object-cover" draggable={false} style={{ transform: previewTransform(params) }} />
                                 <div className="absolute -bottom-6 left-1/2 h-10 w-24 -translate-x-1/2 rounded-full border bg-black/20 backdrop-blur" />
                             </div>
                         </div>
@@ -51,7 +54,7 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
                         <AngleSlider label={t("canvas.editors.pitch")} value={params.pitchAngle} min={-45} max={45} step={1} suffix="deg" onChange={(value) => update("pitchAngle", value)} />
                         <AngleSlider label={t("canvas.editors.distance")} value={params.cameraDistance} min={1} max={10} step={0.1} onChange={(value) => update("cameraDistance", value)} />
                         <div className="grid grid-cols-[88px_1fr_72px] items-center gap-4">
-                            <span className="font-medium opacity-75">{t("canvas.editors.lens")}</span>
+                            <span className="font-medium" style={{ color: theme.node.label }}>{t("canvas.editors.lens")}</span>
                             <Segmented
                                 className="w-fit"
                                 value={params.wideAngle ? "wide" : "standard"}
@@ -75,9 +78,10 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
 }
 
 function AngleSlider({ label, value, min, max, step, suffix = "", onChange }: { label: string; value: number; min: number; max: number; step: number; suffix?: string; onChange: (value: number) => void }) {
+    const theme = useCanvasTheme();
     return (
         <div className="grid grid-cols-[88px_1fr_72px] items-center gap-4">
-            <span className="font-medium opacity-75">{label}</span>
+            <span className="font-medium" style={{ color: theme.node.label }}>{label}</span>
             <Slider min={min} max={max} step={step} value={value} onChange={onChange} />
             <span className="whitespace-nowrap text-right font-semibold">
                 {Number.isInteger(value) ? value : value.toFixed(1)}

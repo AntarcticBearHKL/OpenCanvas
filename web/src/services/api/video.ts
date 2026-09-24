@@ -78,7 +78,7 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
     const script = resolveModelScript(config, selectedModel);
     if (script) return createPluginVideoTask(requestConfig, selectedModel, script, prompt, references, options);
-    if (isOpenRouterVideoModel(selectedModel)) return createOpenRouterVideoTask(requestConfig, selectedModel, prompt, references, options);
+    if (isOpenRouterVideoModel(requestConfig.model)) return createOpenRouterVideoTask(requestConfig, selectedModel, prompt, references, options);
     assertVideoConfig(requestConfig, requestConfig.model);
     return createOpenAIVideoTask(requestConfig, selectedModel, prompt, references, options);
 }

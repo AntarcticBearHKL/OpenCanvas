@@ -5,7 +5,7 @@ import { Image } from "antd";
 import { FileText, Image as ImageIcon, Music2, Video } from "lucide-react";
 
 import i18n from "@/i18n";
-import { canvasThemes, frostedSurfaceClass } from "@/lib/canvas-theme";
+import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { isImeComposing, isPlainEnterKey } from "@/lib/keyboard-event";
 import { CANVAS_REFERENCE_DRAG_TYPE, type CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
@@ -283,8 +283,8 @@ function MentionMenu({ rect, references, activeIndex, theme, onSelect }: { rect:
     return createPortal(
         <div
             data-canvas-resource-mention-menu="true"
-            className={`fixed z-[1100] max-h-56 w-64 overflow-y-auto rounded-2xl border p-1 ${frostedSurfaceClass}`}
-            style={{ left, top, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
+            className="fixed z-[1100] max-h-56 w-64 overflow-y-auto rounded-none border p-1 glass-raised"
+            style={{ left, top, borderColor: theme.toolbar.border, color: theme.node.text }}
             onPointerDown={stopCanvasInteraction}
             onMouseDown={stopCanvasInteraction}
             onClick={(event) => event.stopPropagation()}
@@ -294,7 +294,7 @@ function MentionMenu({ rect, references, activeIndex, theme, onSelect }: { rect:
                     key={reference.id}
                     ref={index === activeIndex ? activeItemRef : undefined}
                     type="button"
-                    className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition"
+                    className="flex w-full min-w-0 items-center gap-2 rounded-[2px] px-2 py-1.5 text-left text-sm transition"
                     style={{ background: index === activeIndex ? theme.toolbar.activeBg : "transparent", color: index === activeIndex ? theme.toolbar.activeText : theme.node.text }}
                     onPointerDown={(event) => {
                         event.preventDefault();
@@ -310,7 +310,7 @@ function MentionMenu({ rect, references, activeIndex, theme, onSelect }: { rect:
                     <ReferencePreview reference={reference} />
                     <span className="min-w-0 flex-1">
                         <span className="block font-medium">{reference.label}</span>
-                        <span className="block truncate opacity-65">{reference.text || reference.title}</span>
+                        <span className="block truncate" style={{ color: theme.node.muted }}>{reference.text || reference.title}</span>
                     </span>
                 </button>
             ))}
@@ -320,11 +320,11 @@ function MentionMenu({ rect, references, activeIndex, theme, onSelect }: { rect:
 }
 
 function ReferencePreview({ reference }: { reference: CanvasResourceReference }) {
-    if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-9 rounded-md object-cover" />;
-    if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-9 rounded-md bg-black object-cover" muted preload="metadata" />;
+    if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-9 rounded-[2px] object-cover" />;
+    if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-9 rounded-[2px] bg-black object-cover" muted preload="metadata" />;
     const Icon = reference.kind === "audio" ? Music2 : reference.kind === "video" ? Video : reference.kind === "image" ? ImageIcon : FileText;
     return (
-        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-black/10">
+        <span className="grid size-9 shrink-0 place-items-center rounded-[2px] bg-black/10">
             <Icon className="size-4" />
         </span>
     );
@@ -338,8 +338,8 @@ function createReferenceChip(reference: CanvasResourceReference, theme: (typeof 
         const image = document.createElement("img");
         image.src = reference.previewUrl;
         image.alt = reference.title;
-        image.className = "size-6 rounded object-cover";
-        wrapper.className = "mx-px inline-flex size-6 items-center justify-center overflow-hidden rounded align-middle";
+        image.className = "size-6 rounded-[2px] object-cover";
+        wrapper.className = "mx-px inline-flex size-6 items-center justify-center overflow-hidden rounded-[2px] align-middle";
         wrapper.appendChild(image);
         wrapper.addEventListener("click", (event) => {
             event.preventDefault();
@@ -347,7 +347,7 @@ function createReferenceChip(reference: CanvasResourceReference, theme: (typeof 
             onImagePreview(reference.previewUrl || "");
         });
     } else {
-        wrapper.className = "mx-px inline-flex h-6 max-w-40 items-center justify-center overflow-hidden rounded-md border px-1 text-xs leading-none align-middle";
+        wrapper.className = "mx-px inline-flex h-6 max-w-40 items-center justify-center overflow-hidden rounded-[2px] border px-1 text-sm leading-none align-middle";
         Object.assign(wrapper.style, { background: theme.toolbar.panel, borderColor: theme.node.stroke, color: theme.node.text } as CSSProperties);
         wrapper.title = reference.text || reference.title;
         const text = document.createElement("span");

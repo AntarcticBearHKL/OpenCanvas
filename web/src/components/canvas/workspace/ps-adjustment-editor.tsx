@@ -17,7 +17,7 @@ type PsAdjustmentEditorProps = {
 
 const ROW_CLASS = STUDIO_PANEL_ROW_CLASS;
 const LABEL_CLASS = STUDIO_PANEL_LABEL_CLASS;
-const VALUE_CLASS = "w-9 shrink-0 text-right text-[11px] tabular-nums";
+const VALUE_CLASS = "w-9 shrink-0 text-right text-sm tabular-nums";
 const number = (params: Record<string, CanvasPsParamValue>, key: string, fallback: number) => (typeof params[key] === "number" ? (params[key] as number) : fallback);
 const text = (params: Record<string, CanvasPsParamValue>, key: string, fallback: string) => (typeof params[key] === "string" ? (params[key] as string) : fallback);
 const numbers = (params: Record<string, CanvasPsParamValue>, key: string, fallback: number[]) => (Array.isArray(params[key]) && typeof params[key][0] !== "string" ? (params[key] as number[]) : fallback);
@@ -35,7 +35,7 @@ export default function PsAdjustmentEditor({ type, params, onChange }: PsAdjustm
     const rangeOptions = ["reds", "yellows", "greens", "cyans", "blues", "magentas", "whites", "neutrals", "blacks"].map((range) => ({ value: range, label: t(`canvas.ps.adjust.${range}`) }));
     const toneOptions = ["shadows", "midtones", "highlights"].map((tone) => ({ value: tone, label: t(`canvas.ps.adjust.opt${tone[0].toUpperCase()}${tone.slice(1)}`) }));
     const row = (labelKey: string, children: ReactNode) => (
-        <div className={ROW_CLASS} style={{ color: theme.node.muted }}>
+        <div className={ROW_CLASS} style={{ color: theme.node.label }}>
             <span className={LABEL_CLASS}>{t(labelKey)}</span>
             {children}
         </div>
@@ -72,12 +72,12 @@ export default function PsAdjustmentEditor({ type, params, onChange }: PsAdjustm
         const values = numbers(params, key, [0, 0, 0]);
         return (
             <div className="py-1">
-                <span className="text-[11px]" style={{ color: theme.node.muted }}>
+                <span className="text-sm font-medium" style={{ color: theme.node.label }}>
                     {t(labelKey)}
                 </span>
                 {labels.map((item, index) => (
                     <div key={item} className="flex min-w-0 items-center gap-2 py-0.5">
-                        <span className="w-10 shrink-0 text-[11px]" style={{ color: theme.node.muted }}>
+                        <span className="w-10 shrink-0 text-sm" style={{ color: theme.node.label }}>
                             {t(item)}
                         </span>
                         <Slider
@@ -119,7 +119,7 @@ export default function PsAdjustmentEditor({ type, params, onChange }: PsAdjustm
             <>
                 {select("canvas.ps.adjust.channel", "channel", "rgb", channelOptions(true))}
                 <PsCurveEditor points={numbers(params, "points", PS_CURVE_IDENTITY)} theme={theme} onChange={(points) => onChange({ points })} />
-                <button type="button" className="mt-1 rounded-md px-2 py-0.5 text-[11px] transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }} onClick={() => onChange({ points: [...PS_CURVE_IDENTITY] })}>
+                <button type="button" className="mt-1 rounded-[2px] px-2 py-0.5 text-sm transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => onChange({ points: [...PS_CURVE_IDENTITY] })}>
                     {t("canvas.ps.adjust.curveReset")}
                 </button>
             </>

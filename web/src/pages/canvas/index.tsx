@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useCanvasProjectDelete } from "@/hooks/use-canvas-project-delete";
 import { CanvasImportDialog } from "@/components/canvas/canvas-import-dialog";
 import { CanvasProjectRow } from "@/components/canvas/canvas-project-row";
-import { useAssetStore } from "@/stores/use-asset-store";
+import { cleanupUnusedCanvasImages } from "@/services/image-storage";
 import { useCanvasStore, type CanvasProject } from "@/stores/canvas/use-canvas-store";
 import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
@@ -33,7 +33,6 @@ export default function CanvasPage() {
     const createGroup = useCanvasStore((state) => state.createGroup);
     const renameGroup = useCanvasStore((state) => state.renameGroup);
     const deleteGroup = useCanvasStore((state) => state.deleteGroup);
-    const cleanupImages = useAssetStore((state) => state.cleanupImages);
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const { armedId, confirmDelete, cancel } = useCanvasProjectDelete();
     const selectedGroupId = useCanvasUiStore((state) => state.selectedGroupId);
@@ -82,7 +81,7 @@ export default function CanvasPage() {
             cancelText: t("common.cancel"),
             onOk: () => {
                 deleteGroup(id);
-                cleanupImages();
+                cleanupUnusedCanvasImages();
             },
         });
     };
@@ -104,19 +103,19 @@ export default function CanvasPage() {
 
     return (
         <main className="flex h-full min-h-0 bg-background text-foreground dark:text-foreground">
-            <aside className="flex w-60 shrink-0 flex-col border-r border-border">
+            <aside className="flex w-60 shrink-0 flex-col border-r border-border glass-surface">
                 <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground" style={{ margin: 0 }}>{t("canvas.library")}</p>
+                    <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground" style={{ margin: 0 }}>{t("canvas.library")}</p>
                     <Button type="text" size="small" shape="circle" icon={<Plus className="size-4" />} disabled={!hydrated} onClick={addGroup} aria-label={t("canvas.group.create")} title={t("canvas.group.create")} />
                 </div>
                 <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
                     {groups.map((group) => (
                         <div key={group.id}>
                             {editingGroupId === group.id ? (
-                                <div className="flex h-9 items-center gap-1 rounded-xl bg-muted px-2">
+                                <div className="flex h-9 items-center gap-1 rounded-none border-b border-border bg-muted px-2">
                                     <Input
                                         size="small"
-                                        className="min-w-0 flex-1"
+                                        className="min-w-0 flex-1 rounded-[2px]"
                                         value={editingGroupName}
                                         onChange={(event) => setEditingGroupName(event.target.value)}
                                         onKeyDown={(event) => {
@@ -129,11 +128,11 @@ export default function CanvasPage() {
                                     <Button type="text" size="small" shape="circle" icon={<X className="size-3.5" />} onClick={() => setEditingGroupId(null)} aria-label={t("common.cancel")} title={t("common.cancel")} />
                                 </div>
                             ) : (
-                                <div className={`group flex h-9 items-center rounded-xl px-2 transition ${selectedGroupId === group.id ? "bg-black/10 dark:bg-white/10" : "hover:bg-black/5 dark:hover:bg-white/10"}`}>
+                                <div className={`group flex h-9 items-center rounded-none border-b border-border px-2 transition ${selectedGroupId === group.id ? "bg-brand-soft shadow-[inset_2px_0_0_0_var(--brand)]" : "hover:bg-hover"}`}>
                                     <button
                                         type="button"
                                         onClick={() => setSelectedGroupId(group.id)}
-                                        className={`flex h-full min-w-0 flex-1 items-center gap-2 text-left text-sm ${selectedGroupId === group.id ? "text-foreground" : "text-muted-foreground"}`}
+                                        className={`flex h-full min-w-0 flex-1 items-center gap-2 text-left text-sm ${selectedGroupId === group.id ? "font-medium text-foreground" : "text-muted-foreground"}`}
                                     >
                                         <span className="min-w-0 flex-1 truncate">{group.name}</span>
                                         <span className="shrink-0 text-xs text-muted-foreground group-hover:hidden dark:text-muted-foreground">{projects.filter((project) => project.groupId === group.id).length}</span>
@@ -162,9 +161,9 @@ export default function CanvasPage() {
 
             <section className="flex min-w-0 flex-1 flex-col">
                 <header className="shrink-0">
-                    <div className="flex min-h-14 w-full flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2">
+                    <div className="flex min-h-14 w-full flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2 glass-surface">
                         <div className="flex min-w-0 items-center gap-2">
-                            <h1 className="truncate text-base font-semibold text-foreground" style={{ margin: 0 }}>{selectedGroup?.name ?? t("canvas.group.none")}</h1>
+                            <h1 className="truncate text-lg font-semibold text-foreground" style={{ margin: 0 }}>{selectedGroup?.name ?? t("canvas.group.none")}</h1>
                             {selectedGroup ? <span className="shrink-0 text-xs text-muted-foreground">{t("canvas.group.count", { count: groupProjects.length })}</span> : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -192,7 +191,7 @@ export default function CanvasPage() {
                     </div>
                 </header>
 
-                <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
+                <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 glass-card">
                     {!hydrated ? (
                         <div className="flex h-full items-center justify-center">
                             <Spin />
@@ -213,7 +212,7 @@ export default function CanvasPage() {
                             className="[&_.ant-table]:!rounded-none [&_.ant-table]:!bg-transparent [&_.ant-table-container]:!rounded-none [&_.ant-table-thead>tr>th]:!rounded-none [&_.ant-table-thead>tr>th]:!bg-transparent"
                             rowClassName={(project, index) =>
                                 cn(
-                                    dragId === project.id && "opacity-40",
+                                    dragId === project.id && "[&>td]:bg-brand-soft",
                                     dropIndex === index && "[&>td]:border-t-2 [&>td]:border-t-primary",
                                     dropIndex === groupProjects.length && index === groupProjects.length - 1 && "[&>td]:border-b-2 [&>td]:border-b-primary",
                                 )

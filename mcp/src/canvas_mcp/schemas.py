@@ -1,4 +1,4 @@
-"""The 33 canvas tools: names, verbatim descriptions, and input schemas.
+"""The 30 canvas tools: names, verbatim descriptions, and input schemas.
 
 Port of ``web/server/canvas/schemas.ts``. Tool names and Chinese descriptions are
 copied verbatim; the zod schemas are re-expressed as Pydantic models whose JSON
@@ -29,7 +29,6 @@ NodeType = Literal[
     "assets",
     "recording",
     "image-modifier",
-    "story",
 ]
 GenerationMode = Literal["text", "image", "video", "audio"]
 AlignMode = Literal["left", "center-x", "right", "top", "center-y", "bottom", "distribute-x", "distribute-y"]
@@ -64,10 +63,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "canvas_select_nodes",
     "canvas_set_viewport",
     "canvas_run_generation",
-    "canvas_expand_story",
     "generation_get_status",
-    "assets_list",
-    "assets_add",
 )
 
 
@@ -152,12 +148,6 @@ class ArrangeBoardOp(_Op):
     id: str
 
 
-class ExpandStoryOp(_Op):
-    type: Literal["expand_story"]
-    nodeId: str
-    instructions: str | None = None
-
-
 class PlaceOnBoardOp(_Op):
     type: Literal["place_on_board"]
     nodeId: str
@@ -173,7 +163,6 @@ CanvasOp = Annotated[
     | SetViewportOp
     | SelectNodesOp
     | RunGenerationOp
-    | ExpandStoryOp
     | ArrangeBoardOp
     | PlaceOnBoardOp,
     Field(discriminator="type"),
@@ -378,33 +367,11 @@ class RunGenerationInput(BaseModel):
     prompt: str | None = None
 
 
-class ExpandStoryInput(BaseModel):
-    nodeId: str
-    instructions: str | None = None
-
-
 class GenerationStatusInput(BaseModel):
     scope: Literal["all", "canvas"] | None = None
     taskId: str | None = None
     nodeIds: list[str] | None = None
     limit: float | None = None
-
-
-class AssetsListInput(BaseModel):
-    kind: Literal["all", "text", "image", "video"] | None = None
-    keyword: str | None = None
-    page: float | None = None
-    pageSize: float | None = None
-
-
-class AssetsAddInput(BaseModel):
-    kind: Literal["text", "image"]
-    title: str
-    content: str | None = None
-    imageUrl: str | None = None
-    tags: list[str] | None = None
-    source: str | None = None
-    note: str | None = None
 
 
 INPUT_MODELS: dict[str, type[BaseModel]] = {
@@ -437,10 +404,7 @@ INPUT_MODELS: dict[str, type[BaseModel]] = {
     "canvas_select_nodes": SelectNodesInput,
     "canvas_set_viewport": SetViewportInput,
     "canvas_run_generation": RunGenerationInput,
-    "canvas_expand_story": ExpandStoryInput,
     "generation_get_status": GenerationStatusInput,
-    "assets_list": AssetsListInput,
-    "assets_add": AssetsAddInput,
 }
 
 INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
@@ -448,13 +412,13 @@ INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
 }
 
 TOOL_DESCRIPTIONS: dict[str, str] = {
-    "site_navigate": "跳转网站页面。path 可为 / (首页)、/canvas (我的画布)、/canvas/:id (指定画布)、/assets (我的素材)、/config (配置)。操作画布前若不在画布页，先用本工具打开画布。",
+    "site_navigate": "跳转网站页面。path 可为 / (首页)、/canvas (我的画布)、/canvas/:id (指定画布)、/config (配置)、/write (作品库)、/write/:id (指定作品)。操作画布前若不在画布页，先用本工具打开画布。",
     "canvas_list_projects": "列出用户全部画布（仅标题、创建/更新时间、节点数、连线数，不含完整数据），支持 keyword 搜索和 page/pageSize 分页。返回的 id 可配合 site_navigate 跳转到 /canvas/:id 打开对应画布。",
     "canvas_get_state": "读取当前网页画布的节点、连线、选区和视口。",
     "canvas_get_selection": "读取当前网页画布选中的节点。",
     "canvas_export_snapshot": "导出当前画布快照，用于理解布局。",
-    "canvas_apply_ops": "批量操作当前网页画布。ops 支持 add_node、update_node、delete_node、delete_connections、connect_nodes、set_viewport、select_nodes、run_generation、expand_story、arrange_board、place_on_board。arrange_board / place_on_board 操作的是智能画板自包含的图层文档（metadata.boardLayers），不会移动画布上的节点。expand_story 由前端拦截执行，不直接落地为节点操作。",
-    "canvas_create_node": "创建任意类型节点。nodeType 可为 text、prompt、music-prompt、speech-prompt、video-prompt、image、video、audio、config、image-generation、speech-generation、music-generation、video-generation、smart-canvas、assets、recording、image-modifier、story。适合创建占位图、媒体占位、提示词节点、配置节点或自定义 metadata 节点。",
+    "canvas_apply_ops": "批量操作当前网页画布。ops 支持 add_node、update_node、delete_node、delete_connections、connect_nodes、set_viewport、select_nodes、run_generation、arrange_board、place_on_board。arrange_board / place_on_board 操作的是智能画板自包含的图层文档（metadata.boardLayers），不会移动画布上的节点。",
+    "canvas_create_node": "创建任意类型节点。nodeType 可为 text、prompt、music-prompt、speech-prompt、video-prompt、image、video、audio、config、image-generation、speech-generation、music-generation、video-generation、smart-canvas、assets、recording、image-modifier。适合创建占位图、媒体占位、提示词节点、配置节点或自定义 metadata 节点。",
     "canvas_create_text_node": "在当前画布创建单个文本节点。",
     "canvas_create_text_nodes": "批量创建文本节点，适合生成标题、段落、脚本、说明等内容块。",
     "canvas_create_config_node": "创建生成配置节点，可指定 text/image/video/audio 模式和生成参数，可选择立即触发生成。视频为 minimax/hailuo-3-max：分辨率 480p/768p、时长 5-15s、frames/reference 两种模式；首尾帧与参考图槽位（videoSlots）只对 video-prompt + video-generation 节点组合生效。",
@@ -477,8 +441,5 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "canvas_select_nodes": "设置当前选中节点。",
     "canvas_set_viewport": "调整画布视口。",
     "canvas_run_generation": "触发指定节点生成，通常用于配置节点或文本/图片/视频/音频节点。视频为 minimax/hailuo-3-max：分辨率 480p/768p、时长 5-15s、frames/reference 模式；video-generation 节点按 metadata（model/vquality/size/seconds）与所连 video-prompt 的 videoMode/videoSlots 生成。",
-    "canvas_expand_story": "把故事节点（前提/幕/章/场景）展开为下一级故事节点：按叙事顺序生成 3-6 个子节点、自动连线并排版。可用 instructions 追加展开要求。",
     "generation_get_status": "查询当前活动网页画布的生成任务状态。可用 scope 过滤来源，用 nodeIds 查询画布节点。",
-    "assets_list": "列出用户「我的素材」，支持 kind（text/image/video）过滤、keyword 搜索和 page/pageSize 分页。为控制体积不返回图片/视频原始 data，仅返回封面与元信息。",
-    "assets_add": "向「我的素材」新增素材。kind=text 时用 content 传文本内容；kind=image 时用 imageUrl 传图片地址或 dataURL。可附带 title、tags、source、note。",
 }

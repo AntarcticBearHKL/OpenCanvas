@@ -4,6 +4,7 @@ import { Check, ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
+import { STUDIO_MENU_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { PS_FILTER_BY_TYPE, PS_FILTER_GROUPS, PS_FILTERS, type PsFilterType } from "@/components/canvas/workspace/ps-filters";
 import type { PsCanvasAnchor } from "@/components/canvas/workspace/ps-image-ops";
@@ -40,7 +41,8 @@ type PsMenusProps = {
     onClearTransform: () => void;
 };
 
-const MENU_BUTTON_CLASS = "flex h-6 shrink-0 items-center gap-0.5 rounded-md px-1.5 text-xs transition hover:bg-black/5 dark:hover:bg-white/10";
+const MENU_BUTTON_CLASS = STUDIO_MENU_BUTTON_CLASS;
+export const PS_MENU_POPUP = { className: "glass-raised", style: { background: "var(--glass-strong)" } };
 const ANCHORS: PsCanvasAnchor[][] = [
     ["top-left", "top", "top-right"],
     ["left", "center", "right"],
@@ -86,7 +88,7 @@ export function PsMenus({
     const item = (label: string, hint = ""): ReactNode => (
         <span className="flex w-full min-w-[180px] items-center justify-between gap-6">
             <span>{label}</span>
-            {hint ? <span className="text-[11px] opacity-50">{hint}</span> : null}
+            {hint ? <span className="text-xs" style={{ color: theme.node.muted }}>{hint}</span> : null}
         </span>
     );
     const toggle = (label: string, active: boolean): ReactNode => (
@@ -174,7 +176,7 @@ export function PsMenus({
         else onTransform(key as PsTransformMode);
     };
     const renderMenu = (label: string, items: MenuProps["items"], onClick: MenuProps["onClick"]) => (
-        <Dropdown menu={{ items, onClick }} placement="bottomLeft" disabled={disabled} styles={{ root: { zIndex: 1300 } }}>
+        <Dropdown menu={{ ...PS_MENU_POPUP, items, onClick }} placement="bottomLeft" disabled={disabled} styles={{ root: { zIndex: 1300 } }}>
             <Button size="small" type="text" className={MENU_BUTTON_CLASS} style={{ color: theme.node.text }} disabled={disabled}>
                 {label}
                 <ChevronDown className="size-3" />
@@ -192,21 +194,21 @@ export function PsMenus({
                 {renderMenu(t("canvas.ps.viewMenu"), viewItems, onViewClick)}
             </span>
 
-            <Modal open={dialog === "size" || dialog === "canvas"} title={t(dialog === "size" ? "canvas.ps.imageSizeTitle" : "canvas.ps.canvasSizeTitle")} okText={t("canvas.ps.apply")} cancelText={t("canvas.ps.cancel")} onCancel={() => setDialog("")} onOk={() => { if (dialog === "size") onImageSize(Math.round(form.width), Math.round(form.height)); else onCanvasSize(Math.round(form.width), Math.round(form.height), form.anchor); setDialog(""); }}>
+            <Modal open={dialog === "size" || dialog === "canvas"} title={t(dialog === "size" ? "canvas.ps.imageSizeTitle" : "canvas.ps.canvasSizeTitle")} okText={t("canvas.ps.apply")} cancelText={t("canvas.ps.cancel")} onCancel={() => setDialog("")} onOk={() => { if (dialog === "size") onImageSize(Math.round(form.width), Math.round(form.height)); else onCanvasSize(Math.round(form.width), Math.round(form.height), form.anchor); setDialog(""); }} classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
                 <ImageSettingsTheme theme={theme}>
-                    <div className="flex flex-wrap items-center gap-2 py-2 text-xs" style={{ color: theme.node.text }}>
+                    <div className="flex flex-wrap items-center gap-2 py-2 text-sm" style={{ color: theme.node.text }}>
                         <InputNumber size="small" min={1} max={8192} value={form.width} aria-label={t("canvas.ps.width")} onChange={(value) => value !== null && setForm((prev) => ({ ...prev, width: Math.max(1, value), height: prev.constrain && dialog === "size" ? Math.max(1, Math.round((value * prev.height) / Math.max(1, prev.width))) : prev.height }))} />
                         <span>×</span>
                         <InputNumber size="small" min={1} max={8192} value={form.height} aria-label={t("canvas.ps.height")} onChange={(value) => value !== null && setForm((prev) => ({ ...prev, height: Math.max(1, value), width: prev.constrain && dialog === "size" ? Math.max(1, Math.round((value * prev.width) / Math.max(1, prev.height))) : prev.width }))} />
                     </div>
                     {dialog === "size" ? (
-                        <div className="flex items-center gap-2 text-xs" style={{ color: theme.node.muted }}>
+                        <div className="flex items-center gap-2 text-sm" style={{ color: theme.node.muted }}>
                             <Switch size="small" checked={form.constrain} onChange={(value) => setForm((prev) => ({ ...prev, constrain: value }))} />
                             {t("canvas.ps.constrainProportions")}
                         </div>
                     ) : (
                         <div className="space-y-1.5 py-1">
-                            <span className="text-xs" style={{ color: theme.node.muted }}>
+                            <span className="text-sm font-medium" style={{ color: theme.node.label }}>
                                 {t("canvas.ps.anchor")}
                             </span>
                             <div className="grid w-fit grid-cols-3 gap-0.5">
@@ -216,7 +218,7 @@ export function PsMenus({
                                         type="button"
                                         aria-label={anchor}
                                         className="size-6 rounded-[3px] border"
-                                        style={{ borderColor: theme.toolbar.border, background: form.anchor === anchor ? theme.toolbar.activeBg : "transparent" }}
+                                        style={{ borderColor: form.anchor === anchor ? theme.node.accent : theme.toolbar.border, background: form.anchor === anchor ? theme.node.accentSoft : "transparent" }}
                                         onClick={() => setForm((prev) => ({ ...prev, anchor }))}
                                     />
                                 ))}
@@ -236,9 +238,11 @@ export function PsMenus({
                     onRotate(form.angle);
                     setDialog("");
                 }}
+                classNames={{ container: "glass-raised" }}
+                styles={{ container: { background: "var(--glass-strong)" } }}
             >
                 <ImageSettingsTheme theme={theme}>
-                    <div className="flex items-center gap-2 py-2 text-xs" style={{ color: theme.node.text }}>
+                    <div className="flex items-center gap-2 py-2 text-sm" style={{ color: theme.node.text }}>
                         <InputNumber size="small" min={-180} max={180} value={form.angle} aria-label={t("canvas.ps.angle")} onChange={(value) => value !== null && setForm((prev) => ({ ...prev, angle: value }))} />
                         <span>°</span>
                     </div>
@@ -255,9 +259,11 @@ export function PsMenus({
                     onNumericTransform(form.transform);
                     setDialog("");
                 }}
+                classNames={{ container: "glass-raised" }}
+                styles={{ container: { background: "var(--glass-strong)" } }}
             >
                 <ImageSettingsTheme theme={theme}>
-                    <div className="grid grid-cols-2 gap-1.5 py-2 text-xs" style={{ color: theme.node.text }}>
+                    <div className="grid grid-cols-2 gap-1.5 py-2 text-sm" style={{ color: theme.node.text }}>
                         {(
                             [
                                 ["dx", t("canvas.ps.transformDx")],
@@ -270,7 +276,7 @@ export function PsMenus({
                             ] as [keyof PsNumericTransform, string][]
                         ).map(([key, label]) => (
                             <label key={key} className="flex min-w-0 items-center gap-1.5">
-                                <span className="w-16 shrink-0" style={{ color: theme.node.muted }}>
+                                <span className="w-16 shrink-0" style={{ color: theme.node.label }}>
                                     {label}
                                 </span>
                                 <InputNumber size="small" className="!w-full" min={-8192} max={8192} value={form.transform[key]} aria-label={label} onChange={(value) => value !== null && setForm((prev) => ({ ...prev, transform: { ...prev.transform, [key]: value } }))} />

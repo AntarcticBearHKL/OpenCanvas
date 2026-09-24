@@ -31,28 +31,28 @@ export function VersionReleaseModal({ className, style }: VersionReleaseModalPro
         <>
             <button
                 type="button"
-                className={className || "shrink-0 cursor-pointer text-xs font-medium text-muted-foreground transition hover:text-foreground dark:text-muted-foreground dark:hover:text-white"}
+                className={className || "shrink-0 cursor-pointer text-sm font-medium text-muted-foreground transition hover:text-foreground dark:text-muted-foreground dark:hover:text-white"}
                 style={style}
                 onClick={openReleaseModal}
                 title={t("version.viewUpdates")}
             >
                 <span className="relative inline-flex">
                     {APP_VERSION}
-                    {hasNewVersion ? <span className="absolute -right-1.5 -top-1 size-1.5 rounded-full bg-green-500" /> : null}
+                    {hasNewVersion ? <span className="absolute -right-1.5 -top-1 size-1.5 rounded-full bg-success" /> : null}
                 </span>
             </button>
-            <Modal title={t("version.title")} open={open} width={680} centered footer={null} onCancel={() => setOpen(false)}>
+            <Modal title={t("version.title")} open={open} width={680} centered footer={null} onCancel={() => setOpen(false)} classNames={{ container: "glass-raised !bg-[var(--glass-strong)]" }} styles={{ container: { borderRadius: 0 } }}>
                 <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg border border-border p-3 dark:border-border">
-                        <div className="text-xs text-muted-foreground">{t("version.currentVersion")}</div>
+                    <div className="rounded-none border border-border p-3 dark:border-border">
+                        <div className="text-sm text-muted-foreground">{t("version.currentVersion")}</div>
                         <div className="mt-1 text-base font-semibold text-foreground">{APP_VERSION}</div>
                     </div>
-                    <div className="rounded-lg border border-border p-3 dark:border-border">
+                    <div className="rounded-none border border-border p-3 dark:border-border">
                         <div className="flex items-center justify-between gap-3">
-                            <div className="text-xs text-muted-foreground">{t("version.latestVersion")}</div>
+                            <div className="text-sm text-muted-foreground">{t("version.latestVersion")}</div>
                             <button
                                 type="button"
-                                className="cursor-pointer bg-transparent p-0 text-[11px] font-normal text-muted-foreground underline-offset-2 transition hover:text-foreground hover:underline dark:text-muted-foreground dark:hover:text-muted-foreground"
+                                className="cursor-pointer bg-transparent p-0 text-sm font-normal text-muted-foreground underline-offset-2 transition hover:text-brand hover:underline dark:text-muted-foreground dark:hover:text-brand"
                                 onClick={() => void checkLatestRelease(true)}
                             >
                                 {t(checking ? "version.checking" : "version.checkUpdates")}

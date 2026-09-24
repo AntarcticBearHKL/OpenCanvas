@@ -5,6 +5,7 @@ import { Brush, Eraser, ImagePlus, Redo2, RotateCcw, Undo2, WandSparkles, ZoomIn
 import { useTranslation } from "react-i18next";
 
 import { readImageMeta } from "@/lib/image-utils";
+import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { useImageEditorViewport } from "@/components/canvas/use-image-editor-viewport";
 
 export type CanvasImageMaskEditPayload = {
@@ -23,6 +24,7 @@ const maskOverlayAlpha = 0.4;
 
 export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: { dataUrl: string; open: boolean; onClose: () => void; onConfirm: (payload: CanvasImageMaskEditPayload) => void }) {
     const { t } = useTranslation();
+    const theme = useCanvasTheme();
     const maskCanvasRef = useRef<HTMLCanvasElement>(null);
     const previewCanvasRef = useRef<HTMLCanvasElement>(null);
     const maskContextRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -250,15 +252,15 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
     };
 
     return (
-        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={980} centered destroyOnHidden transitionName="" maskTransitionName="">
+        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={980} centered destroyOnHidden transitionName="" maskTransitionName="" classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
             <div className="grid gap-5 lg:grid-cols-[minmax(360px,1fr)_320px]" data-canvas-no-zoom>
                 <div
                     ref={viewport.viewportRef}
                     {...viewport.panHandlers}
-                    className={`relative h-[min(68vh,720px)] min-h-[360px] rounded-xl border border-black/10 bg-transparent dark:border-white/10 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
+                    className={`relative h-[min(68vh,720px)] min-h-[360px] rounded-none border border-black/10 bg-transparent dark:border-white/10 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
                 >
                     <div className="relative" style={viewport.contentStyle}>
-                        <div ref={viewport.stageRef} className="absolute isolate overflow-hidden rounded-lg bg-transparent select-none [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
+                        <div ref={viewport.stageRef} className="absolute isolate overflow-hidden rounded-[2px] bg-transparent select-none [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
                             {image ? (
                                 <>
                                     <canvas ref={attachMaskCanvas} width={image.width} height={image.height} className="hidden" />
@@ -293,7 +295,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
                               className={`pointer-events-none fixed left-0 top-0 z-[1100] rounded-full border-2 ${brushAdjusting ? "border-[#fbbf24] bg-black/10" : "border-white/90 bg-black/5"} ${brushVisible ? "" : "invisible"} shadow-[0_0_0_1px_rgba(0,0,0,.8)]`}
                               style={{ aspectRatio: 1 }}
                           >
-                              {brushAdjusting ? <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded bg-black/75 px-1.5 py-0.5 text-xs font-semibold text-white">{brushSize}px</span> : null}
+                              {brushAdjusting ? <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[2px] bg-black/75 px-1.5 py-0.5 text-xs font-semibold text-white">{brushSize}px</span> : null}
                           </div>,
                           document.body,
                       )
@@ -302,8 +304,8 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
                 <div className="flex min-h-[360px] min-w-0 flex-col gap-5">
                     <div>
                         <h2 className="text-xl font-semibold">{t("canvas.editors.maskTitle")}</h2>
-                        <div className="mt-2 text-sm opacity-60">{image ? `${image.width} x ${image.height}px` : t("canvas.editors.loading")}</div>
-                        <div className="mt-2 text-xs leading-5 opacity-55">{t("canvas.editors.maskHint")}</div>
+                        <div className="mt-2 text-sm" style={{ color: theme.node.muted }}>{image ? `${image.width} x ${image.height}px` : t("canvas.editors.loading")}</div>
+                        <div className="mt-2 text-sm leading-5" style={{ color: theme.node.muted }}>{t("canvas.editors.maskHint")}</div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
@@ -315,7 +317,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
                         </Button>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-lg border border-black/10 px-2 py-1 dark:border-white/10">
+                    <div className="flex items-center justify-between rounded-[2px] border border-black/10 px-2 py-1 dark:border-white/10">
                         <Tooltip title={t("canvas.editors.undoMaskTitle")}>
                             <Button type="text" icon={<Undo2 className="size-4" />} disabled={!historySize} aria-label={t("canvas.editors.undoMask")} onClick={undoMask} />
                         </Tooltip>
@@ -326,7 +328,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
                             <Tooltip title={t("canvas.editors.zoomOut")}>
                                 <Button type="text" icon={<ZoomOut className="size-4" />} disabled={!viewport.canZoomOut} aria-label={t("canvas.editors.zoomOut")} onClick={viewport.zoomOut} />
                             </Tooltip>
-                            <button type="button" className="min-w-14 text-center text-xs font-semibold tabular-nums opacity-70" onClick={viewport.resetZoom}>
+                            <button type="button" className="min-w-14 text-center text-xs font-semibold tabular-nums" style={{ color: theme.node.label }} onClick={viewport.resetZoom}>
                                 {Math.round(viewport.zoom * 100)}%
                             </button>
                             <Tooltip title={t("canvas.editors.zoomIn")}>
@@ -337,14 +339,14 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
 
                     <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium opacity-75">{t("canvas.editors.brushSize")}</span>
+                            <span className="font-medium" style={{ color: theme.node.label }}>{t("canvas.editors.brushSize")}</span>
                             <span className="font-semibold">{brushSize}px</span>
                         </div>
                         <Slider min={8} max={160} step={2} value={brushSize} onChange={setBrushSize} />
                     </div>
 
                     <div className="space-y-2">
-                        <div className="text-sm font-medium opacity-75">{t("canvas.editors.editInstructions")}</div>
+                        <div className="text-sm font-medium" style={{ color: theme.node.label }}>{t("canvas.editors.editInstructions")}</div>
                         <Input.TextArea
                             rows={6}
                             value={prompt}
@@ -355,7 +357,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
                                 setError("");
                             }}
                         />
-                        {error ? <div className="text-xs font-medium text-[#ef4444]">{error}</div> : null}
+                        {error ? <div className="text-sm font-medium" style={{ color: theme.node.danger }}>{error}</div> : null}
                     </div>
 
                     <div className="mt-auto flex flex-wrap items-center justify-between gap-2">

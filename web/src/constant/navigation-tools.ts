@@ -1,9 +1,13 @@
-import { Images, Maximize2, Settings2 } from "lucide-react";
+import { Images, PenLine, Settings2, Workflow } from "lucide-react";
 
 export const navigationTools = [
     {
         slug: "canvas",
-        icon: Maximize2,
+        icon: Workflow,
+    },
+    {
+        slug: "write",
+        icon: PenLine,
     },
     {
         slug: "assets",

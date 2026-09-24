@@ -16,10 +16,10 @@ export const SmartCanvasNodeContent = memo(
         const layers = smartCanvasLayers(node);
 
         return (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-5 text-center" style={{ color: theme.node.placeholder }}>
-                <LayoutDashboard className="size-7 opacity-35" />
-                <span className="text-xs">{`${smartCanvasRatio(node)} · ${smartCanvasResolution(node).toUpperCase()}`}</span>
-                <span className="text-[11px] tabular-nums opacity-70">{t("canvas.smartCanvas.placedCount", { count: layers.length })}</span>
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-5 text-center" style={{ color: theme.node.muted }}>
+                <LayoutDashboard className="size-7" style={{ color: theme.node.muted }} />
+                <span className="text-sm" style={{ color: theme.node.label }}>{`${smartCanvasRatio(node)} · ${smartCanvasResolution(node).toUpperCase()}`}</span>
+                <span className="text-sm tabular-nums" style={{ color: theme.node.muted }}>{t("canvas.smartCanvas.placedCount", { count: layers.length })}</span>
             </div>
         );
     },

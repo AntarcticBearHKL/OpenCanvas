@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Modal, Segmented } from "antd";
-import { BetweenHorizontalStart, Copy, Download, FolderPlus, GalleryHorizontal, GalleryHorizontalEnd, Image as ImageIcon, ImagePlus, Info, Layers, MessageSquare, Minus, Music2, Plus, RefreshCw, Settings2, Tags, Trash2, Upload, Video } from "lucide-react";
+import { BetweenHorizontalStart, ClipboardCopy, Copy, Download, GalleryHorizontal, GalleryHorizontalEnd, Image as ImageIcon, ImagePlus, Info, Layers, MessageSquare, Minus, Music2, Plus, RefreshCw, Settings2, Tags, Trash2, Upload, Video } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
@@ -27,7 +27,7 @@ type CanvasNodeHoverToolbarProps = {
     onGenerateImage: (node: CanvasNodeData) => void;
     onUpload: (node: CanvasNodeData) => void;
     onDownload: (node: CanvasNodeData) => void;
-    onSaveAsset: (node: CanvasNodeData) => void;
+    onCopy: (node: CanvasNodeData) => void;
     onMaskEdit: (node: CanvasNodeData) => void;
     onCrop: (node: CanvasNodeData) => void;
     onRemoveBackground: (node: CanvasNodeData) => void;
@@ -73,7 +73,7 @@ export function CanvasNodeHoverToolbar({
     onGenerateImage,
     onUpload,
     onDownload,
-    onSaveAsset,
+    onCopy,
     onMaskEdit,
     onCrop,
     onRemoveBackground,
@@ -157,8 +157,9 @@ export function CanvasNodeHoverToolbar({
                   { id: "captureCurrent", title: t("canvas.videoFrames.current"), label: t("canvas.videoFrames.current"), icon: <GalleryHorizontal className="size-4" />, onClick: () => onCaptureVideoFrame(node, "current") },
               ]
             : []),
-        ...(hasVideo || isText ? [{ id: "saveAsset", title: t("common.addToAssets"), label: t("canvas.nodeToolbar.saveAsset"), icon: <FolderPlus className="size-4" />, onClick: () => onSaveAsset(node) }] : []),
         ...(hasVideo || hasAudio ? [{ id: "download", title: t(hasAudio ? "canvas.nodeToolbar.downloadAudio" : "canvas.nodeToolbar.downloadVideo"), label: t("common.download"), icon: <Download className="size-4" />, onClick: () => onDownload(node) }] : []),
+        ...(hasImage ? [{ id: "download", title: t("common.download"), label: t("common.download"), icon: <Download className="size-4" />, onClick: () => onDownload(node) }] : []),
+        ...(hasImage ? [{ id: "copy", title: t("canvas.imageTools.copyTitle"), label: t("canvas.imageTools.copy"), icon: <ClipboardCopy className="size-4" />, onClick: () => onCopy(node) }] : []),
         ...(isVideo ? [{ id: "edit", title: t("common.edit"), label: t("common.edit"), icon: <MessageSquare className="size-4" />, onClick: () => onToggleDialog(node) }] : []),
         ...(isText ? [{ id: "generateImage", title: t("canvas.node.generateImage"), label: t("canvas.node.generate"), icon: <ImageIcon className="size-4" />, onClick: () => onGenerateImage(node) }] : []),
         ...(isConfig ? [{ id: "config", title: t("canvas.configNode.title"), label: t("canvas.configNode.title"), icon: <Settings2 className="size-4" />, onClick: () => onToggleDialog(node) }] : []),
@@ -238,14 +239,14 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
     );
 
     return (
-        <Modal className="canvas-node-info-modal" title={title} open={open && Boolean(node)} centered footer={null} onCancel={onClose}>
+        <Modal className="canvas-node-info-modal" title={title} open={open && Boolean(node)} centered footer={null} onCancel={onClose} classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
             {node ? (
                 <div className="h-[56vh] min-h-[360px] select-text text-sm" data-canvas-shortcuts-ignore>
                     {view === "info" ? (
                         <div className="thin-scrollbar h-full space-y-3 overflow-auto pr-1">
                             <InfoRow label="ID" value={node.id} />
                             <InfoRow label={t("canvas.nodeToolbar.name")} value={node.title || t("canvas.node.untitled")} />
-                            <InfoRow label={t("canvas.nodeToolbar.type")} value={node.type === CanvasNodeType.Config ? t("canvas.configNode.title") : [CanvasNodeType.Image, CanvasNodeType.Video, CanvasNodeType.Audio, CanvasNodeType.Text].includes(node.type as CanvasNodeType) ? t(`assets.kinds.${node.type}`) : getNodeDefinition(node.type)?.title || node.type} />
+                            <InfoRow label={t("canvas.nodeToolbar.type")}                         value={node.type === CanvasNodeType.Config ? t("canvas.configNode.title") : [CanvasNodeType.Image, CanvasNodeType.Video, CanvasNodeType.Audio, CanvasNodeType.Text].includes(node.type as CanvasNodeType) ? t(`canvas.nodeTypes.${node.type}`) : getNodeDefinition(node.type)?.title || node.type} />
                             <InfoRow label={t("canvas.nodeToolbar.size")} value={`${Math.round(node.width)} x ${Math.round(node.height)}`} />
                             <InfoRow label={t("canvas.nodeToolbar.position")} value={`${Math.round(node.position.x)}, ${Math.round(node.position.y)}`} />
                             <InfoRow label={t("canvas.nodeToolbar.status")} value={node.metadata?.status || "idle"} />
@@ -254,13 +255,13 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
                             {node.metadata?.videoTaskId ? <InfoRow label={t("canvas.nodeToolbar.videoTaskId")} value={node.metadata.videoTaskId} /> : null}
                             {imageBytes ? <InfoRow label={t("canvas.nodeToolbar.imageSize")} value={formatBytes(imageBytes)} /> : null}
                             {node.metadata?.errorDetails ? (
-                                <div className="rounded-lg border p-3 text-red-400" style={{ borderColor: theme.node.stroke }}>
+                                <div className="rounded-[2px] border p-3" style={{ borderColor: theme.node.stroke, color: theme.node.danger }}>
                                     {node.metadata.errorDetails}
                                 </div>
                             ) : null}
                         </div>
                     ) : (
-                        <pre className="thin-scrollbar h-full overflow-auto rounded-lg border p-3 text-xs leading-5" style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke, color: theme.node.text }}>
+                        <pre className="thin-scrollbar h-full overflow-auto rounded-[2px] border p-3 text-sm leading-5" style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke, color: theme.node.text }}>
                             {json}
                         </pre>
                     )}
@@ -271,10 +272,11 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
 }
 
 function InfoRow({ label, value }: { label: string; value: ReactNode }) {
+    const theme = useCanvasTheme();
     return (
         <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-3">
-            <span className="opacity-50">{label}</span>
-            <span className="min-w-0 whitespace-pre-wrap break-words">{value}</span>
+            <span className="font-medium" style={{ color: theme.node.label }}>{label}</span>
+            <span className="min-w-0 whitespace-pre-wrap break-words" style={{ color: theme.node.text }}>{value}</span>
         </div>
     );
 }

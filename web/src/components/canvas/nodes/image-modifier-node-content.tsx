@@ -242,12 +242,12 @@ export function ImageModifierNodeContent({
             >
                 <div className="flex h-7 shrink-0 items-center gap-1">
                     <SlidersHorizontal className="size-3.5 shrink-0" style={{ color: theme.node.muted }} />
-                    <span className="min-w-0 flex-1 truncate text-xs font-semibold" style={{ color: theme.node.text }}>
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold" style={{ color: theme.node.text }}>
                         {t("canvas.nodeTypes.imageModifier")}
                     </span>
                     <button
                         type="button"
-                        className="flex h-6 shrink-0 items-center rounded-md px-2 text-[10px] font-medium transition hover:bg-black/5 dark:hover:bg-white/10"
+                        className="flex h-6 shrink-0 items-center rounded-[2px] px-2 text-sm font-medium transition hover:bg-hover"
                         style={{ color: theme.node.muted }}
                         onClick={() => {
                             onParamsChange(DEFAULT_IMAGE_MODIFIER_PARAMS);
@@ -260,17 +260,17 @@ export function ImageModifierNodeContent({
                 </div>
 
                 {emit ? null : (
-                    <div className="relative flex h-[220px] shrink-0 items-center justify-center overflow-hidden rounded-xl" style={{ background: theme.node.fill }}>
+                    <div className="relative flex h-[220px] shrink-0 items-center justify-center overflow-hidden" style={{ background: theme.node.fill }}>
                         {showImage ? (
                             <canvas ref={previewRef} width={428} height={PREVIEW_HEIGHT} className="h-full w-full" />
                         ) : (
-                            <div className="flex flex-col items-center gap-2 px-4 text-center" style={{ color: theme.node.placeholder }}>
-                                {loadFailed ? <ImageOff className="size-6 opacity-40" /> : <ImagePlus className="size-6 opacity-40" />}
-                                <span className="text-[11px] leading-5">{loadFailed ? t("canvas.imageModifier.sourceLoadFailed") : hasSource ? t("canvas.imageModifier.rendering") : t("canvas.imageModifier.empty")}</span>
+                            <div className="flex flex-col items-center gap-2 px-4 text-center" style={{ color: theme.node.muted }}>
+                                {loadFailed ? <ImageOff className="size-6" style={{ color: theme.node.muted }} /> : <ImagePlus className="size-6" style={{ color: theme.node.muted }} />}
+                                <span className="text-sm leading-5">{loadFailed ? t("canvas.imageModifier.sourceLoadFailed") : hasSource ? t("canvas.imageModifier.rendering") : t("canvas.imageModifier.empty")}</span>
                                 {loadFailed ? (
                                     <button
                                         type="button"
-                                        className="flex h-6 items-center rounded-md px-2 text-[10px] font-medium transition hover:bg-black/5 dark:hover:bg-white/10"
+                                        className="flex h-6 items-center rounded-[2px] px-2 text-sm font-medium transition hover:bg-hover"
                                         style={{ color: theme.node.text }}
                                         onClick={onClearSource}
                                         onMouseDown={(event) => event.stopPropagation()}
@@ -280,7 +280,7 @@ export function ImageModifierNodeContent({
                                 ) : null}
                             </div>
                         )}
-                        {!showImage ? <div className="pointer-events-none absolute inset-0 rounded-xl border border-dashed" style={{ borderColor: theme.node.stroke }} /> : null}
+                        {!showImage ? <div className="pointer-events-none absolute inset-0 border border-dashed" style={{ borderColor: theme.node.stroke }} /> : null}
                     </div>
                 )}
 
@@ -303,7 +303,7 @@ export function ImageModifierNodeContent({
                         <div className="grid h-full grid-cols-2 content-center gap-2">
                             {IMAGE_MODIFIER_PARAMS.map((spec) => (
                                 <label key={spec.key} className="flex h-8 flex-col justify-between">
-                                    <span className="flex min-w-0 items-center justify-between gap-1 text-[10px] leading-4" style={{ color: theme.node.muted }}>
+                                    <span className="flex min-w-0 items-center justify-between gap-1 text-sm leading-4" style={{ color: theme.node.muted }}>
                                         <span className="truncate">{t(spec.labelKey)}</span>
                                         <span className="shrink-0 tabular-nums">{formatImageModifierValue(spec, params[spec.key])}</span>
                                     </span>
@@ -329,7 +329,7 @@ export function ImageModifierNodeContent({
                         <div className="grid h-full grid-cols-2 content-center gap-2">
                             {IMAGE_MODIFIER_TONE_PARAMS.map((spec) => (
                                 <label key={spec.key} className="flex h-8 flex-col justify-between">
-                                    <span className="flex min-w-0 items-center justify-between gap-1 text-[10px] leading-4" style={{ color: theme.node.muted }}>
+                                    <span className="flex min-w-0 items-center justify-between gap-1 text-sm leading-4" style={{ color: theme.node.muted }}>
                                         <span className="truncate">{t(spec.labelKey)}</span>
                                         <span className="shrink-0 tabular-nums">{formatImageModifierValue(spec, toneParamValue(spec.key))}</span>
                                     </span>
@@ -349,11 +349,11 @@ export function ImageModifierNodeContent({
                         </div>
                     ) : (
                         <div className="flex h-full flex-col justify-center gap-2">
-                            <div className="flex h-4 shrink-0 items-center justify-between text-[10px] leading-4" style={{ color: theme.node.muted }}>
+                            <div className="flex h-4 shrink-0 items-center justify-between text-sm leading-4" style={{ color: theme.node.muted }}>
                                 <span className="truncate">{t("canvas.imageModifier.curve")}</span>
                                 <button
                                     type="button"
-                                    className="flex h-4 shrink-0 items-center rounded px-1.5 font-medium transition hover:bg-black/5 dark:hover:bg-white/10"
+                                    className="flex h-4 shrink-0 items-center rounded-[2px] px-1.5 font-medium transition hover:bg-hover"
                                     style={{ color: theme.node.muted }}
                                     onClick={() => onCurveChange(DEFAULT_IMAGE_MODIFIER_CURVE.map((point) => ({ ...point })))}
                                     onMouseDown={(event) => event.stopPropagation()}
@@ -365,7 +365,7 @@ export function ImageModifierNodeContent({
                                 ref={curveRef}
                                 width={428}
                                 height={CURVE_HEIGHT}
-                                className="h-[150px] w-full shrink-0 cursor-crosshair touch-none rounded-xl"
+                                className="h-[150px] w-full shrink-0 cursor-crosshair touch-none"
                                 title={t("canvas.imageModifier.curveHint")}
                                 onPointerDown={(event) => {
                                     event.stopPropagation();
@@ -384,15 +384,15 @@ export function ImageModifierNodeContent({
                     )}
                 </div>
 
-                <div className="flex h-4 shrink-0 items-center text-[10px] leading-4" onMouseDown={(event) => event.stopPropagation()}>
-                    <span className="truncate" style={{ color: error ? "#f87171" : theme.node.muted }}>
+                <div className="flex h-4 shrink-0 items-center text-sm leading-4" onMouseDown={(event) => event.stopPropagation()}>
+                    <span className="truncate" style={{ color: error ? theme.node.danger : theme.node.muted }}>
                         {error || (emit ? t("canvas.imageModifier.emitHint") : t("canvas.imageModifier.dropHint"))}
                     </span>
                 </div>
 
                 <button
                     type="button"
-                    className="flex h-9 w-full shrink-0 items-center justify-between rounded-lg border px-3 text-[11px] font-medium transition hover:bg-black/5 dark:hover:bg-white/10"
+                    className="flex h-9 w-full shrink-0 items-center justify-between rounded-[2px] border px-3 text-sm font-medium transition hover:bg-hover"
                     style={{ borderColor: emit ? theme.node.activeStroke : theme.node.stroke, color: emit ? theme.node.activeStroke : theme.node.muted }}
                     title={t("canvas.imageModifier.emitTitle")}
                     onClick={() => onEmitChange(!emit)}
@@ -412,8 +412,8 @@ export function ImageModifierNodeContent({
                         setBaking(true);
                         void onGenerate().finally(() => setBaking(false));
                     }}
-                    className="flex h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border text-xs font-semibold transition hover:bg-black/5 disabled:opacity-40 dark:hover:bg-white/10"
-                    style={{ borderColor: theme.node.stroke, color: theme.node.text }}
+                    className="flex h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-[2px] border text-sm font-semibold transition hover:bg-hover disabled:opacity-40"
+                    style={{ borderColor: theme.node.accent, background: theme.node.accentSoft, color: theme.node.accentText }}
                 >
                     {baking ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
                     {baking ? t("canvas.imageModifier.baking") : t("canvas.imageModifier.generate")}

@@ -7,7 +7,7 @@ export default function ConfigPage() {
 
     return (
         <main className="flex h-full min-h-0 flex-col bg-background">
-            <div className="shrink-0 px-5 pb-1 pt-5">
+            <div className="shrink-0 px-5 pb-1 pt-5 glass-surface">
                 <h1 className="text-xl font-semibold text-foreground">{t("config.title")}</h1>
             </div>
             <div className="min-h-0 flex-1">

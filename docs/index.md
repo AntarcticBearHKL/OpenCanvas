@@ -36,5 +36,5 @@
 
 ## Notes
 
-- Canvas projects and My Assets are primarily stored in the browser; there is no built-in cloud sync.
+- Canvas projects and the writing studio's works are primarily stored in the browser; there is no built-in cloud sync.
 - The AI API key is stored in the browser, which sends requests directly to OpenAI-compatible endpoints.

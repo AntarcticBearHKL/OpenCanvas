@@ -59,14 +59,14 @@ export function CanvasTopBar({
                             type="button"
                             onClick={toggleSidePanel}
                             aria-label={sidePanelOpen ? t("canvas.collapsePanel") : t("canvas.expandPanel")}
-                            className="grid size-7 place-items-center rounded-full transition hover:bg-black/5 dark:hover:bg-white/10"
+                            className="grid size-7 place-items-center rounded-full transition hover:bg-hover"
                             style={{ color: theme.node.text }}
                         >
                             {sidePanelOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
                         </button>
                     </Tooltip>
                     <Tooltip title={t("canvas.projects")}>
-                        <button type="button" onClick={onProjects} aria-label={t("canvas.projects")} className="grid size-7 place-items-center rounded-full transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }}>
+                        <button type="button" onClick={onProjects} aria-label={t("canvas.projects")} className="grid size-7 place-items-center rounded-full transition hover:bg-hover" style={{ color: theme.node.text }}>
                             <House className="size-4" />
                         </button>
                     </Tooltip>
@@ -106,8 +106,8 @@ export function CanvasTopBar({
                             <button
                                 key={item}
                                 type="button"
-                                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-1 text-xs transition hover:bg-black/5 sm:px-2.5 dark:hover:bg-white/10"
-                                style={active ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
+                                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-1 text-sm transition hover:bg-hover sm:px-2.5"
+                                style={active ? { background: theme.node.accentSoft, color: theme.node.accent, boxShadow: `inset 0 0 0 1px ${theme.node.accent}` } : { color: theme.node.muted }}
                                 aria-current={active ? "page" : undefined}
                                 aria-label={t(`canvas.workspace.${item}`)}
                                 title={t(`canvas.workspace.${item}`)}

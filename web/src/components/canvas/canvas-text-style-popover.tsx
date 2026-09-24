@@ -5,7 +5,7 @@ import { Button, ColorPicker, InputNumber, Segmented, Select } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
-import { frostedSurfaceClass, type CanvasTheme } from "@/lib/canvas-theme";
+import { type CanvasTheme } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { clampFontSize, clampLineHeight, resolveTextStyle, TEXT_FONT_FAMILIES, TEXT_FONT_SIZE_MAX, TEXT_FONT_SIZE_MIN, TEXT_LINE_HEIGHT_MAX, TEXT_LINE_HEIGHT_MIN, type TextAlign } from "@/lib/canvas/text-style";
 import type { CanvasNodeMetadata } from "@/types/canvas";
@@ -45,7 +45,7 @@ export function CanvasTextStylePopover({ metadata, onChange }: CanvasTextStylePo
     return (
         <>
             <button ref={buttonRef} type="button" className="group relative flex h-12 items-center whitespace-nowrap px-1.5" style={{ color: theme.node.text }} aria-label={t("canvas.nodeToolbar.textStyle")} onClick={() => setOpen((current) => !current)}>
-                <span className="flex h-9 items-center gap-2 rounded-lg px-2.5 transition group-hover:bg-black/5 dark:group-hover:bg-white/10" style={open ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : undefined}>
+                <span className="flex h-9 items-center gap-2 rounded-[2px] px-2.5 transition group-hover:bg-hover" style={open ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : undefined}>
                     <Type className="size-4" />
                     <span>{t("canvas.nodeToolbar.textStyle")}</span>
                 </span>
@@ -73,19 +73,18 @@ function CanvasTextStylePanel({ panelRef, buttonRect, theme, metadata, onChange 
         width,
         left,
         ...(buttonRect.bottom + 320 > window.innerHeight ? { bottom: window.innerHeight - buttonRect.top + gap } : { top: buttonRect.bottom + gap }),
-        background: theme.toolbar.panel,
         border: `1px solid ${theme.toolbar.border}`,
         borderRadius: 16,
         padding: 16,
         color: theme.node.text,
     } as const;
-    const labelClass = "text-xs";
+    const labelClass = "text-sm";
 
     return (
-        <div ref={panelRef} className={`canvas-text-style-popover ${frostedSurfaceClass}`} style={panelStyle} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+        <div ref={panelRef} className="canvas-text-style-popover glass-raised" style={panelStyle} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
             <ImageSettingsTheme theme={theme}>
                 <div className="space-y-3">
-                    <div className="text-xs font-medium" style={{ color: theme.node.muted }}>
+                    <div className="text-sm font-medium" style={{ color: theme.node.muted }}>
                         {t("canvas.textStyle.title")}
                     </div>
                     <div className="space-y-1.5">
@@ -159,7 +158,7 @@ function CanvasTextStylePanel({ panelRef, buttonRect, theme, metadata, onChange 
                             {t("canvas.textStyle.color")}
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <Button size="small" type="text" className="!h-7 !px-1.5 !text-xs" style={{ color: theme.node.muted }} onClick={() => onChange({ textColor: "" })}>
+                            <Button size="small" type="text" className="!h-7 !px-1.5 !text-sm" style={{ color: theme.node.muted }} onClick={() => onChange({ textColor: "" })}>
                                 {t("canvas.textStyle.colorReset")}
                             </Button>
                             <ColorPicker size="small" value={style.color || theme.node.text} disabledAlpha getPopupContainer={() => panelRef.current || document.body} onChangeComplete={(color) => onChange({ textColor: color.toHexString() })} />

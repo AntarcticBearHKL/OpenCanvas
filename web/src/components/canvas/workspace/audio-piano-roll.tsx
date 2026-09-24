@@ -39,7 +39,7 @@ const NOTE_EDGE_PX = 5;
 const ROW_COUNT = AUDIO_NOTE_MAX - AUDIO_NOTE_MIN + 1;
 const MIN_PX_PER_BEAT = 8;
 const MAX_PX_PER_BEAT = 240;
-const ROLL_ACTION_CLASS = "grid size-6 shrink-0 place-items-center rounded-md opacity-70 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10";
+const ROLL_ACTION_CLASS = "grid size-6 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover hover:opacity-100 hover:bg-hover";
 const EMPTY_NOTES: CanvasAudioNote[] = [];
 
 type AudioPianoRollProps = {
@@ -227,11 +227,11 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
     if (!region || !track) {
         return (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-                <Music2 className="size-7 opacity-40" style={{ color: theme.node.muted }} />
-                <span className="text-xs" style={{ color: theme.node.placeholder }}>
+                <Music2 className="size-7" style={{ color: theme.node.muted }} />
+                <span className="text-sm" style={{ color: theme.node.placeholder }}>
                     {t("canvas.audioStudio.rollEmpty")}
                 </span>
-                <button type="button" className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }} onClick={onClose}>
+                <button type="button" className="flex items-center gap-1.5 rounded-[2px] px-2 py-1 text-sm transition hover:bg-hover" style={{ color: theme.node.text }} onClick={onClose}>
                     {t("canvas.audioStudio.rollBack")}
                 </button>
             </div>
@@ -239,10 +239,10 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
     }
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-2 py-1 text-[11px]" style={{ borderColor: theme.toolbar.border, color: theme.node.muted }}>
+        <div className="flex min-h-0 flex-1 flex-col glass-card">
+            <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-2 py-1 text-sm" style={{ borderColor: theme.toolbar.border, color: theme.node.muted }}>
                 <input
-                    className="w-40 min-w-0 shrink rounded border bg-transparent px-1.5 py-0.5 text-[11px] outline-none"
+                    className="w-40 min-w-0 shrink rounded-[2px] border bg-transparent px-1.5 py-0.5 text-sm outline-none"
                     style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                     value={region.name || ""}
                     placeholder={track.name || t(AUDIO_TRACK_TYPE_LABEL_KEYS[audioTrackType(track)])}
@@ -286,7 +286,7 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
                             const pitch = AUDIO_NOTE_MAX - index;
                             const black = isBlackKey(pitch);
                             return (
-                                <div key={pitch} className="flex items-center justify-end pr-1 text-[8px] tabular-nums" style={{ height: ROW_HEIGHT, background: black ? theme.node.faint : theme.toolbar.panel, color: black ? theme.node.muted : theme.node.text, borderBottom: `1px solid ${theme.toolbar.border}` }}>
+                                <div key={pitch} className="flex items-center justify-end pr-1 text-xs leading-3 tabular-nums" style={{ height: ROW_HEIGHT, background: black ? theme.node.faint : theme.toolbar.panel, color: black ? theme.node.muted : theme.node.text, borderBottom: `1px solid ${theme.toolbar.border}` }}>
                                     {pitch % 12 === 0 ? noteName(pitch) : ""}
                                 </div>
                             );
@@ -308,14 +308,14 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
                             return (
                                 <div
                                     key={note.id}
-                                    className="absolute rounded-sm border"
+                                    className="absolute rounded-[2px] border"
                                     style={{
                                         left: note.tick * pxPerTick,
                                         top: (AUDIO_NOTE_MAX - note.pitch) * ROW_HEIGHT,
                                         width: Math.max(4, note.durationTicks * pxPerTick),
                                         height: ROW_HEIGHT - 2,
                                         background: selected ? theme.node.muted : theme.node.faint,
-                                        borderColor: selected ? theme.node.activeStroke : theme.toolbar.border,
+                                        borderColor: selected ? theme.node.accent : theme.toolbar.border,
                                         cursor: "grab",
                                     }}
                                     tabIndex={0}
@@ -334,11 +334,11 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
                                 </div>
                             );
                         })}
-                        <span ref={playheadRef} className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-px" style={{ background: theme.node.activeStroke }} />
+                        <span ref={playheadRef} className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-px" style={{ background: theme.node.accent }} />
                     </div>
                 </div>
                 <div className="sticky bottom-0 z-30 flex" style={{ width: KEY_WIDTH + gridWidth }}>
-                    <div className="sticky left-0 z-10 flex shrink-0 items-end justify-end pr-1 pb-1 text-[9px]" style={{ width: KEY_WIDTH, height: VELOCITY_HEIGHT, background: theme.toolbar.panel, borderTop: `1px solid ${theme.toolbar.border}`, color: theme.node.muted }}>
+                    <div className="sticky left-0 z-10 flex shrink-0 items-end justify-end pr-1 pb-1 text-sm" style={{ width: KEY_WIDTH, height: VELOCITY_HEIGHT, background: theme.toolbar.panel, borderTop: `1px solid ${theme.toolbar.border}`, color: theme.node.muted }}>
                         {t("canvas.audioStudio.rollVelocity")}
                     </div>
                     <div

@@ -27,14 +27,14 @@ export function CanvasRulers({ viewport, viewportSize }: { viewport: ViewportTra
         <>
             <div data-ruler="left" className="pointer-events-none absolute left-0 z-[75] border-r" style={{ ...surface, top: TOP_BAR_HEIGHT, width: RULER_THICKNESS, height: Math.max(viewportSize.height - TOP_BAR_HEIGHT, 0) }}>
                 {ticksY.map((value) => (
-                    <span key={value} className="absolute left-0 opacity-60" style={{ top: viewport.y + value * viewport.k - TOP_BAR_HEIGHT + 4, fontSize: 10, writingMode: "vertical-rl" }}>
+                    <span key={value} className="absolute left-0" style={{ top: viewport.y + value * viewport.k - TOP_BAR_HEIGHT + 4, fontSize: 11, color: theme.node.muted, writingMode: "vertical-rl" }}>
                         {value}
                     </span>
                 ))}
             </div>
             <div data-ruler="top" className="pointer-events-none absolute z-[75] border-b" style={{ ...surface, top: TOP_BAR_HEIGHT, left: RULER_THICKNESS, width: Math.max(viewportSize.width - RULER_THICKNESS, 0), height: RULER_THICKNESS }}>
                 {ticksX.map((value) => (
-                    <span key={value} className="absolute top-0 opacity-60" style={{ left: viewport.x + value * viewport.k + 4 - RULER_THICKNESS, fontSize: 10, lineHeight: `${RULER_THICKNESS}px` }}>
+                    <span key={value} className="absolute top-0" style={{ left: viewport.x + value * viewport.k + 4 - RULER_THICKNESS, fontSize: 11, color: theme.node.muted, lineHeight: `${RULER_THICKNESS}px` }}>
                         {value}
                     </span>
                 ))}

@@ -3,7 +3,7 @@ import type { CSSProperties, MouseEvent, PointerEvent, TextareaHTMLAttributes } 
 import { createPortal } from "react-dom";
 import { FileText, Image as ImageIcon, Music2, Video } from "lucide-react";
 
-import { canvasThemes, frostedSurfaceClass } from "@/lib/canvas-theme";
+import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { isImeComposing, isPlainEnterKey } from "@/lib/keyboard-event";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
@@ -195,14 +195,15 @@ export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Pro
 });
 
 function MentionHighlightText({ value, labels, placeholder }: { value: string; labels: string[]; placeholder: boolean }) {
-    if (placeholder) return <span className="opacity-45">{value}</span>;
+    const theme = useCanvasTheme();
+    if (placeholder) return <span style={{ color: theme.node.placeholder }}>{value}</span>;
     if (!labels.length) return <>{value}</>;
     const pattern = new RegExp(`(${labels.map(escapeRegExp).join("|")})`, "g");
     return (
         <>
             {value.split(pattern).map((part, index) =>
                 labels.includes(part) ? (
-                    <span key={`${part}-${index}`} className="rounded-md bg-[#2f80ff]/16 px-1 py-0.5 font-medium text-[#2f80ff] ring-1 ring-[#2f80ff]/24">
+                    <span key={`${part}-${index}`} className="rounded-[2px] bg-[#2f80ff]/16 px-1 py-0.5 font-medium text-[#2f80ff] ring-1 ring-[#2f80ff]/24">
                         {part}
                     </span>
                 ) : (
@@ -244,8 +245,8 @@ function MentionMenu({ textarea, caretIndex, references, activeIndex, theme, onS
     return createPortal(
         <div
             data-canvas-resource-mention-menu="true"
-                className={`fixed z-[120] max-h-56 w-64 overflow-y-auto rounded-2xl border p-1 ${frostedSurfaceClass}`}
-            style={{ left, top, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
+                className="fixed z-[120] max-h-56 w-64 overflow-y-auto rounded-none border p-1 glass-raised"
+            style={{ left, top, borderColor: theme.toolbar.border, color: theme.node.text }}
             onPointerDown={stopCanvasInteraction}
             onMouseDown={stopCanvasInteraction}
             onClick={(event) => event.stopPropagation()}
@@ -254,7 +255,7 @@ function MentionMenu({ textarea, caretIndex, references, activeIndex, theme, onS
                 <button
                     key={reference.id}
                     type="button"
-                    className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition"
+                    className="flex w-full min-w-0 items-center gap-2 rounded-[2px] px-2 py-1.5 text-left text-sm transition"
                     style={{ background: index === activeIndex ? theme.toolbar.activeBg : "transparent", color: index === activeIndex ? theme.toolbar.activeText : theme.node.text }}
                     onPointerDown={(event) => {
                         event.preventDefault();
@@ -270,7 +271,7 @@ function MentionMenu({ textarea, caretIndex, references, activeIndex, theme, onS
                     <ReferencePreview reference={reference} />
                     <span className="min-w-0 flex-1">
                         <span className="block font-medium">{reference.label}</span>
-                        <span className="block truncate opacity-65">{reference.text || reference.title}</span>
+                        <span className="block truncate" style={{ color: theme.node.muted }}>{reference.text || reference.title}</span>
                     </span>
                 </button>
             ))}
@@ -280,11 +281,11 @@ function MentionMenu({ textarea, caretIndex, references, activeIndex, theme, onS
 }
 
 function ReferencePreview({ reference }: { reference: CanvasResourceReference }) {
-    if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-9 rounded-md object-cover" />;
-    if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-9 rounded-md bg-black object-cover" muted preload="metadata" />;
+    if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-9 rounded-[2px] object-cover" />;
+    if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-9 rounded-[2px] bg-black object-cover" muted preload="metadata" />;
     const Icon = reference.kind === "audio" ? Music2 : reference.kind === "video" ? Video : reference.kind === "image" ? ImageIcon : FileText;
     return (
-        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-black/10">
+        <span className="grid size-9 shrink-0 place-items-center rounded-[2px] bg-black/10">
             <Icon className="size-4" />
         </span>
     );

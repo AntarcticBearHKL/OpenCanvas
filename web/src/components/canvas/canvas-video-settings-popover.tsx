@@ -4,7 +4,7 @@ import { Settings2 } from "lucide-react";
 import { Button } from "antd";
 
 import { VideoSettingsPanel, videoModeLabel, videoResolutionLabel, videoSecondsLabel, videoSizeLabel } from "@/components/video-settings-panel";
-import { canvasThemes, frostedSurfaceClass } from "@/lib/canvas-theme";
+import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import type { AiConfig } from "@/stores/use-config-store";
 
@@ -48,7 +48,7 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
     return (
         <>
             <span ref={buttonRef} className="inline-flex min-w-0">
-                <Button size="small" type="text" className={`${buttonClassName || "!h-8 !max-w-[220px] !justify-start !rounded-full !px-2.5"} hover:bg-black/5 dark:hover:bg-white/10`} style={{ color: theme.node.text }} icon={<Settings2 className="size-3.5" />} onClick={() => setOpen((current) => !current)}>
+                <Button size="small" type="text" className={`${buttonClassName || "!h-8 !max-w-[220px] !justify-start !rounded-full !px-2.5"} hover:bg-hover`} style={{ color: theme.node.text }} icon={<Settings2 className="size-3.5" />} onClick={() => setOpen((current) => !current)}>
                     <span className="truncate">
                         {videoResolutionLabel(config.vquality, config.model || config.videoModel)} · {videoSizeLabel(config.size)} · {videoSecondsLabel(config.videoSeconds, config.model || config.videoModel)} · {videoModeLabel(config.videoMode)}
                     </span>
@@ -87,7 +87,6 @@ function VideoSettingsPortal({
         width,
         left: Math.max(margin, Math.min(window.innerWidth - width - margin, left)),
         ...(topPlacement ? { bottom: window.innerHeight - buttonRect.top + gap, maxHeight: Math.max(260, buttonRect.top - margin * 2) } : { top: buttonRect.bottom + gap, maxHeight: Math.max(260, window.innerHeight - buttonRect.bottom - margin * 2) }),
-        background: theme.toolbar.panel,
         border: `1px solid ${theme.toolbar.border}`,
         borderRadius: 16,
         padding: 18,
@@ -98,7 +97,7 @@ function VideoSettingsPortal({
     return createPortal(
         <div
             ref={panelRef}
-            className={`canvas-image-settings-popover ${frostedSurfaceClass}`}
+            className="canvas-image-settings-popover glass-raised"
             style={style}
             onPointerDown={(event) => event.stopPropagation()}
             onMouseDown={(event) => event.stopPropagation()}

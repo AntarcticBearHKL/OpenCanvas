@@ -87,14 +87,14 @@ export function PsRulers({
     for (let value = Math.floor(-view.x / view.k / step) * step; view.x + value * view.k <= size.w; value += step) ticksX.push(value);
     const ticksY: number[] = [];
     for (let value = Math.floor(-view.y / view.k / step) * step; view.y + value * view.k <= size.h; value += step) ticksY.push(value);
-    const surface = { background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.muted };
+    const surface = { borderColor: theme.toolbar.border, color: theme.node.muted };
 
     return (
         <>
-            <div className="absolute left-0 top-0 z-30 border-r border-b" style={{ ...surface, width: RULER_SIZE, height: RULER_SIZE }} />
+            <div className="absolute left-0 top-0 z-30 border-r border-b glass-surface" style={{ ...surface, width: RULER_SIZE, height: RULER_SIZE }} />
             <div
                 data-ruler="top"
-                className="absolute z-30 cursor-ns-resize border-b select-none"
+                className="absolute z-30 cursor-ns-resize border-b select-none glass-surface"
                 style={{ ...surface, left: RULER_SIZE, top: 0, width: Math.max(size.w - RULER_SIZE, 0), height: RULER_SIZE }}
                 onPointerDown={(event) => onGuidePointerDown("y", event)}
                 onPointerMove={onGuidePointerMove}
@@ -102,14 +102,14 @@ export function PsRulers({
                 onPointerCancel={onGuidePointerUp}
             >
                 {ticksX.map((value) => (
-                    <span key={value} className="absolute top-0 opacity-60" style={{ left: view.x + value * view.k - RULER_SIZE + 4, fontSize: 10, lineHeight: `${RULER_SIZE}px` }}>
+                    <span key={value} className="absolute top-0" style={{ left: view.x + value * view.k - RULER_SIZE + 4, fontSize: 12, lineHeight: `${RULER_SIZE}px` }}>
                         {value}
                     </span>
                 ))}
             </div>
             <div
                 data-ruler="left"
-                className="absolute z-30 cursor-ew-resize border-r select-none"
+                className="absolute z-30 cursor-ew-resize border-r select-none glass-surface"
                 style={{ ...surface, left: 0, top: RULER_SIZE, width: RULER_SIZE, height: Math.max(size.h - RULER_SIZE, 0) }}
                 onPointerDown={(event) => onGuidePointerDown("x", event)}
                 onPointerMove={onGuidePointerMove}
@@ -117,7 +117,7 @@ export function PsRulers({
                 onPointerCancel={onGuidePointerUp}
             >
                 {ticksY.map((value) => (
-                    <span key={value} className="absolute left-0 opacity-60" style={{ top: view.y + value * view.k - RULER_SIZE + 4, fontSize: 10, writingMode: "vertical-rl" }}>
+                    <span key={value} className="absolute left-0" style={{ top: view.y + value * view.k - RULER_SIZE + 4, fontSize: 12, writingMode: "vertical-rl" }}>
                         {value}
                     </span>
                 ))}

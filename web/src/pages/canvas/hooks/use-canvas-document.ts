@@ -3,9 +3,8 @@ import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction 
 import { getGenerationCount } from "@/lib/canvas/canvas-generation-helpers";
 import { createCanvasNode } from "@/lib/canvas/canvas-node-factory";
 import { isNodeLocked } from "@/lib/canvas/canvas-node-geometry";
-import { getNodeDefinition, isBuiltinNodeType as isBuiltinType } from "@/lib/canvas/node-registry";
 import type { AiConfig } from "@/stores/use-config-store";
-import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasNodeTypeId, type Position, type SelectionBox, type ViewportTransform } from "@/types/canvas";
+import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasNodeMetadata, type CanvasNodeTypeId, type Position, type SelectionBox, type ViewportTransform } from "@/types/canvas";
 
 type CanvasClipboard = {
     nodes: CanvasNodeData[];
@@ -49,7 +48,7 @@ type CanvasDocumentParams = {
 export function useCanvasDocument(params: CanvasDocumentParams) {
     const { effectiveConfig, getCanvasCenter, nodesRef, connectionsRef, selectedNodeIdsRef, clipboardRef, cleanupCanvasFiles, projectId, size, cancelPendingConnectionCreate, setNodes, setConnections, setSelectedNodeIds, setSelectedConnectionId, setDialogNodeId, setHoveredNodeId, setToolbarNodeId, setInfoNodeId, setCropNodeId, setMaskEditNodeId, setAngleNodeId, setPreviewNodeId, setRunningNodeId, setExpandedBatchNodeIds, setSelectionBox, setViewport } = params;
     const createNode = useCallback(
-        (type: CanvasNodeTypeId, position?: Position) => {
+        (type: CanvasNodeTypeId, position?: Position, metadata?: CanvasNodeMetadata) => {
             const targetPosition = position || getCanvasCenter();
             const configMetadata =
                 type === CanvasNodeType.Config
@@ -59,23 +58,11 @@ export function useCanvasDocument(params: CanvasDocumentParams) {
                           count: getGenerationCount(effectiveConfig.canvasImageCount || effectiveConfig.count),
                       }
                     : undefined;
-            const newNode = createCanvasNode(type, targetPosition, configMetadata);
+            const newNode = createCanvasNode(type, targetPosition, { ...configMetadata, ...metadata });
 
             setNodes((prev) => [...prev, newNode]);
             setSelectedNodeIds(new Set([newNode.id]));
             setSelectedConnectionId(null);
-            const definition = getNodeDefinition(type);
-            // Display-only plugin nodes with hidePanel do not open a panel; custom Panels require autoOpenPanel on creation.
-            // Plugin nodes declaring useBuiltinPanel open the built-in generation panel on creation, like image nodes.
-            // Built-in image, video, and config nodes retain their existing open-on-create behavior.
-            const wantsPanel = definition?.hidePanel
-                ? false
-                : definition?.Panel
-                  ? Boolean(definition.autoOpenPanel)
-                  : definition?.useBuiltinPanel
-                    ? true
-                    : isBuiltinType(type) && type !== CanvasNodeType.Text && type !== CanvasNodeType.Audio && type !== CanvasNodeType.Image;
-            if (wantsPanel) setDialogNodeId(newNode.id);
         },
         [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, getCanvasCenter],
     );
@@ -137,7 +124,6 @@ export function useCanvasDocument(params: CanvasDocumentParams) {
         setNodes((prev) => [...prev, next]);
         setSelectedNodeIds(new Set([id]));
         setSelectedConnectionId(null);
-        setDialogNodeId(id);
     }, []);
 
     const copySelectedNodes = useCallback(() => {
@@ -210,7 +196,6 @@ export function useCanvasDocument(params: CanvasDocumentParams) {
         setConnections((prev) => [...prev, ...nextConnections]);
         setSelectedNodeIds(new Set(nextNodes.map((node) => node.id)));
         setSelectedConnectionId(null);
-        setDialogNodeId(nextNodes[0]?.id || null);
         return true;
     }, [getCanvasCenter]);
 

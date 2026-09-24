@@ -45,7 +45,7 @@ export function CanvasConfigNodePanel({ node, isRunning, hasPromptConnection, in
     const hasAnyInput = Boolean(inputSummary.textCount || inputSummary.imageCount || inputSummary.videoCount || inputSummary.audioCount);
     const hasComposerContent = Boolean((node.metadata?.composerContent ?? node.metadata?.prompt ?? "").trim());
     const canGenerate = isAudioGenerationNode ? hasPromptConnection : isImageGenerationNode || isVideoGenerationNode || hasComposerContent || (mode === "audio" ? inputSummary.textCount > 0 : hasAnyInput);
-    const flatButtonClass = "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-md px-2 text-[11px] transition hover:bg-black/5 dark:hover:bg-white/10";
+    const flatButtonClass = "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-[2px] px-2 text-sm transition hover:bg-hover";
     const summaryParts = [
         inputSummary.textCount ? `${t("canvas.configNode.prompt")} ${inputSummary.textCount}` : "",
         inputSummary.imageCount ? `${t("canvas.configNode.references")} ${inputSummary.imageCount}` : "",
@@ -71,7 +71,7 @@ export function CanvasConfigNodePanel({ node, isRunning, hasPromptConnection, in
                         <div className="cursor-default" onMouseDown={(event) => event.stopPropagation()}>
                             <Segmented
                                 size="small"
-                                className="canvas-config-mode !rounded-md !p-0.5"
+                                className="canvas-config-mode !rounded-[2px] !p-0.5"
                                 value={mode}
                                 onChange={(value) => onConfigChange(node.id, { generationMode: value as CanvasGenerationMode })}
                                 options={[
@@ -118,18 +118,18 @@ export function CanvasConfigNodePanel({ node, isRunning, hasPromptConnection, in
                 )}
 
                 {isAudioGenerationNode ? null : (
-                    <div className="mb-1.5 min-w-0 truncate text-[11px]" style={{ color: theme.node.label }}>
+                    <div className="mb-1.5 min-w-0 truncate text-sm" style={{ color: theme.node.label }}>
                         {summaryParts.length ? summaryParts.join(" · ") : t("canvas.configNode.noInputs")}
                     </div>
                 )}
 
                 <div className="mb-1.5 flex min-w-0 cursor-default items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
                     <ModelPicker
-                        className="canvas-compact-control h-9 min-w-0 flex-1 !rounded-lg !border-transparent !bg-transparent hover:!bg-black/5 dark:hover:!bg-white/10"
+                        className="canvas-compact-control h-9 min-w-0 flex-1 !rounded-[2px] !border-transparent !bg-transparent hover:!bg-hover"
                         config={config}
-                        value={config.model}
+                        value={node.metadata?.model || (node.type === CanvasNodeType.SpeechGeneration ? config.speechModel : mode === "image" ? config.imageModel : mode === "video" ? config.videoModel : mode === "audio" ? config.audioModel : config.textModel)}
                         onChange={(model) => onConfigChange(node.id, { model })}
-                        capability={mode}
+                        capability={node.type === CanvasNodeType.SpeechGeneration ? "speech" : mode}
                         models={node.type === CanvasNodeType.SpeechGeneration ? openRouterSpeechModels : isMusicGenerationNode ? openRouterMusicModels : isVideoGenerationNode ? openRouterVideoModels : undefined}
                         onMissingConfig={() => openConfigDialog()}
                         fullWidth
@@ -138,7 +138,7 @@ export function CanvasConfigNodePanel({ node, isRunning, hasPromptConnection, in
                         <CanvasAudioSettingsPopover
                             config={config}
                             placement="topRight"
-                            buttonClassName="canvas-compact-control !h-9 !w-full !justify-start !rounded-lg !px-2"
+                            buttonClassName="canvas-compact-control !h-9 !w-full !justify-start !rounded-[2px] !px-2"
                             onConfigChange={(key, value) => onConfigChange(node.id, audioConfigPatch(key, value))}
                         />
                     ) : mode === "text" ? (
@@ -146,7 +146,7 @@ export function CanvasConfigNodePanel({ node, isRunning, hasPromptConnection, in
                             config={config}
                             count={node.metadata?.textCount || 1}
                             placement="topRight"
-                            buttonClassName="canvas-compact-control !h-9 !w-full !justify-start !rounded-lg !px-2"
+                            buttonClassName="canvas-compact-control !h-9 !w-full !justify-start !rounded-[2px] !px-2"
                             onConfigChange={(_, value) => onConfigChange(node.id, { reasoningEffort: value })}
                             onCountChange={(textCount) => onConfigChange(node.id, { textCount })}
                         />
@@ -194,7 +194,7 @@ export function CanvasConfigNodePanel({ node, isRunning, hasPromptConnection, in
                         />
                         <Button
                             type="primary"
-                            className="!h-9 !w-full !cursor-pointer !rounded-full !border-transparent !px-4 !text-[11px] !font-semibold transition"
+                            className="!h-9 !w-full !cursor-pointer !rounded-full !border-transparent !px-4 !text-sm !font-semibold transition"
                             style={{ background: "transparent", color: theme.node.text }}
                             danger={isRunning}
                             disabled={!isRunning && !canGenerate}

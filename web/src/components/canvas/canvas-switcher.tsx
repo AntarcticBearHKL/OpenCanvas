@@ -10,7 +10,7 @@ import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 
 import { CanvasImportDialog } from "./canvas-import-dialog";
 
-const headerButtonClass = "flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10";
+const headerButtonClass = "flex h-6 shrink-0 items-center gap-1 rounded-[2px] px-1.5 text-sm font-medium transition hover:bg-hover";
 
 export function CanvasSwitcherTab({ theme }: { theme: CanvasTheme }) {
     const { t } = useTranslation();
@@ -64,8 +64,8 @@ export function CanvasSwitcherTab({ theme }: { theme: CanvasTheme }) {
                 <div className="flex min-w-0 flex-1 items-center gap-1.5">
                     {groupName ? (
                         <>
-                            <Folder className="size-3.5 shrink-0 opacity-70" style={{ color: theme.node.muted }} />
-                            <span className="min-w-0 flex-1 truncate text-[11px] font-medium" style={{ color: theme.node.label }}>
+                            <Folder className="size-3.5 shrink-0" style={{ color: theme.node.muted }} />
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium" style={{ color: theme.node.label }}>
                                 {groupName}
                             </span>
                         </>
@@ -113,19 +113,21 @@ export function CanvasSwitcherTab({ theme }: { theme: CanvasTheme }) {
                         const armed = armedId === project.id;
                         return (
                             <Fragment key={project.id}>
-                                {dropIndex === index ? <div className="h-0.5 rounded-full" style={{ background: theme.node.activeStroke }} /> : null}
+                                {dropIndex === index ? <div className="h-0.5 rounded-none" style={{ background: theme.node.activeStroke }} /> : null}
                                 <div
                                     className={cn(
-                                        "group flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 transition",
-                                        !isCurrent && "hover:bg-black/5 dark:hover:bg-white/10",
-                                        dragId === project.id && "opacity-40",
+                                        "group flex w-full min-w-0 items-center gap-2 rounded-none px-2 py-1.5 transition",
+                                        !isCurrent && "hover:bg-hover",
                                     )}
-                                    style={{ background: isCurrent ? theme.toolbar.activeBg : "transparent", color: theme.node.text }}
+                                    style={{
+                                        background: isCurrent ? theme.toolbar.accentBg : dragId === project.id ? theme.node.accentSoft : "transparent",
+                                        color: isCurrent ? theme.node.accentText : theme.node.text,
+                                    }}
                                 >
                                     <button
                                         type="button"
                                         draggable
-                                        className="flex min-w-0 flex-1 cursor-grab items-center gap-2 text-left text-xs"
+                                        className={cn("flex min-w-0 flex-1 cursor-grab items-center gap-2 text-left text-sm", isCurrent && "font-medium")}
                                         onDragStart={(event) => {
                                             draggingRef.current = true;
                                             setDragId(project.id);
@@ -152,13 +154,13 @@ export function CanvasSwitcherTab({ theme }: { theme: CanvasTheme }) {
                                         }}
                                     >
                                         <span className="min-w-0 flex-1 truncate">{project.title || t("canvas.untitledCanvas")}</span>
-                                        <span className="shrink-0 text-[10px]" style={{ color: theme.node.muted }}>
+                                        <span className="shrink-0 text-xs" style={{ color: theme.node.muted }}>
                                             {t("canvas.switcher.nodes", { count: project.nodes.length })}
                                         </span>
                                     </button>
                                     <button
                                         type="button"
-                                        className={cn("flex h-5 shrink-0 items-center rounded-md transition hover:bg-black/5 dark:hover:bg-white/10", armed ? "gap-1 px-1 text-[10px]" : "w-5 justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100")}
+                                        className={cn("flex h-5 shrink-0 items-center rounded-[2px] transition hover:bg-hover", armed ? "gap-1 px-1 text-sm" : "w-5 justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100")}
                                         style={{ color: armed ? theme.node.blocked : theme.node.text }}
                                         title={t(armed ? "canvas.project.confirmDelete" : "canvas.project.delete")}
                                         aria-label={t(armed ? "canvas.project.confirmDelete" : "canvas.project.delete")}
@@ -172,9 +174,9 @@ export function CanvasSwitcherTab({ theme }: { theme: CanvasTheme }) {
                         );
                     })
                 ) : (
-                    <div className="py-3 text-center text-xs opacity-45">{t("canvas.switcher.empty")}</div>
+                    <div className="py-3 text-center text-sm" style={{ color: theme.node.muted }}>{t("canvas.switcher.empty")}</div>
                 )}
-                {dropIndex === items.length ? <div className="h-0.5 rounded-full" style={{ background: theme.node.activeStroke }} /> : null}
+                {dropIndex === items.length ? <div className="h-0.5 rounded-none" style={{ background: theme.node.activeStroke }} /> : null}
             </div>
             <CanvasImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
         </div>

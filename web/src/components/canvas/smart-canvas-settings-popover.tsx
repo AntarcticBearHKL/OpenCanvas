@@ -5,7 +5,7 @@ import { Button, ColorPicker, Segmented, Select, Slider } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
-import { canvasThemes, frostedSurfaceClass } from "@/lib/canvas-theme";
+import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { mediaRatioOptions } from "@/lib/media-size";
 import type { SmartCanvasResolution } from "@/lib/canvas/smart-canvas";
@@ -65,7 +65,7 @@ export function SmartCanvasSettingsPopover({ ratio, resolution, background, back
     return (
         <>
             <span ref={buttonRef} className="inline-flex min-w-0">
-                <Button size="small" type="text" className="!h-8 !max-w-[180px] !justify-start !rounded-full !px-2.5 hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }} icon={<Settings2 className="size-3.5" />} onClick={() => setOpen(!open)}>
+                <Button size="small" type="text" className="!h-8 !max-w-[180px] !justify-start !rounded-full !px-2.5 hover:bg-hover" style={{ color: theme.node.text }} icon={<Settings2 className="size-3.5" />} onClick={() => setOpen(!open)}>
                     <span className="truncate">
                         {ratio} · {resolution.toUpperCase()}
                     </span>
@@ -112,7 +112,6 @@ function SmartCanvasSettingsPortal({
         left: Math.max(margin, Math.min(window.innerWidth - width - margin, left)),
         top: buttonRect.bottom + gap,
         maxHeight: Math.max(260, window.innerHeight - buttonRect.bottom - margin * 2),
-        background: theme.toolbar.panel,
         border: `1px solid ${theme.toolbar.border}`,
         borderRadius: 16,
         padding: 18,
@@ -121,17 +120,17 @@ function SmartCanvasSettingsPortal({
     } as const;
 
     return createPortal(
-        <div ref={panelRef} className={`canvas-smart-canvas-settings-popover ${frostedSurfaceClass}`} style={style} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+        <div ref={panelRef} className="canvas-smart-canvas-settings-popover glass-raised" style={style} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
             <ImageSettingsTheme theme={theme}>
                 <div className="space-y-4">
                     <div className="space-y-2.5">
-                        <div className="text-xs font-medium" style={{ color: theme.node.muted }}>
+                        <div className="text-sm font-medium" style={{ color: theme.node.muted }}>
                             {t("canvas.smartCanvas.ratio")}
                         </div>
                         <Select className="w-full" value={ratio} options={ratioOptions} onChange={(value) => onChange({ boardRatio: value })} />
                     </div>
                     <div className="space-y-2.5">
-                        <div className="text-xs font-medium" style={{ color: theme.node.muted }}>
+                        <div className="text-sm font-medium" style={{ color: theme.node.muted }}>
                             {t("canvas.smartCanvas.resolution")}
                         </div>
                         <Segmented
@@ -145,12 +144,12 @@ function SmartCanvasSettingsPortal({
                         />
                     </div>
                     <div className="space-y-2.5">
-                        <div className="text-xs font-medium" style={{ color: theme.node.muted }}>
+                        <div className="text-sm font-medium" style={{ color: theme.node.muted }}>
                             {t("canvas.smartCanvas.background")}
                         </div>
                         <Segmented block value={backgroundOptions.some((option) => option.value === background) ? background : undefined} options={backgroundOptions} onChange={(value) => onChange({ boardBackground: value })} />
                         <div className="flex items-center justify-between">
-                            <span className="text-xs" style={{ color: theme.node.muted }}>
+                            <span className="text-sm" style={{ color: theme.node.muted }}>
                                 {t("canvas.smartCanvas.bgCustom")}
                             </span>
                             <ColorPicker
@@ -161,7 +160,7 @@ function SmartCanvasSettingsPortal({
                             />
                         </div>
                         <div className="flex items-center justify-between gap-3">
-                            <span className="shrink-0 text-xs" style={{ color: theme.node.muted }}>
+                            <span className="shrink-0 text-sm" style={{ color: theme.node.muted }}>
                                 {t("canvas.smartCanvas.backgroundOpacity")}
                             </span>
                             <Slider

@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from canvas_mcp.operations.flows import auto_generate, create_config_node, create_generation_flow, create_image_prompt_flow, expand_story, run_generation
+from canvas_mcp.operations.flows import auto_generate, create_config_node, create_generation_flow, create_image_prompt_flow, run_generation
 from canvas_mcp.operations.nodes import (
     bulk_rename,
     create_node,
@@ -53,7 +53,6 @@ HANDLERS: dict[str, CanvasToolHandler] = {
     "canvas_select_nodes": select_nodes,
     "canvas_set_viewport": set_viewport,
     "canvas_run_generation": run_generation,
-    "canvas_expand_story": expand_story,
 }
 
 

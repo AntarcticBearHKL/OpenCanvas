@@ -109,12 +109,12 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
     const withUpgradeDot = (icon: ReactNode) => (
         <span className="relative inline-flex">
             {icon}
-            <span className="absolute -right-1 -top-1 size-2 rounded-full" style={{ background: "#22c55e", boxShadow: `0 0 0 2px ${theme.node.fill}` }} title={t("canvas.plugins.newVersion")} />
+            <span className="absolute -right-1 -top-1 size-2 rounded-full" style={{ background: theme.node.success, boxShadow: `0 0 0 2px ${theme.node.fill}` }} title={t("canvas.plugins.newVersion")} />
         </span>
     );
 
     const versionTag = (version: string) => (
-        <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px]" style={{ background: theme.toolbar.activeBg, color: theme.node.muted }}>
+        <span className="shrink-0 rounded-full px-1.5 py-0.5 text-xs font-medium" style={{ background: theme.toolbar.activeBg, color: theme.node.label }}>
             v{version}
         </span>
     );
@@ -127,8 +127,8 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
 
     // Shared plugin row: icon, title with name and version, description, and actions.
     const row = (key: string, icon: ReactNode, name: string, version: string, subtitle: string | undefined, right: ReactNode) => (
-        <div key={key} className="flex items-center gap-3 rounded-xl border px-3 py-2.5" style={{ borderColor: theme.node.stroke, background: theme.node.fill }}>
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg text-base" style={{ background: theme.toolbar.activeBg, color: theme.node.muted }}>
+        <div key={key} className="flex items-center gap-3 rounded-none border px-3 py-2.5" style={{ borderColor: theme.node.stroke, background: theme.node.fill }}>
+            <span className="grid size-9 shrink-0 place-items-center rounded-[2px] text-base" style={{ background: theme.toolbar.activeBg, color: theme.node.muted }}>
                 {icon}
             </span>
             <div className="min-w-0 flex-1">
@@ -137,7 +137,7 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
                     {versionTag(version)}
                 </div>
                 {subtitle ? (
-                    <div className="mt-0.5 truncate text-xs" style={{ color: theme.node.muted }}>
+                    <div className="mt-0.5 truncate text-sm" style={{ color: theme.node.muted }}>
                         {subtitle}
                     </div>
                 ) : null}
@@ -149,7 +149,7 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
     const officialTab = (
         <div className="space-y-2">
             <div className="flex items-center justify-between">
-                <div className="text-xs" style={{ color: theme.node.muted }}>
+                <div className="text-sm" style={{ color: theme.node.muted }}>
                     {t("canvas.plugins.officialDescription")}
                 </div>
                 <Button type="text" size="small" icon={<RefreshCw className={`size-4 ${loadingOfficial ? "animate-spin" : ""}`} />} onClick={loadOfficial} disabled={loadingOfficial}>
@@ -157,7 +157,7 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
                 </Button>
             </div>
             {officialError ? (
-                <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}>
+                <div className="rounded-[2px] border px-3 py-2 text-sm" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}>
                     {t("canvas.plugins.loadFailed", { error: officialError })}
                 </div>
             ) : loadingOfficial && official.length === 0 ? (
@@ -213,9 +213,9 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
     ];
 
     return (
-        <Modal title={t("canvas.plugins.title")} open={open} onCancel={onClose} footer={null} centered width={640}>
+            <Modal title={t("canvas.plugins.title")} open={open} onCancel={onClose} footer={null} centered width={640} classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
             <div className="space-y-3">
-                <div className="flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "#f59e0b55", background: "#f59e0b14", color: theme.node.text }}>
+                <div className="flex items-start gap-2 rounded-[2px] border px-3 py-2 text-sm leading-5" style={{ borderColor: "#f59e0b55", background: "#f59e0b14", color: theme.node.text }}>
                     <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />
                     <span>{t("canvas.plugins.warning")}</span>
                 </div>

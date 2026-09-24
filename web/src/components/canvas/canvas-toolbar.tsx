@@ -3,12 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Modal } from "antd";
 import { AlignLeft, AudioLines, Clapperboard, Compass, Download, Focus, FolderDown, FolderInput, Hand, HelpCircle, LayoutDashboard, ListTree, Loader2, MessageSquareText, Mic, MousePointer2, Music2, Puzzle, Redo2, SlidersHorizontal, SlidersVertical, Sparkles, Trash2, Undo2, Video, ZoomIn } from "lucide-react";
 
-import { canvasThemes, frostedSurfaceClass, type CanvasTheme } from "@/lib/canvas-theme";
+import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { getNodePluginId, listNodeDefinitions, useNodeRegistryVersion } from "@/lib/canvas/node-registry";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useTranslation } from "react-i18next";
-import { CanvasNodeType, type CanvasNodeTypeId } from "@/types/canvas";
+import { CanvasNodeType, type CanvasNodeMetadata, type CanvasNodeTypeId } from "@/types/canvas";
 
 export function CanvasToolbar({
     selectedCount,
@@ -36,7 +36,7 @@ export function CanvasToolbar({
     canRedo: boolean;
     scale: number;
     isMiniMapOpen: boolean;
-    onAddNode: (type: CanvasNodeTypeId) => void;
+    onAddNode: (type: CanvasNodeTypeId, metadata?: CanvasNodeMetadata) => void;
     onAddExtensionNode: (type: string) => void;
     onExport: () => Promise<void>;
     onUndo: () => void;
@@ -67,12 +67,12 @@ export function CanvasToolbar({
     // Keep extension plugin nodes synchronized with registry changes.
     useNodeRegistryVersion();
     const extensionDefs = listNodeDefinitions().filter((def) => def.showInCreateMenu !== false && getNodePluginId(def.type) !== "builtin");
-    const dockStyle = { background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item };
+    const dockStyle = { borderColor: theme.toolbar.border, color: theme.toolbar.item };
     const hoverStyle = { background: theme.toolbar.itemHover, color: theme.toolbar.activeText };
     const activeStyle = { background: theme.toolbar.activeBg, color: theme.toolbar.activeText };
     // Tips share the band above the dock with the create/extensions/zoom panels, so hide them while a panel is open.
     const tip = hovered && !createMenu && !extensionsOpen && !zoomOpen ? toolLabel(hovered, t) : "";
-    const createMenuItems: Record<"prompt" | "generator" | "input" | "modifiers", { type: CanvasNodeType; label: string; icon: ReactNode }[]> = {
+    const createMenuItems: Record<"prompt" | "generator" | "input" | "modifiers", { type: CanvasNodeType; label: string; icon: ReactNode; metadata?: CanvasNodeMetadata }[]> = {
         prompt: [
             { type: CanvasNodeType.Prompt, label: t("canvas.nodeTypes.prompt"), icon: <MessageSquareText className="size-4" /> },
             { type: CanvasNodeType.MusicPrompt, label: t("canvas.nodeTypes.musicPrompt"), icon: <Music2 className="size-4" /> },
@@ -117,7 +117,7 @@ export function CanvasToolbar({
     return (
         <div ref={rootRef} className="pointer-events-none absolute bottom-5 left-0 right-0 z-50 flex justify-center px-3">
             {tip ? <DockTip label={tip} x={tipX} theme={theme} /> : null}
-            <div ref={wrapRef} className={`thin-scrollbar pointer-events-auto flex h-14 max-w-full items-center gap-1 overflow-x-auto rounded-2xl border px-2 [&>*]:shrink-0 ${frostedSurfaceClass}`} style={dockStyle}>
+            <div ref={wrapRef} className={`thin-scrollbar pointer-events-auto flex h-14 max-w-full items-center gap-1 overflow-x-auto rounded-none border px-2 [&>*]:shrink-0 glass-surface`} style={dockStyle}>
                 <ToolbarButton
                     id="tool-export"
                     label={t("canvas.exportCanvas")}
@@ -297,25 +297,25 @@ export function CanvasToolbar({
 
             {createMenu ? (
                 <div
-                    className={`pointer-events-auto absolute bottom-[72px] z-30 w-[220px] -translate-x-1/2 rounded-2xl border p-2 ${frostedSurfaceClass}`}
-                    style={{ left: createMenuX || "50%", background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item }}
+                    className="pointer-events-auto absolute bottom-[72px] z-30 w-[220px] -translate-x-1/2 rounded-none border p-2 glass-raised"
+                    style={{ left: createMenuX || "50%", borderColor: theme.toolbar.border, color: theme.toolbar.item }}
                 >
-                    <div className="px-1.5 pb-1.5 text-[11px] font-medium opacity-50">{t(createMenu === "prompt" ? "canvas.toolbar.promptGroup" : createMenu === "generator" ? "canvas.toolbar.generatorGroup" : createMenu === "modifiers" ? "canvas.toolbar.modifiersGroup" : "canvas.toolbar.inputOutputGroup")}</div>
+                    <div className="px-1.5 pb-1.5 text-sm font-medium" style={{ color: theme.node.label }}>{t(createMenu === "prompt" ? "canvas.toolbar.promptGroup" : createMenu === "generator" ? "canvas.toolbar.generatorGroup" : createMenu === "modifiers" ? "canvas.toolbar.modifiersGroup" : "canvas.toolbar.inputOutputGroup")}</div>
                     <div className="grid gap-0.5">
                         {createMenuItems[createMenu].map((item) => (
                             <button
-                                key={item.type}
+                                key={`${item.type}-${item.label}`}
                                 type="button"
-                                className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition"
+                                className="flex w-full items-center gap-2.5 rounded-[2px] px-2 py-1.5 text-left text-sm transition"
                                 style={{ color: theme.toolbar.item }}
                                 onMouseEnter={(event) => (event.currentTarget.style.background = theme.toolbar.itemHover)}
                                 onMouseLeave={(event) => (event.currentTarget.style.background = "transparent")}
                                 onClick={() => {
-                                    onAddNode(item.type);
+                                    onAddNode(item.type, item.metadata);
                                     setCreateMenu(null);
                                 }}
                             >
-                                <span className="grid size-7 shrink-0 place-items-center rounded-md text-base" style={{ background: theme.toolbar.itemHover }}>
+                                <span className="grid size-7 shrink-0 place-items-center rounded-[2px] text-base" style={{ background: theme.toolbar.itemHover }}>
                                     {item.icon}
                                 </span>
                                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
@@ -327,16 +327,16 @@ export function CanvasToolbar({
 
             {extensionsOpen && extensionDefs.length ? (
                 <div
-                    className={`thin-scrollbar pointer-events-auto absolute bottom-[72px] z-30 max-h-[50vh] w-[240px] -translate-x-1/2 overflow-y-auto rounded-2xl border p-2 ${frostedSurfaceClass}`}
-                    style={{ left: extPanelX || "50%", background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item }}
+                    className="thin-scrollbar pointer-events-auto absolute bottom-[72px] z-30 max-h-[50vh] w-[240px] -translate-x-1/2 overflow-y-auto rounded-none border p-2 glass-raised"
+                    style={{ left: extPanelX || "50%", borderColor: theme.toolbar.border, color: theme.toolbar.item }}
                 >
-                    <div className="px-1.5 pb-1.5 text-[11px] font-medium opacity-50">{t("canvas.toolbar.extensions")}</div>
+                    <div className="px-1.5 pb-1.5 text-sm font-medium" style={{ color: theme.node.label }}>{t("canvas.toolbar.extensions")}</div>
                     <div className="grid gap-0.5">
                         {extensionDefs.map((def) => (
                             <button
                                 key={def.type}
                                 type="button"
-                                className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition"
+                                className="flex w-full items-center gap-2.5 rounded-[2px] px-2 py-1.5 text-left text-sm transition"
                                 style={{ color: theme.toolbar.item }}
                                 onMouseEnter={(event) => (event.currentTarget.style.background = theme.toolbar.itemHover)}
                                 onMouseLeave={(event) => (event.currentTarget.style.background = "transparent")}
@@ -345,7 +345,7 @@ export function CanvasToolbar({
                                     setExtensionsOpen(false);
                                 }}
                             >
-                                <span className="grid size-7 shrink-0 place-items-center rounded-md text-base" style={{ background: theme.toolbar.itemHover }}>
+                                <span className="grid size-7 shrink-0 place-items-center rounded-[2px] text-base" style={{ background: theme.toolbar.itemHover }}>
                                     {def.icon}
                                 </span>
                                 <span className="min-w-0 flex-1 truncate">{def.title}</span>
@@ -357,12 +357,12 @@ export function CanvasToolbar({
 
             {zoomOpen ? (
                 <div
-                    className={`pointer-events-auto absolute bottom-[72px] z-30 w-[248px] -translate-x-1/2 rounded-2xl border p-2.5 ${frostedSurfaceClass}`}
-                    style={{ left: zoomPanelX || "50%", background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item }}
+                    className="pointer-events-auto absolute bottom-[72px] z-30 w-[248px] -translate-x-1/2 rounded-none border p-2.5 glass-raised"
+                    style={{ left: zoomPanelX || "50%", borderColor: theme.toolbar.border, color: theme.toolbar.item }}
                 >
                     <div className="flex items-center justify-between gap-3 px-1 pb-2">
-                        <span className="text-sm font-medium opacity-65">{t("canvas.toolbar.zoom")}</span>
-                        <span className="text-xs tabular-nums opacity-60">{Math.round(scale * 100)}%</span>
+                        <span className="text-sm font-medium" style={{ color: theme.node.text }}>{t("canvas.toolbar.zoom")}</span>
+                        <span className="text-xs tabular-nums" style={{ color: theme.node.muted }}>{Math.round(scale * 100)}%</span>
                     </div>
                     <input
                         type="range"
@@ -448,7 +448,7 @@ function ToolbarButton({
             aria-label={label}
             className="!h-8 !w-8 !min-w-8 !p-0 transition"
             disabled={disabled}
-            style={active ? activeStyle : hovered === id && !disabled ? hoverStyle : { color: danger ? "#f87171" : theme.toolbar.item, opacity: disabled ? 0.35 : 1 }}
+            style={active ? activeStyle : hovered === id && !disabled ? hoverStyle : { color: danger ? theme.node.danger : theme.toolbar.item, opacity: disabled ? 0.35 : 1 }}
             icon={children}
             onMouseEnter={(event) => {
                 onHover(id);
@@ -468,7 +468,7 @@ function PanelAction({ icon, label, active, onClick, theme }: { icon: ReactNode;
     return (
         <button
             type="button"
-            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition"
+            className="flex w-full items-center gap-2.5 rounded-[2px] px-2 py-1.5 text-left text-sm transition"
             style={active ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.toolbar.item }}
             onMouseEnter={(event) => {
                 if (!active) event.currentTarget.style.background = theme.toolbar.itemHover;
@@ -486,17 +486,18 @@ function PanelAction({ icon, label, active, onClick, theme }: { icon: ReactNode;
 
 function DockTip({ label, x, theme }: { label: string; x: number; theme: CanvasTheme }) {
     return (
-        <span className="absolute bottom-[calc(100%+8px)] -translate-x-1/2 rounded-md px-2 py-1 text-xs" style={{ left: x, background: theme.node.text, color: theme.node.panel }}>
+        <span className="absolute bottom-[calc(100%+8px)] -translate-x-1/2 rounded-[2px] px-2 py-1 text-xs" style={{ left: x, background: theme.node.text, color: theme.node.panel }}>
             {label}
         </span>
     );
 }
 
 function Shortcut({ label, value }: { label: ReactNode; value: string }) {
+    const theme = useCanvasTheme();
     return (
         <div className="flex items-center justify-between gap-4">
             <span className="text-base font-medium">{label}</span>
-            <span className="opacity-60">{value}</span>
+            <span style={{ color: theme.node.muted }}>{value}</span>
         </div>
     );
 }

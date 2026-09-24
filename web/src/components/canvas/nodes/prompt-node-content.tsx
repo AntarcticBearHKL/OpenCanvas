@@ -13,7 +13,7 @@ export function PromptContent({ node, theme }: PromptContentProps) {
     const prompt = node.metadata?.prompt || "";
 
     return (
-        <div className="flex h-full w-full flex-col overflow-hidden rounded-3xl p-4">
+        <div className="flex h-full w-full flex-col overflow-hidden p-4">
             <div className="min-h-0 flex-1 overflow-hidden">
                 {prompt ? (
                     <div className="line-clamp-6 whitespace-pre-wrap break-words font-mono text-sm leading-6" style={{ color: theme.node.text }}>
@@ -25,7 +25,7 @@ export function PromptContent({ node, theme }: PromptContentProps) {
                     </div>
                 )}
             </div>
-            <div className="shrink-0 pt-2 text-[11px]" style={{ color: theme.node.muted }}>
+            <div className="shrink-0 pt-2 text-sm" style={{ color: theme.node.muted }}>
                 {t("canvas.promptNode.panelHint")}
             </div>
         </div>

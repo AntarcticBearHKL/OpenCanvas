@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type HTMLAttributes, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 
-import { PsPanelTabs } from "@/components/canvas/workspace/ps-asset-panels";
+import { DockTabs } from "@/components/canvas/dock/dock-tabs";
 import { DOCK_EDGES, dockClampSize, dockDefaultLayout, dockLoadLayout, dockMovePanel, dockRevealPanel, dockSaveLayout, dockSetActive, dockSetSize, dockTogglePanel, type DockEdge, type DockLayout, type DockPanelDef } from "@/components/canvas/dock/dock-layout";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 
@@ -26,8 +26,8 @@ type ResizeState = { edge: DockEdge; startX: number; startY: number; size: numbe
 type DragState = { id: string; moved: boolean; startX: number; startY: number };
 
 const DRAG_THRESHOLD = 6;
-const DROP_ZONE_CLASS = "pointer-events-none absolute rounded-lg border border-dashed";
-const SPLITTER_CLASS = "group/splitter relative shrink-0 before:absolute before:inset-0 before:m-auto before:transition hover:before:bg-black/5 dark:hover:before:bg-white/10";
+const DROP_ZONE_CLASS = "pointer-events-none absolute rounded-[2px] border border-dashed";
+const SPLITTER_CLASS = "group/splitter relative shrink-0 before:absolute before:inset-0 before:m-auto before:transition hover:before:bg-hover";
 /** Below these widths the docks give width back to the centre surface instead of keeping the saved size. */
 const DOCK_WIDTH_STEPS: { query: string; side: number; bottom: number }[] = [
     { query: "(max-width: 1023px)", side: 208, bottom: 160 },
@@ -71,7 +71,7 @@ export function DockArea({ defs, layout, renderPanel, onActivate, onMove, onResi
     }, []);
 
     const delta = (state: ResizeState, event: { clientX: number; clientY: number }) =>
-        state.edge === "bottom" ? event.clientY - state.startY : state.edge === "left" ? event.clientX - state.startX : state.startX - event.clientX;
+        state.edge === "bottom" ? state.startY - event.clientY : state.edge === "left" ? event.clientX - state.startX : state.startX - event.clientX;
     const beginResize = (event: ReactPointerEvent<HTMLDivElement>, edge: DockEdge) => {
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -146,9 +146,7 @@ export function DockArea({ defs, layout, renderPanel, onActivate, onMove, onResi
             >
                 {edge === "left" ? null : splitter}
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                    <div className="thin-scrollbar flex h-8 shrink-0 select-none items-center overflow-x-auto">
-                        <PsPanelTabs tabs={ids.map((id) => ({ id, label: t(defs.find((def) => def.id === id)?.labelKey ?? id), handlers: tabHandlers(id) }))} value={active} onChange={(id) => onActivate(edge, id)} />
-                    </div>
+                    <DockTabs tabs={ids.map((id) => ({ id, label: t(defs.find((def) => def.id === id)?.labelKey ?? id), handlers: tabHandlers(id) }))} value={active} onChange={(id) => onActivate(edge, id)} />
                     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{renderPanel(active)}</div>
                 </div>
                 {edge === "left" ? splitter : null}
@@ -174,7 +172,7 @@ export function DockArea({ defs, layout, renderPanel, onActivate, onMove, onResi
                             style={{ borderColor: theme.node.activeStroke, background: drag.target === edge ? theme.toolbar.activeBg : undefined }}
                         />
                     ))}
-                    <span className="pointer-events-none fixed z-50 rounded-md border px-2 py-1 text-[11px]" style={{ left: drag.x + 12, top: drag.y + 12, borderColor: theme.toolbar.border, background: theme.toolbar.panel, color: theme.node.text }}>
+                    <span className="pointer-events-none fixed z-50 rounded-[2px] border px-2 py-1 text-xs" style={{ left: drag.x + 12, top: drag.y + 12, borderColor: theme.toolbar.border, background: theme.toolbar.panel, color: theme.node.text }}>
                         {t(defs.find((def) => def.id === drag.id)?.labelKey ?? drag.id)}
                     </span>
                 </div>

@@ -76,14 +76,14 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                     }}
                 />
                 {source === "folder" && (
-                    <button type="button" className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }} onClick={() => void bindFolder(node.id)} onMouseDown={(event) => event.stopPropagation()}>
+                    <button type="button" className="flex h-7 shrink-0 items-center gap-1 rounded-[2px] px-2 text-sm font-medium transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => void bindFolder(node.id)} onMouseDown={(event) => event.stopPropagation()}>
                         <FolderInput className="size-3.5" />
                         {bound ? t("canvas.assets.rebind") : t("canvas.assets.bind")}
                     </button>
                 )}
                 <button
                     type="button"
-                    className="grid size-7 shrink-0 place-items-center rounded-md transition hover:bg-black/5 dark:hover:bg-white/10"
+                    className="grid size-7 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover"
                     style={{ color: theme.node.text }}
                     aria-label={t("canvas.assets.refresh")}
                     title={t("canvas.assets.refresh")}
@@ -100,7 +100,7 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                         {cachedItems.length ? (
                             <div className="flex flex-col gap-0.5">
                                 {cachedItems.map((item) => (
-                                    <div key={item.id} className="group/row flex items-center gap-0.5" onMouseDown={(event) => event.stopPropagation()}>
+                                    <div key={item.id} className="group/row flex w-full items-center gap-0.5 border-b transition hover:bg-hover" style={{ borderColor: theme.toolbar.border }} onMouseDown={(event) => event.stopPropagation()}>
                                         <button
                                             type="button"
                                             draggable
@@ -111,7 +111,7 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                                             }}
                                             onClick={() => void insertCached(item.id)}
                                             onMouseDown={(event) => event.stopPropagation()}
-                                            className="min-w-0 flex-1 cursor-grab truncate rounded px-1.5 py-1 text-left text-[11px] transition hover:bg-black/5 active:cursor-grabbing dark:hover:bg-white/10"
+                                            className="min-w-0 flex-1 cursor-grab truncate px-1.5 py-1 text-left text-sm transition active:cursor-grabbing"
                                             style={{ color: theme.node.text }}
                                             title={item.name}
                                         >
@@ -119,7 +119,7 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                                         </button>
                                         <button
                                             type="button"
-                                            className="grid size-5 shrink-0 place-items-center rounded opacity-0 transition group-hover/row:opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
+                                            className="grid size-5 shrink-0 place-items-center rounded-[2px] opacity-0 transition group-hover/row:opacity-100 hover:bg-hover"
                                             style={{ color: theme.node.text }}
                                             aria-label={t("canvas.assets.preview")}
                                             title={t("canvas.assets.preview")}
@@ -135,16 +135,16 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                                 ))}
                             </div>
                         ) : (
-                            <div className="grid h-full place-items-center px-4 text-center text-[11px]" style={{ color: theme.node.placeholder }}>
+                            <div className="grid h-full place-items-center px-4 text-center text-sm" style={{ color: theme.node.placeholder }}>
                                 {t("canvas.assets.cacheEmpty")}
                             </div>
                         )}
                     </div>
                 ) : (
-                    <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center" style={{ color: theme.node.placeholder }}>
-                        <PlugZap className="size-6 opacity-35" />
-                        <span className="px-4 text-[11px] leading-5">{cacheStatus === "connecting" ? t("canvas.assets.cacheConnecting") : t("canvas.assets.cacheUnavailable")}</span>
-                        {cacheStatus === "unavailable" && <span className="px-4 text-[10px] leading-4">{t("canvas.assets.cacheInstallHint")}</span>}
+                    <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center" style={{ color: theme.node.muted }}>
+                        <PlugZap className="size-6" />
+                        <span className="px-4 text-sm leading-5">{cacheStatus === "connecting" ? t("canvas.assets.cacheConnecting") : t("canvas.assets.cacheUnavailable")}</span>
+                        {cacheStatus === "unavailable" && <span className="px-4 text-sm leading-4">{t("canvas.assets.cacheInstallHint")}</span>}
                     </div>
                 )
             ) : bound ? (
@@ -152,7 +152,7 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                     <div className="flex min-w-0 items-center gap-0.5" onMouseDown={(event) => event.stopPropagation()}>
                         <button
                             type="button"
-                            className="grid size-5 shrink-0 place-items-center rounded transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-white/10 dark:disabled:hover:bg-transparent"
+                            className="grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent"
                             style={{ color: theme.node.text }}
                             aria-label={t("canvas.assets.back")}
                             title={t("canvas.assets.back")}
@@ -162,14 +162,14 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                         >
                             <ChevronLeft className="size-3.5" />
                         </button>
-                        <div className="flex min-w-0 flex-1 items-center gap-0.5 truncate text-[10px]" style={{ color: theme.node.muted }}>
+                        <div className="flex min-w-0 flex-1 items-center gap-0.5 truncate text-sm" style={{ color: theme.node.muted }}>
                             {crumbs.map((segment, index) => (
                                 <span key={`${index}-${segment}`} className="flex min-w-0 items-center gap-0.5">
                                     {index > 0 && <span className="shrink-0">/</span>}
                                     {index === crumbs.length - 1 ? (
                                         <span className="truncate">{segment}</span>
                                     ) : (
-                                        <button type="button" className="min-w-0 truncate rounded px-0.5 transition hover:bg-black/5 dark:hover:bg-white/10" onClick={() => void goToDepth(node.id, index)} onMouseDown={(event) => event.stopPropagation()}>
+                                        <button type="button" className="min-w-0 truncate rounded-[2px] px-0.5 transition hover:bg-hover" onClick={() => void goToDepth(node.id, index)} onMouseDown={(event) => event.stopPropagation()}>
                                             {segment}
                                         </button>
                                     )}
@@ -186,8 +186,8 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                                         type="button"
                                         onClick={() => void enterFolder(node.id, folder.name)}
                                         onMouseDown={(event) => event.stopPropagation()}
-                                        className="flex w-full min-w-0 items-center gap-1 rounded px-1.5 py-1 text-left text-[11px] transition hover:bg-black/5 dark:hover:bg-white/10"
-                                        style={{ color: theme.node.text }}
+                                        className="flex w-full min-w-0 items-center gap-1 border-b px-1.5 py-1 text-left text-sm transition hover:bg-hover"
+                                        style={{ color: theme.node.text, borderColor: theme.toolbar.border }}
                                         aria-label={t("canvas.assets.openFolder")}
                                         title={t("canvas.assets.openFolder")}
                                     >
@@ -196,7 +196,7 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                                     </button>
                                 ))}
                                 {files.map((item) => (
-                                    <div key={item.id} className="group/row flex items-center gap-0.5" onMouseDown={(event) => event.stopPropagation()}>
+                                    <div key={item.id} className="group/row flex w-full items-center gap-0.5 border-b transition hover:bg-hover" style={{ borderColor: theme.toolbar.border }} onMouseDown={(event) => event.stopPropagation()}>
                                         <button
                                             type="button"
                                             draggable
@@ -207,7 +207,7 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                                             }}
                                             onClick={() => onInsert(item.file)}
                                             onMouseDown={(event) => event.stopPropagation()}
-                                            className="min-w-0 flex-1 cursor-grab truncate rounded px-1.5 py-1 text-left text-[11px] transition hover:bg-black/5 active:cursor-grabbing dark:hover:bg-white/10"
+                                            className="min-w-0 flex-1 cursor-grab truncate px-1.5 py-1 text-left text-sm transition active:cursor-grabbing"
                                             style={{ color: theme.node.text }}
                                             title={item.name}
                                         >
@@ -215,7 +215,7 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                                         </button>
                                         <button
                                             type="button"
-                                            className="grid size-5 shrink-0 place-items-center rounded opacity-0 transition group-hover/row:opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
+                                            className="grid size-5 shrink-0 place-items-center rounded-[2px] opacity-0 transition group-hover/row:opacity-100 hover:bg-hover"
                                             style={{ color: theme.node.text }}
                                             aria-label={t("canvas.assets.preview")}
                                             title={t("canvas.assets.preview")}
@@ -231,20 +231,20 @@ export function AssetsNodeContent({ node, onInsert, onSourceChange }: { node: Ca
                                 ))}
                             </div>
                         ) : (
-                            <div className="grid h-full place-items-center px-4 text-center text-[11px]" style={{ color: theme.node.placeholder }}>
+                            <div className="grid h-full place-items-center px-4 text-center text-sm" style={{ color: theme.node.placeholder }}>
                                 {t("canvas.assets.empty")}
                             </div>
                         )}
                     </div>
                 </>
             ) : (
-                <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center" style={{ color: theme.node.placeholder }}>
-                    <FolderInput className="size-6 opacity-35" />
-                    <span className="px-4 text-[11px] leading-5">{t("canvas.assets.unbound")}</span>
+                <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center" style={{ color: theme.node.muted }}>
+                    <FolderInput className="size-6" />
+                    <span className="px-4 text-sm leading-5">{t("canvas.assets.unbound")}</span>
                 </div>
             )}
 
-            <div className="flex shrink-0 items-center justify-between gap-2 text-[10px]" style={{ color: theme.node.muted }}>
+            <div className="flex shrink-0 items-center justify-between gap-2 text-sm" style={{ color: theme.node.muted }}>
                 <span>{source === "cache" ? t("canvas.assets.cacheCount", { count: cacheItems.length }) : t("canvas.assets.count", { count: files.length })}</span>
                 <span className="truncate">{source === "cache" ? cacheStatusLabel : statusLabel}</span>
             </div>

@@ -78,11 +78,6 @@ def run_generation_op(node_id: str, mode: str, prompt: str | None = None) -> dic
     return omit_none({"type": "run_generation", "nodeId": node_id, "mode": mode, "prompt": prompt})
 
 
-def expand_story_op(node_id: str, instructions: str | None = None) -> dict[str, Any]:
-    """Build an ``expand_story`` op, intercepted by the front-end canvas."""
-    return omit_none({"type": "expand_story", "nodeId": node_id, "instructions": instructions})
-
-
 def generation_mode(value: Any) -> str:
     """Normalise an unknown generation mode to one the canvas supports."""
     return value if value in ("text", "video", "audio") else "image"

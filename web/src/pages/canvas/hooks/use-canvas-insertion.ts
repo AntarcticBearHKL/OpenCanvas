@@ -14,8 +14,9 @@ import { ASSET_FOLDER_DRAG_MIME, classifyAssetFolderFile } from "@/lib/canvas/as
 import { BROWSER_CACHE_DRAG_MIME, getBrowserCacheFile } from "@/services/api/browser-cache";
 import { NODE_STATUS_SUCCESS, VIDEO_NODE_MAX_HEIGHT, VIDEO_NODE_MAX_WIDTH } from "@/lib/canvas/canvas-node-constants";
 import { useAssetFolderStore } from "@/stores/use-asset-folder-store";
-import type { InsertAssetPayload } from "@/components/canvas/asset-picker-modal";
 import { CanvasNodeType, type CanvasAssistantImage, type CanvasNodeData, type Position } from "@/types/canvas";
+
+type AssetInsertPayload = { kind: "text"; content: string; title: string } | { kind: "image"; dataUrl: string; title: string; storageKey?: string } | { kind: "video"; url: string; title: string; storageKey?: string; width?: number; height?: number };
 
 type CanvasInsertionParams = {
     containerRef: RefObject<HTMLDivElement | null>;
@@ -30,7 +31,6 @@ type CanvasInsertionParams = {
     setSelectedNodeIds: Dispatch<SetStateAction<Set<string>>>;
     setSelectedConnectionId: Dispatch<SetStateAction<string | null>>;
     setDialogNodeId: Dispatch<SetStateAction<string | null>>;
-    setAssetPickerOpen: Dispatch<SetStateAction<boolean>>;
 };
 
 /**
@@ -39,7 +39,7 @@ type CanvasInsertionParams = {
  * implementations; every input is injected through params.
  */
 export function useCanvasInsertion(params: CanvasInsertionParams) {
-    const { containerRef, imageInputRef, uploadTargetRef, size, screenToCanvas, getCanvasCenter, message, t, setNodes, setSelectedNodeIds, setSelectedConnectionId, setDialogNodeId, setAssetPickerOpen } = params;
+    const { containerRef, imageInputRef, uploadTargetRef, size, screenToCanvas, getCanvasCenter, message, t, setNodes, setSelectedNodeIds, setSelectedConnectionId, setDialogNodeId } = params;
     const createImageFileNode = useCallback(async (file: File, position: Position) => {
         const image = await uploadImage(file);
         const size = fitNodeSize(image.width, image.height);
@@ -317,7 +317,7 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
     );
 
     const handleAssetInsert = useCallback(
-        (payload: InsertAssetPayload, position?: Position) => {
+        (payload: AssetInsertPayload, position?: Position) => {
             if (payload.kind === "text") {
                 insertAssistantText(payload.content, payload.title, position);
             } else if (payload.kind === "video") {
@@ -341,7 +341,6 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
             } else {
                 insertAssistantImage({ id: `asset-${Date.now()}`, prompt: payload.title, dataUrl: payload.dataUrl, storageKey: payload.storageKey }, position);
             }
-            setAssetPickerOpen(false);
         },
         [insertAssistantImage, insertAssistantText, screenToCanvas, size.height, size.width],
     );
@@ -384,7 +383,7 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
                 const raw = event.dataTransfer.getData("application/x-infinite-canvas-asset");
                 if (raw) {
                     try {
-                        handleAssetInsert(JSON.parse(raw) as InsertAssetPayload, screenToCanvas(event.clientX, event.clientY));
+                        handleAssetInsert(JSON.parse(raw) as AssetInsertPayload, screenToCanvas(event.clientX, event.clientY));
                     } catch {
                         // Ignore malformed drag payloads.
                     }

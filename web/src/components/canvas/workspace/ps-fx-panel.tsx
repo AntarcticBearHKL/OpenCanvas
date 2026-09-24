@@ -31,7 +31,7 @@ type StyleControl =
 
 const ROW_CLASS = STUDIO_PANEL_ROW_CLASS;
 const LABEL_CLASS = STUDIO_PANEL_LABEL_CLASS;
-const VALUE_CLASS = "w-10 shrink-0 text-right text-[11px] tabular-nums";
+const VALUE_CLASS = "w-10 shrink-0 text-right text-sm tabular-nums";
 const BLEND_OPTIONS = CANVAS_BLEND_MODES.map((mode) => ({ value: mode.id, labelKey: `canvas.blendModes.${mode.id}` }));
 const POSITION_OPTIONS = [
     { value: "outside", labelKey: "canvas.ps.fx.optOutside" },
@@ -129,7 +129,7 @@ export default function PsFxPanel({ board, setNodes, layer, onClose }: PsFxPanel
     const styles = layer?.styles || [];
     const commit = (next: CanvasPsLayer[]) => commitBoardLayers(setNodes, board.id, next);
     return (
-        <Modal open={Boolean(layer)} title={t("canvas.ps.fxTitle")} footer={null} width={380} onCancel={onClose}>
+        <Modal open={Boolean(layer)} title={t("canvas.ps.fxTitle")} footer={null} width={380} onCancel={onClose} classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
             <ImageSettingsTheme theme={theme}>
                 {layer ? (
                     <div className="thin-scrollbar max-h-[65vh] overflow-y-auto pr-1">
@@ -137,7 +137,7 @@ export default function PsFxPanel({ board, setNodes, layer, onClose }: PsFxPanel
                             const style = styles.find((item) => item.type === type);
                             return (
                                 <div key={type} className="border-b py-1 last:border-b-0" style={{ borderColor: theme.toolbar.border }}>
-                                    <div className="flex items-center py-0.5 text-xs" style={{ color: theme.node.text }}>
+                                    <div className="flex items-center py-0.5 text-sm font-medium" style={{ color: theme.node.label }}>
                                         <Checkbox
                                             checked={Boolean(style?.enabled)}
                                             aria-label={t(PS_LAYER_STYLE_NAME_KEYS[type])}
@@ -173,7 +173,7 @@ function StyleControlRow({ control, value, onChange }: { control: StyleControl; 
     const theme = useCanvasTheme();
     const patterns = usePsAssetStore((state) => state.patterns);
     const label = (
-        <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
+        <span className={LABEL_CLASS} style={{ color: theme.node.label }}>
             {t(control.labelKey)}
         </span>
     );
@@ -246,7 +246,7 @@ function StyleControlRow({ control, value, onChange }: { control: StyleControl; 
     const stops = Array.isArray(value) && typeof value[0] === "string" ? (value as string[]) : ["#000000@0", "#ffffff@1"];
     return (
         <div className="py-0.5">
-            <span className="text-[11px]" style={{ color: theme.node.muted }}>
+            <span className="text-sm font-medium" style={{ color: theme.node.label }}>
                 {t(control.labelKey)}
             </span>
             <PsGradientStopsEditor stops={stops} theme={theme} onChange={onChange} />

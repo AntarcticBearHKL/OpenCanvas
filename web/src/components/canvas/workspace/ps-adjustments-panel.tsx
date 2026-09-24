@@ -48,11 +48,11 @@ export default function PsAdjustmentsPanel({ board, setNodes, selected, onSelect
         onSelect(layer.id);
     };
     return (
-        <section className="shrink-0 border-t" style={{ borderColor: theme.toolbar.border }}>
+        <section className="shrink-0 border-t glass-card" style={{ borderColor: theme.toolbar.border }}>
             <div className="flex shrink-0 items-center gap-1 px-2 py-1.5">
                 <SlidersHorizontal className="size-3.5 shrink-0" style={{ color: theme.node.muted }} />
-                <span className="min-w-0 flex-1 truncate text-xs font-medium">{t("canvas.ps.adjustments")}</span>
-                <span className="max-w-[140px] shrink-0 truncate text-[11px]" style={{ color: theme.node.placeholder }}>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium" style={{ color: theme.node.label }}>{t("canvas.ps.adjustments")}</span>
+                <span className="max-w-[140px] shrink-0 truncate text-sm" style={{ color: theme.node.muted }}>
                     {t(selected?.kind === "adjustment" ? "canvas.ps.adjust.replaceHint" : "canvas.ps.adjust.addHint")}
                 </span>
             </div>
@@ -64,7 +64,7 @@ export default function PsAdjustmentsPanel({ board, setNodes, selected, onSelect
                         <button
                             key={type}
                             type="button"
-                            className="grid h-7 place-items-center rounded-md transition hover:bg-black/5 dark:hover:bg-white/10"
+                            className="grid h-7 place-items-center rounded-[2px] transition hover:bg-hover"
                             style={active ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
                             aria-label={t(PS_ADJUSTMENT_NAME_KEYS[type])}
                             title={t(PS_ADJUSTMENT_NAME_KEYS[type])}

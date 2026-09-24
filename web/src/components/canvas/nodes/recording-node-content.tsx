@@ -97,8 +97,8 @@ export function RecordingNodeContent({ onRecorded }: { onRecorded: (blob: Blob) 
             <button
                 type="button"
                 disabled={busy}
-                className="grid size-14 place-items-center rounded-full transition hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
-                style={{ color: recording ? "#f87171" : theme.node.text }}
+                className="grid size-14 place-items-center rounded-full transition hover:bg-hover disabled:opacity-50 hover:bg-hover"
+                style={{ color: recording ? theme.node.danger : theme.node.text }}
                 aria-label={t(recording ? "canvas.recording.stop" : "canvas.recording.start")}
                 title={t(recording ? "canvas.recording.stop" : "canvas.recording.start")}
                 onClick={(event) => {
@@ -114,11 +114,11 @@ export function RecordingNodeContent({ onRecorded }: { onRecorded: (blob: Blob) 
             <span className="text-xl tabular-nums" style={{ color: theme.node.text }}>
                 {formatAudioTime(elapsedMs / 1000)}
             </span>
-            <span className="text-[11px] leading-4" style={{ color: state === "idle" || state === "recording" ? theme.node.muted : theme.node.text }}>
+            <span className="text-sm leading-4" style={{ color: state === "idle" || state === "recording" ? theme.node.muted : theme.node.text }}>
                 {t(`canvas.recording.status.${state}`)}
             </span>
             {state === "idle" ? (
-                <span className="text-[10px] leading-4" style={{ color: theme.node.placeholder }}>
+                <span className="text-sm leading-4" style={{ color: theme.node.muted }}>
                     {t("canvas.recording.hint")}
                 </span>
             ) : null}

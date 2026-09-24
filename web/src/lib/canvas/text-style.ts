@@ -17,7 +17,7 @@ export const TEXT_FONT_FAMILIES: { label: string; value: string }[] = [
     { label: "Sans", value: "ui-sans-serif, Helvetica, Arial, sans-serif" },
     { label: "Serif", value: 'Georgia, "Times New Roman", serif' },
     { label: "Mono", value: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" },
-    { label: "Rounded", value: 'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", Quicksand, sans-serif' },
+        { label: "Rounded", value: 'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", Quicksand, sans-serif' },
 ];
 
 export const TEXT_FONT_SIZE_MIN = 8;

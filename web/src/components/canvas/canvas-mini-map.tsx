@@ -1,7 +1,6 @@
 import { memo, useCallback, useMemo, useRef, useState } from "react";
 
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
-import { frostedSurfaceClass } from "@/lib/canvas-theme";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
 import { type CanvasNodeData, type ViewportTransform } from "@/types/canvas";
 
@@ -119,7 +118,7 @@ export const Minimap = memo(function Minimap({ nodes, viewport, viewportSize, on
     );
 
     return (
-        <div className={`absolute bottom-24 left-6 z-50 overflow-hidden rounded-2xl border ${frostedSurfaceClass}`} style={{ width, height, background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
+        <div className="absolute bottom-24 left-6 z-50 overflow-hidden rounded-none border glass-card" style={{ width, height, borderColor: theme.toolbar.border }}>
             <div
                 ref={containerRef}
                 className="relative h-full w-full cursor-crosshair"

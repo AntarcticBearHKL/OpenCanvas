@@ -3,7 +3,6 @@ import { AlignHorizontalDistributeCenter, AlignHorizontalJustifyCenter, AlignHor
 import { useTranslation } from "react-i18next";
 
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
-import { frostedSurfaceClass } from "@/lib/canvas-theme";
 import type { AlignAxis } from "@/lib/canvas/alignment";
 import { nodeBounds } from "@/lib/canvas/canvas-node-geometry";
 import type { CanvasNodeData, ViewportTransform } from "@/types/canvas";
@@ -125,8 +124,8 @@ function SelectionToolbarMenu({ items, onSelect }: { items: SelectionToolbarMenu
     const theme = useCanvasTheme();
     return (
         <div
-            className={`absolute bottom-full left-1/2 z-10 mb-2 w-44 -translate-x-1/2 rounded-2xl border p-1.5 ${frostedSurfaceClass}`}
-            style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item }}
+            className="absolute bottom-full left-1/2 z-10 mb-2 w-44 -translate-x-1/2 rounded-none border p-1.5 glass-raised"
+            style={{ borderColor: theme.toolbar.border, color: theme.toolbar.item }}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
         >
@@ -134,7 +133,7 @@ function SelectionToolbarMenu({ items, onSelect }: { items: SelectionToolbarMenu
                 <button
                     key={item.key}
                     type="button"
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition disabled:opacity-40"
+                    className="flex w-full items-center gap-2.5 rounded-[2px] px-2 py-1.5 text-left text-sm transition disabled:opacity-40"
                     style={{ color: theme.toolbar.item }}
                     disabled={item.disabled}
                     onMouseEnter={(event) => (event.currentTarget.style.background = item.disabled ? "transparent" : theme.toolbar.itemHover)}

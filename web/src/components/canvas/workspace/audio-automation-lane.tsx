@@ -29,7 +29,7 @@ export const AUTOMATION_PLOT_HEIGHT = AUTOMATION_LANE_HEIGHT - 8;
 
 const POINT_SIZE = 6;
 const POINT_HIT_SIZE = 12;
-const PANEL_ACTION_CLASS = "grid size-5 shrink-0 place-items-center rounded opacity-70 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10";
+const PANEL_ACTION_CLASS = "grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover hover:opacity-100 hover:bg-hover";
 
 export function automationTargetLabel(t: TFunction, target: string, tracks: CanvasAudioTrack[]) {
     const kind = automationTargetKind(target);
@@ -168,7 +168,7 @@ export function AudioAutomationLane({ lane, tracks, headerWidth, width, pxPerSec
     };
 
     return (
-        <div className="flex" style={{ height: AUTOMATION_LANE_HEIGHT }}>
+        <div className="flex glass-card" style={{ height: AUTOMATION_LANE_HEIGHT }}>
             <div className="sticky left-0 z-30 flex shrink-0 items-center gap-1 px-2" style={{ width: headerWidth, background: theme.canvas.background, borderBottom: `1px solid ${theme.toolbar.border}` }}>
                 <Select
                     size="small"
@@ -203,7 +203,7 @@ export function AudioAutomationLane({ lane, tracks, headerWidth, width, pxPerSec
                     {points.map((point, index) => (
                         <AudioAutomationPointMenu key={index} curve={point.curve ?? "linear"} onCommand={(command) => handlePointCommand(index, command)}>
                             <div
-                                className="absolute grid place-items-center rounded-sm"
+                                className="absolute grid place-items-center rounded-[2px]"
                                 style={{ left: point.time * pxPerSecond - POINT_HIT_SIZE / 2, top: toY(point.value) - POINT_HIT_SIZE / 2, width: POINT_HIT_SIZE, height: POINT_HIT_SIZE, cursor: "grab" }}
                                 tabIndex={0}
                                 role="button"
@@ -251,7 +251,7 @@ export function AudioAutomationPanel({ automation, tracks, selectedTrackId, onAd
     const track = tracks.find((item) => item.id === selectedTrackId) ?? tracks[0] ?? null;
     if (!track) {
         return (
-            <div className="flex min-h-0 flex-1 items-center justify-center px-4 text-center text-[11px]" style={{ color: theme.node.placeholder }}>
+            <div className="flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm glass-card" style={{ color: theme.node.placeholder }}>
                 {t("canvas.audioStudio.noTracks")}
             </div>
         );
@@ -264,7 +264,7 @@ export function AudioAutomationPanel({ automation, tracks, selectedTrackId, onAd
         lanes.map((lane) => lane.target),
     );
     return (
-        <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto text-[11px]" style={{ color: theme.node.text }}>
+        <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto text-sm glass-card" style={{ color: theme.node.text }}>
             <div className="flex flex-col gap-1 px-2 py-1.5">
                 <div className="flex min-w-0 items-center gap-1.5">
                     <span className="w-14 shrink-0" style={{ color: theme.node.muted }}>
@@ -285,7 +285,7 @@ export function AudioAutomationPanel({ automation, tracks, selectedTrackId, onAd
                     aria-label={t("canvas.audioStudio.automationAdd")}
                     onChange={(target: string) => onAdd(track.id, target)}
                 />
-                <span className="text-[10px] leading-4" style={{ color: theme.node.placeholder }}>
+                <span className="text-sm leading-4" style={{ color: theme.node.placeholder }}>
                     {t("canvas.audioStudio.automationHint")}
                 </span>
             </div>

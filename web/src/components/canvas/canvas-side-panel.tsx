@@ -3,7 +3,6 @@ import { PanelLeftClose } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useTranslation } from "react-i18next";
 
-import { frostedSurfaceLargeClass } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { CANVAS_SIDE_PANEL_MAX_WIDTH, CANVAS_SIDE_PANEL_MIN_WIDTH, CANVAS_SIDE_PANEL_MOTION_MS, useCanvasSidePanelStore } from "@/stores/use-canvas-side-panel-store";
 
@@ -55,15 +54,15 @@ export function CanvasSidePanel() {
             style={{ overflow: "clip", pointerEvents: panelClosing ? "none" : undefined }}
         >
             <motion.aside
-                className={`relative flex h-full shrink-0 flex-col overflow-hidden border-r max-md:max-w-[85vw] ${frostedSurfaceLargeClass}`}
+                className="relative flex h-full shrink-0 flex-col overflow-hidden border-r max-md:max-w-[85vw] glass-surface"
                 initial={{ x: -48 }}
                 animate={{ x: panelClosing ? -28 : 0 }}
                 transition={{ duration: resizing || reduceMotion ? 0 : PANEL_MOTION_SECONDS, ease: PANEL_EASE }}
-                style={{ width, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
+                style={{ width, borderColor: theme.toolbar.border, color: theme.node.text }}
                 data-canvas-no-zoom
             >
                 <div className="flex items-center px-3 pt-3.5 md:hidden">
-                    <button type="button" onClick={closePanel} className="ml-auto grid size-7 place-items-center rounded-md opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" aria-label={t("canvas.collapsePanel")}>
+                    <button type="button" onClick={closePanel} className="ml-auto grid size-7 place-items-center rounded-[2px] transition hover:bg-hover" aria-label={t("canvas.collapsePanel")}>
                         <PanelLeftClose className="size-4" />
                     </button>
                 </div>

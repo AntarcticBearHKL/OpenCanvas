@@ -3,7 +3,6 @@ import { ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock } from "lucide-rea
 import { useTranslation } from "react-i18next";
 
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
-import { frostedSurfaceClass } from "@/lib/canvas-theme";
 import { filterNodesByType, isNodeHidden, isNodeLocked } from "@/lib/canvas/canvas-node-geometry";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
@@ -54,14 +53,14 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
     };
 
     return (
-        <div className={`rounded-2xl border p-2.5 text-sm ${frostedSurfaceClass}`} style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}>
+        <div className="rounded-none border p-2.5 text-sm glass-card" style={{ borderColor: theme.toolbar.border, color: theme.node.text }}>
             {stackIndex >= 0 ? (
                 <>
-                    <div className="text-center text-xs font-medium opacity-70">{t("canvas.nodeToolbar.layerCount", { current: stack.length - stackIndex, total: stack.length })}</div>
+                    <div className="text-center text-sm font-medium" style={{ color: theme.node.label }}>{t("canvas.nodeToolbar.layerCount", { current: stack.length - stackIndex, total: stack.length })}</div>
                     <div className="mt-2 grid grid-cols-2 gap-1.5">
                         <button
                             type="button"
-                            className="flex h-8 items-center justify-center gap-1 rounded-lg text-xs transition hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-white/10 dark:disabled:hover:bg-transparent"
+                            className="flex h-8 items-center justify-center gap-1 rounded-[2px] text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
                             aria-label={t("canvas.nodeToolbar.bringForward")}
                             title={t("canvas.nodeToolbar.bringForward")}
                             disabled={!canRaise}
@@ -72,7 +71,7 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                         </button>
                         <button
                             type="button"
-                            className="flex h-8 items-center justify-center gap-1 rounded-lg text-xs transition hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-white/10 dark:disabled:hover:bg-transparent"
+                            className="flex h-8 items-center justify-center gap-1 rounded-[2px] text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
                             aria-label={t("canvas.nodeToolbar.sendBackward")}
                             title={t("canvas.nodeToolbar.sendBackward")}
                             disabled={!canLower}
@@ -82,7 +81,7 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                             <span>{t("canvas.nodeToolbar.sendBackward")}</span>
                         </button>
                     </div>
-                    <div className="mt-2 text-center text-[11px] opacity-45">{t("canvas.nodeToolbar.layerTie")}</div>
+                    <div className="mt-2 text-center text-sm" style={{ color: theme.node.muted }}>{t("canvas.nodeToolbar.layerTie")}</div>
                 </>
             ) : null}
             <div className="mt-2 flex items-center gap-2 border-t pt-2" style={{ borderColor: theme.toolbar.border }}>
@@ -90,7 +89,7 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                     value={typeFilter}
                     onChange={(event) => setTypeFilter(event.target.value)}
                     aria-label={t("canvas.nodeList.filter")}
-                    className="h-7 min-w-0 flex-1 rounded-lg border bg-transparent px-1.5 text-xs outline-none"
+                    className="h-7 min-w-0 flex-1 rounded-[2px] border bg-transparent px-1.5 text-sm outline-none"
                     style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                 >
                     <option value="all">{t("canvas.nodeList.filterAll")}</option>
@@ -100,26 +99,26 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                         </option>
                     ))}
                 </select>
-                <span className="shrink-0 text-[11px] opacity-50">{t("canvas.nodeList.selected", { count: selectedIds.size })}</span>
+                <span className="shrink-0 text-sm" style={{ color: theme.node.muted }}>{t("canvas.nodeList.selected", { count: selectedIds.size })}</span>
             </div>
             <div className="thin-scrollbar mt-1.5 overflow-y-auto" style={{ maxHeight: maxListHeight }}>
                 {listed.length ? (
                     listed.map((item) => (
-                        <div key={item.id} className="flex items-center gap-1.5 rounded-lg px-1 py-1 transition hover:bg-black/5 dark:hover:bg-white/10">
+                        <div key={item.id} className="flex items-center gap-1.5 rounded-[2px] px-1 py-1 transition hover:bg-hover" style={selectedIds.has(item.id) ? { background: theme.toolbar.activeBg } : undefined}>
                             <input
                                 type="checkbox"
                                 className="size-3.5 shrink-0"
-                                style={{ accentColor: theme.node.activeStroke }}
+                                style={{ accentColor: theme.node.accent }}
                                 checked={selectedIds.has(item.id)}
                                 onChange={() => toggleSelected(item.id)}
                                 aria-label={item.title || t("canvas.node.untitled")}
                             />
-                            <span className="min-w-0 flex-1 truncate text-xs" style={{ opacity: isNodeHidden(item) ? 0.45 : 1 }}>
+                            <span className="min-w-0 flex-1 truncate text-sm" style={{ color: isNodeHidden(item) ? theme.node.muted : theme.node.text }}>
                                 {item.title || t("canvas.node.untitled")}
                             </span>
                             <button
                                 type="button"
-                                className="grid size-6 shrink-0 place-items-center rounded-md opacity-60 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
+                                className="grid size-6 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover hover:opacity-100"
                                 style={{ color: isNodeLocked(item) ? theme.node.activeStroke : theme.node.text }}
                                 aria-label={t(isNodeLocked(item) ? "canvas.nodeToolbar.unlock" : "canvas.nodeToolbar.lock")}
                                 title={t(isNodeLocked(item) ? "canvas.nodeToolbar.unlock" : "canvas.nodeToolbar.lock")}
@@ -129,7 +128,7 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                             </button>
                             <button
                                 type="button"
-                                className="grid size-6 shrink-0 place-items-center rounded-md opacity-60 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
+                                className="grid size-6 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover hover:opacity-100"
                                 style={{ color: isNodeHidden(item) ? theme.node.activeStroke : theme.node.text }}
                                 aria-label={t(isNodeHidden(item) ? "canvas.nodeToolbar.show" : "canvas.nodeToolbar.hide")}
                                 title={t(isNodeHidden(item) ? "canvas.nodeToolbar.show" : "canvas.nodeToolbar.hide")}
@@ -140,7 +139,7 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                         </div>
                     ))
                 ) : (
-                    <div className="py-3 text-center text-xs opacity-45">{t("canvas.nodeList.empty")}</div>
+                    <div className="py-3 text-center text-sm" style={{ color: theme.node.muted }}>{t("canvas.nodeList.empty")}</div>
                 )}
             </div>
             <div className="mt-1.5 flex items-center gap-1.5 border-t pt-2" style={{ borderColor: theme.toolbar.border }}>
@@ -152,12 +151,12 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
                     }}
                     placeholder={t("canvas.nodeList.renamePlaceholder")}
                     aria-label={t("canvas.nodeList.renamePlaceholder")}
-                    className="h-7 min-w-0 flex-1 rounded-lg border bg-transparent px-2 text-xs outline-none"
+                    className="h-7 min-w-0 flex-1 rounded-[2px] border bg-transparent px-2 text-sm outline-none"
                     style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                 />
                 <button
                     type="button"
-                    className="h-7 shrink-0 rounded-lg px-2 text-xs font-medium transition hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-white/10 dark:disabled:hover:bg-transparent"
+                    className="h-7 shrink-0 rounded-[2px] px-2 text-sm font-medium transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
                     disabled={!selectedIds.size || !titleDraft.trim()}
                     onClick={applyRename}
                 >

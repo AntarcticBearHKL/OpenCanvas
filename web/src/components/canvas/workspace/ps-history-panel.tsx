@@ -91,28 +91,28 @@ export function PsHistoryPanel({ history, onRestore, onSnapshot }: { history: Ps
                         <Camera className="size-3.5" />
                         {t("canvas.ps.historySnapshot")}
                     </button>
-                    <span className="min-w-0 flex-1 truncate text-right text-[11px]" style={{ color: theme.node.muted }}>
+                    <span className="min-w-0 flex-1 truncate text-right text-sm tabular-nums" style={{ color: theme.node.text }}>
                         {t("canvas.ps.historyCount", { count: history.entries.length, limit: PS_HISTORY_LIMIT })}
                     </span>
                 </div>
-                <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+                <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2 glass-card">
                     {rows.map(({ entry, index }) => (
                         <button
                             key={entry.id}
                             type="button"
-                            className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-[11px] transition hover:bg-black/5 dark:hover:bg-white/10"
-                            style={index === history.index ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: index > history.index ? theme.node.placeholder : theme.node.text }}
+                            className="flex w-full items-center gap-1.5 border-b px-1.5 py-0.5 text-left text-sm transition hover:bg-hover"
+                            style={index === history.index ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText, borderColor: theme.toolbar.border, boxShadow: `inset 2px 0 0 0 ${theme.node.accent}` } : { borderColor: theme.toolbar.border, color: index > history.index ? theme.node.muted : theme.node.text }}
                             onClick={() => onRestore(index)}
                         >
                             <span className="size-4 shrink-0 rounded-[2px] border" style={{ borderColor: theme.toolbar.border, background: index === history.index ? theme.node.activeStroke : "transparent" }} />
                             <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-                            <span className="shrink-0 tabular-nums" style={{ color: theme.node.muted }}>
+                            <span className="shrink-0 tabular-nums" style={index === history.index ? undefined : { color: theme.node.muted }}>
                                 {index + 1}
                             </span>
                         </button>
                     ))}
                 </div>
-                <p className="shrink-0 px-2 pb-1.5 text-[11px]" style={{ color: theme.node.placeholder }}>
+                <p className="shrink-0 px-2 pb-1.5 text-sm" style={{ color: theme.node.muted }}>
                     {t("canvas.ps.historyTransient")}
                 </p>
             </div>

@@ -14,7 +14,7 @@ export type PsColorPickerProps = {
     onBackground?: (hex: string) => void;
 };
 
-const SWATCH_CLASS = "relative size-7 shrink-0 rounded-[3px] border shadow-sm";
+const SWATCH_CLASS = "relative size-7 shrink-0 rounded-[2px] border shadow-sm";
 const CHECKER = "conic-gradient(#c8c8c8 90deg, #ffffff 90deg 180deg, #c8c8c8 180deg 270deg, #ffffff 270deg)";
 
 function psRatio(event: { clientX: number; clientY: number }, element: HTMLElement) {
@@ -58,7 +58,7 @@ export function PsColorFields({ value, onChange, ariaLabel, background, onBackgr
     };
     const field = (label: string, node: ReactNode) => (
         <label className="flex min-w-0 flex-1 items-center gap-1">
-            <span className="shrink-0 text-[11px]" style={{ color: theme.node.muted }}>
+            <span className="shrink-0 text-sm font-medium" style={{ color: theme.node.label }}>
                 {label}
             </span>
             {node}
@@ -75,7 +75,7 @@ export function PsColorFields({ value, onChange, ariaLabel, background, onBackgr
                 role="slider"
                 aria-label={t("canvas.ps.colorSaturationBrightness")}
                 aria-valuenow={Math.round(hsb.b)}
-                className={`relative w-full cursor-crosshair rounded-md border ${row ? "h-24" : "h-32"}`}
+                className={`relative w-full cursor-crosshair rounded-[2px] border ${row ? "h-24" : "h-32"}`}
                 style={{ borderColor: theme.toolbar.border, background: `linear-gradient(to top, #000000, transparent), linear-gradient(to right, #ffffff, ${psHsbToHex({ h: hsb.h, s: 100, b: 100 })})` }}
                 onPointerDown={(event) => drag(event, "sv")}
             >
@@ -86,7 +86,7 @@ export function PsColorFields({ value, onChange, ariaLabel, background, onBackgr
                 role="slider"
                 aria-label={t("canvas.ps.colorHue")}
                 aria-valuenow={Math.round(hsb.h)}
-                className="relative h-3.5 w-full cursor-pointer rounded-full border"
+                className="relative h-3.5 w-full cursor-pointer rounded-[2px] border"
                 style={{ borderColor: theme.toolbar.border, background: "linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)" }}
                 onPointerDown={(event) => drag(event, "hue")}
             >
@@ -94,7 +94,7 @@ export function PsColorFields({ value, onChange, ariaLabel, background, onBackgr
             </div>
             <div className="flex items-center gap-1.5">
                 {background !== undefined ? <PsForegroundBackground foreground={derived} background={background} onChange={onChange} onBackground={onBackground} /> : <span className={SWATCH_CLASS} style={{ background: derived, borderColor: theme.toolbar.border }} />}
-                <span className="min-w-0 flex-1 text-right text-[11px] tabular-nums" style={{ color: theme.node.muted }}>
+                <span className="min-w-0 flex-1 text-right text-sm tabular-nums" style={{ color: theme.node.text }}>
                     {derived.toUpperCase()}
                 </span>
             </div>
@@ -143,7 +143,7 @@ export function PsForegroundBackground({ foreground, background, onChange, onBac
             <span className="relative block size-8 shrink-0">
                 <button
                     type="button"
-                    className="absolute bottom-0 right-0 size-5 rounded-[3px] border shadow-sm"
+                    className="absolute bottom-0 right-0 size-5 rounded-[2px] border shadow-sm"
                     style={{ background, borderColor: theme.toolbar.border }}
                     aria-label={t("canvas.ps.colorBackground")}
                     title={t("canvas.ps.colorBackground")}
@@ -151,17 +151,17 @@ export function PsForegroundBackground({ foreground, background, onChange, onBac
                 />
                 <button
                     type="button"
-                    className="absolute left-0 top-0 size-5 rounded-[3px] border shadow-sm"
+                    className="absolute left-0 top-0 size-5 rounded-[2px] border shadow-sm"
                     style={{ background: foreground, borderColor: theme.toolbar.border }}
                     aria-label={t("canvas.ps.colorForeground")}
                     title={t("canvas.ps.colorForeground")}
                     onClick={() => onChange?.(background)}
                 />
             </span>
-            <button type="button" className="grid size-6 shrink-0 place-items-center rounded-md transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.muted }} aria-label={t("canvas.ps.colorSwap")} title={t("canvas.ps.colorSwap")} onClick={() => { onChange?.(background); onBackground?.(foreground); }}>
+            <button type="button" className="grid size-6 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover" style={{ color: theme.node.muted }} aria-label={t("canvas.ps.colorSwap")} title={t("canvas.ps.colorSwap")} onClick={() => { onChange?.(background); onBackground?.(foreground); }}>
                 <ArrowLeftRight className="size-3" />
             </button>
-            <button type="button" className="grid size-6 shrink-0 place-items-center rounded-md transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.muted }} aria-label={t("canvas.ps.colorReset")} title={t("canvas.ps.colorReset")} onClick={() => { onChange?.("#000000"); onBackground?.("#ffffff"); }}>
+            <button type="button" className="grid size-6 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover" style={{ color: theme.node.muted }} aria-label={t("canvas.ps.colorReset")} title={t("canvas.ps.colorReset")} onClick={() => { onChange?.("#000000"); onBackground?.("#ffffff"); }}>
                 <span className="flex items-center">
                     <span className="size-2.5 rounded-[2px] border border-black/40 bg-black" />
                     <span className="size-2.5 rounded-[2px] border border-black/40 bg-white" />
@@ -176,8 +176,8 @@ export default function PsColorPicker({ value, onChange, ariaLabel, background, 
     const theme = useCanvasTheme();
     const hex = psNormalizeHex(value) || "#000000";
     return (
-        <Popover trigger="click" placement="bottomRight" styles={{ root: { zIndex: 1300 } }} content={<PsColorFields value={hex} onChange={onChange} ariaLabel={ariaLabel} background={background} onBackground={onBackground} />}>
-            <button type="button" className="relative size-6 shrink-0 rounded-[3px] border" style={{ borderColor: theme.toolbar.border, backgroundImage: CHECKER, backgroundSize: "6px 6px" }} aria-label={ariaLabel || t("canvas.ps.color")} title={ariaLabel || t("canvas.ps.color")}>
+        <Popover trigger="click" placement="bottomRight" classNames={{ container: "glass-raised" }} styles={{ root: { zIndex: 1300 }, container: { background: "var(--glass-strong)", borderRadius: 0 } }} content={<PsColorFields value={hex} onChange={onChange} ariaLabel={ariaLabel} background={background} onBackground={onBackground} />}>
+            <button type="button" className="relative size-6 shrink-0 rounded-[2px] border" style={{ borderColor: theme.toolbar.border, backgroundImage: CHECKER, backgroundSize: "6px 6px" }} aria-label={ariaLabel || t("canvas.ps.color")} title={ariaLabel || t("canvas.ps.color")}>
                 <span className="absolute inset-0 rounded-[2px]" style={{ background: hex }} />
             </button>
         </Popover>

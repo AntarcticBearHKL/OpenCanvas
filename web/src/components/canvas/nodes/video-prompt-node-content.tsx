@@ -55,7 +55,7 @@ export function VideoPromptNodeContent({ node, nodes, references, maxFrameImages
                         <button
                             key={item}
                             type="button"
-                            className="h-6 cursor-pointer rounded-md px-2 text-[11px] transition hover:bg-black/5 dark:hover:bg-white/10"
+                            className="h-6 cursor-pointer rounded-[2px] px-2 text-sm transition hover:bg-hover"
                             style={mode === item ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
                             onMouseDown={(event) => event.stopPropagation()}
                             onPointerDown={(event) => event.stopPropagation()}
@@ -83,13 +83,13 @@ export function VideoPromptNodeContent({ node, nodes, references, maxFrameImages
                     references={references}
                     onChange={(value) => onContentChange(node.id, value)}
                     containerClassName="min-h-0 flex-1"
-                    className="thin-scrollbar h-full min-h-0 w-full cursor-text rounded-xl px-2 py-1.5 text-sm leading-6"
+                    className="thin-scrollbar h-full min-h-0 w-full cursor-text rounded-[2px] px-2 py-1.5 text-sm leading-6"
                     style={{ background: "transparent", color: theme.node.text }}
                     placeholder={t("canvas.promptPanel.video")}
                 />
             </div>
             <div className="mt-2 shrink-0">
-                <div className="mb-1 text-xs font-medium" style={{ color: theme.node.muted }}>
+                <div className="mb-1 text-sm font-medium" style={{ color: theme.node.muted }}>
                     {mode === "frames" ? t("canvas.videoPrompt.slots") : `${t("canvas.videoPrompt.reference")} ${referenceIds.length}/${VIDEO_REFERENCE_TOTAL_LIMIT}`}
                 </div>
                 {mode === "frames" ? (
@@ -109,7 +109,7 @@ export function VideoPromptNodeContent({ node, nodes, references, maxFrameImages
                                         <button
                                             key={item}
                                             type="button"
-                                            className="h-6 cursor-pointer rounded-md px-2 text-[11px] transition hover:bg-black/5 dark:hover:bg-white/10"
+                                            className="h-6 cursor-pointer rounded-[2px] px-2 text-sm transition hover:bg-hover"
                                             style={frameSlot === item ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
                                             onMouseDown={(event) => event.stopPropagation()}
                                             onPointerDown={(event) => event.stopPropagation()}
@@ -119,7 +119,7 @@ export function VideoPromptNodeContent({ node, nodes, references, maxFrameImages
                                         </button>
                                     ))}
                                 </div>
-                                <div className="min-w-0 truncate text-[10px]" style={{ color: theme.node.muted }}>
+                                <div className="min-w-0 truncate text-sm" style={{ color: theme.node.muted }}>
                                     {t("canvas.videoPrompt.singleKeyframeHint")}
                                 </div>
                             </div>
@@ -166,17 +166,17 @@ function VideoFrameSlot({ label, nodeId, slot, thumbnail, active, onClear }: { l
 
     return (
         <div className="min-w-0 cursor-default" onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
-            <div className="mb-1 truncate text-[11px]" style={{ color: theme.node.muted }}>
+            <div className="mb-1 truncate text-sm" style={{ color: theme.node.muted }}>
                 {label}
             </div>
             {thumbnail ? (
-                <div className="relative h-14 overflow-hidden rounded-lg border" data-video-slot={slot} data-video-slot-node={nodeId} data-video-slot-kind="image" style={{ borderColor: theme.node.stroke, ...highlight }}>
+                <div className="relative h-14 overflow-hidden border" data-video-slot={slot} data-video-slot-node={nodeId} data-video-slot-kind="image" style={{ borderColor: theme.node.stroke, ...highlight }}>
                     <img src={thumbnail} alt="" draggable={false} className="size-full object-cover" />
                     <SlotClearButton label={t("canvas.videoPrompt.clearSlot")} onClear={onClear} />
                 </div>
             ) : (
                 <div
-                    className="flex h-14 items-center justify-center rounded-lg border border-dashed"
+                    className="flex h-14 items-center justify-center border border-dashed"
                     data-video-slot={slot}
                     data-video-slot-node={nodeId}
                     data-video-slot-kind="image"
@@ -197,7 +197,7 @@ function VideoReferenceSlot({ nodeId, node, kind, onClear }: { nodeId: string; n
 
     return (
         <div
-            className="relative h-14 w-[76px] cursor-default overflow-hidden rounded-lg border"
+            className="relative h-14 w-[76px] cursor-default overflow-hidden border"
             data-video-slot="reference"
             data-video-slot-node={nodeId}
             data-video-slot-kind={kind}
@@ -211,7 +211,7 @@ function VideoReferenceSlot({ nodeId, node, kind, onClear }: { nodeId: string; n
             ) : (
                 <div className="flex size-full flex-col items-center justify-center gap-0.5 px-1">
                     {kind === "video" ? <Video className="size-4" style={{ color: theme.node.text }} /> : <Music2 className="size-4" style={{ color: theme.node.text }} />}
-                    <span className="w-full truncate text-center text-[10px]" style={{ color: theme.node.muted }}>
+                    <span className="w-full truncate text-center text-sm" style={{ color: theme.node.muted }}>
                         {node.title || t(`canvas.videoPrompt.kinds.${kind}`)}
                     </span>
                 </div>
@@ -228,7 +228,7 @@ function VideoReferenceAddSlot({ nodeId, active }: { nodeId: string; active: boo
 
     return (
         <div
-            className="flex h-14 w-[76px] cursor-default items-center justify-center rounded-lg border border-dashed"
+            className="flex h-14 w-[76px] cursor-default items-center justify-center border border-dashed"
             data-video-slot="reference"
             data-video-slot-node={nodeId}
             data-video-slot-kind="any"
@@ -246,7 +246,7 @@ function SlotClearButton({ label, onClear }: { label: string; onClear: () => voi
     return (
         <button
             type="button"
-            className="absolute right-0.5 top-0.5 grid size-5 cursor-pointer place-items-center rounded-md"
+            className="absolute right-0.5 top-0.5 grid size-5 cursor-pointer place-items-center rounded-[2px]"
             style={{ background: "rgba(0,0,0,0.55)", color: "#fff" }}
             title={label}
             aria-label={label}

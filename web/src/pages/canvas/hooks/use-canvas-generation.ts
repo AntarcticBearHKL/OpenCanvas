@@ -383,6 +383,37 @@ export function useCanvasGeneration(params: CanvasGenerationParams) {
                 return;
             }
 
+            if (sourceNode && builtinPanel?.writeBackToSelf && builtinPanel.mode === "text") {
+                const instruction = prompt.trim();
+                if (!instruction) return;
+                setRunningNodeId(nodeId);
+                const controller = startGenerationRequest(nodeId, nodeId, nodeId);
+                setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, prompt: instruction, status: NODE_STATUS_LOADING, errorDetails: undefined } } : node)));
+                try {
+                    const context = buildNodeGenerationContext(nodeId, nodesRef.current, connectionsRef.current, (builtinPanel.promptPrefix || "") + instruction);
+                    const textId = nanoid();
+                    const answer = await requestImageQuestion(generationConfig, buildNodeResponseMessages(context), () => {}, { signal: controller.signal });
+                    recordGenerationCost({ nodeId, model: generationConfig.model, unit: "call", quantity: 1 });
+                    setNodes((prev) =>
+                        prev.map((node) =>
+                            node.id === nodeId
+                                ? { ...node, metadata: { ...node.metadata, content: node.metadata?.content ? `${node.metadata.content}\n\n${answer}` : answer, texts: [...(node.metadata?.texts || []), { id: textId, status: NODE_STATUS_SUCCESS, content: answer }], primaryTextId: textId, model: generationConfig.model, status: NODE_STATUS_SUCCESS, errorDetails: undefined } }
+                                : node,
+                        ),
+                    );
+                } catch (error) {
+                    if (!isGenerationCanceled(error)) {
+                        const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+                        message.error(errorDetails);
+                        setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_ERROR, errorDetails } } : node)));
+                    }
+                } finally {
+                    finishGenerationRequest(nodeId, controller);
+                    setRunningNodeId((current) => (current === nodeId ? null : current));
+                }
+                return;
+            }
+
             setRunningNodeId(nodeId);
             const runController = startGenerationRequest(nodeId, nodeId, nodeId);
             const sourceTextContent = sourceNode?.type === CanvasNodeType.Text ? sourceNode.metadata?.content?.trim() || "" : "";

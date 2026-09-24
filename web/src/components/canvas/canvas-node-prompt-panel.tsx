@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 import { ModelPicker } from "@/components/model-picker";
 import { defaultConfig, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
-import { frostedSurfaceClass } from "@/lib/canvas-theme";
 import { openRouterMusicModels, openRouterSpeechModels } from "@/lib/audio-generation";
 import { normalizeVideoMode, openRouterVideoModels } from "@/lib/video-generation";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -74,8 +73,8 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
 
     return (
         <div
-            className={`rounded-2xl border p-3 ${frostedSurfaceClass}`}
-            style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
+            className="rounded-none border p-3 glass-card"
+            style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
             onWheel={(event) => event.stopPropagation()}
         >
             {acceptsPromptConnection ? null : (
@@ -85,7 +84,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                         references={mentionReferences}
                         onChange={updatePrompt}
                         onSubmit={submit}
-                        className="thin-scrollbar h-40 w-full cursor-text resize-none rounded-xl px-3 py-2 text-sm leading-5 outline-none"
+                        className="thin-scrollbar h-40 w-full cursor-text resize-none rounded-none px-3 py-2 text-sm leading-5 outline-none"
                         style={{ background: "transparent", color: theme.node.text }}
                         placeholder={t(`canvas.promptPanel.${promptPlaceholderKey}`)}
                     />
@@ -101,7 +100,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                     )}
                     {mode === "image" ? (
                         <>
-                            <ModelPicker config={config} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} capability="image" onMissingConfig={() => openConfigDialog()} className="max-w-[190px]" />
+                            <ModelPicker config={config} value={node.metadata?.model || config.imageModel} onChange={(model) => onConfigChange(node.id, { model })} capability="image" onMissingConfig={() => openConfigDialog()} className="max-w-[190px]" />
                             <CanvasImageSettingsPopover
                                 config={config}
                                 placement="topLeft"
@@ -113,17 +112,25 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                         </>
                     ) : mode === "video" ? (
                         <>
-                            <ModelPicker config={config} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} capability="video" models={node.type === CanvasNodeType.VideoGeneration ? openRouterVideoModels : undefined} onMissingConfig={() => openConfigDialog()} className="max-w-[190px]" />
+                            <ModelPicker config={config} value={node.metadata?.model || config.videoModel} onChange={(model) => onConfigChange(node.id, { model })} capability="video" models={node.type === CanvasNodeType.VideoGeneration ? openRouterVideoModels : undefined} onMissingConfig={() => openConfigDialog()} className="max-w-[190px]" />
                             <CanvasVideoSettingsPopover config={config} buttonClassName="!h-10 !max-w-[220px] !justify-start !rounded-full !px-3" onConfigChange={(key, value) => onConfigChange(node.id, videoConfigPatch(key, value))} />
                         </>
                     ) : mode === "audio" ? (
                         <>
-                            <ModelPicker config={config} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} capability="audio" models={node.type === CanvasNodeType.SpeechGeneration ? openRouterSpeechModels : node.type === CanvasNodeType.MusicGeneration ? openRouterMusicModels : undefined} onMissingConfig={() => openConfigDialog()} className="max-w-[190px]" />
+                            <ModelPicker
+                                config={config}
+                                value={node.metadata?.model || (node.type === CanvasNodeType.SpeechGeneration ? config.speechModel : config.audioModel)}
+                                onChange={(model) => onConfigChange(node.id, { model })}
+                                capability={node.type === CanvasNodeType.SpeechGeneration ? "speech" : "audio"}
+                                models={node.type === CanvasNodeType.SpeechGeneration ? openRouterSpeechModels : node.type === CanvasNodeType.MusicGeneration ? openRouterMusicModels : undefined}
+                                onMissingConfig={() => openConfigDialog()}
+                                className="max-w-[190px]"
+                            />
                             <CanvasAudioSettingsPopover config={config} variant={node.type === CanvasNodeType.MusicGeneration ? "music" : "speech"} buttonClassName="!h-10 !max-w-[170px] !justify-start !rounded-full !px-3" onConfigChange={(key, value) => onConfigChange(node.id, audioConfigPatch(key, value))} />
                         </>
                     ) : (
                         <>
-                            <ModelPicker config={config} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} capability="text" onMissingConfig={() => openConfigDialog()} className="max-w-[190px]" />
+                            <ModelPicker config={config} value={node.metadata?.model || config.textModel} onChange={(model) => onConfigChange(node.id, { model })} capability="text" onMissingConfig={() => openConfigDialog()} className="max-w-[190px]" />
                             <CanvasTextSettingsPopover config={config} count={node.metadata?.textCount || 1} onConfigChange={(_, value) => onConfigChange(node.id, { reasoningEffort: value })} onCountChange={(textCount) => onConfigChange(node.id, { textCount })} />
                         </>
                     )}
@@ -141,7 +148,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                             <>
                                 <LoaderCircle className="size-4 animate-spin" />
                                 <Square className="size-3.5 fill-current" />
-                                <span className="text-xs font-medium">{t("canvas.promptPanel.stop")}</span>
+                                <span className="text-sm font-medium">{t("canvas.promptPanel.stop")}</span>
                             </>
                         ) : (
                             <ArrowUp className="size-4" />
@@ -150,13 +157,13 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                 </Button>
             </div>
             {acceptsPromptConnection ? null : (
-                <Modal title={t("canvas.promptPanel.editorTitle")} open={expanded} centered width={760} footer={null} onCancel={() => setExpanded(false)} destroyOnHidden>
+                <Modal title={t("canvas.promptPanel.editorTitle")} open={expanded} centered width={760} footer={null} onCancel={() => setExpanded(false)} destroyOnHidden classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
                     <div data-canvas-no-zoom className="pt-2" onWheelCapture={(event) => event.stopPropagation()}>
                         <CanvasPromptChipInput
                             value={prompt}
                             references={mentionReferences}
                             onChange={updatePrompt}
-                            className="thin-scrollbar h-[52dvh] min-h-80 w-full cursor-text overflow-y-auto rounded-xl border p-4 text-[15px] leading-6 outline-none"
+                            className="thin-scrollbar h-[52dvh] min-h-80 w-full cursor-text overflow-y-auto rounded-none border p-4 text-[15px] leading-6 outline-none"
                             style={{ background: "transparent", borderColor: theme.toolbar.border, color: theme.node.text }}
                             placeholder={t(`canvas.promptPanel.${promptPlaceholderKey}`)}
                         />

@@ -34,25 +34,28 @@ export function ConfigLocalModels() {
         <div className="space-y-3">
             <div>
                 <div className="text-sm font-semibold">{t("config.localModels.title")}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{t("config.localModels.description")}</div>
+                <div className="mt-1 text-sm text-muted-foreground">{t("config.localModels.description")}</div>
             </div>
             {listLocalModels().map((model) => {
                 const state = models[model.id];
                 const downloading = state.status === "downloading";
                 const deletable = state.status === "ready" || state.status === "error";
                 return (
-                    <section key={model.id} className="rounded-lg border border-border p-4 dark:border-border">
+                    <section key={model.id} className="rounded-none border border-border p-4 dark:border-border glass-card">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2 text-sm font-semibold">
                                     <Eraser className="size-4" />
                                     {t(model.titleKey)}
                                 </div>
-                                <div className="mt-1 text-xs text-muted-foreground">{t(model.descriptionKey)}</div>
+                                <div className="mt-1 text-sm text-muted-foreground">{t(model.descriptionKey)}</div>
                             </div>
                             <div className="shrink-0 text-right text-xs text-muted-foreground">
                                 <div>{t("config.localModels.size")}</div>
-                                <div className="mt-0.5">{t(`config.localModels.status.${state.status}`, { percent: state.percent })}</div>
+                                <div className="mt-0.5 flex items-center justify-end gap-1.5">
+                                    <span className={`size-1.5 shrink-0 rounded-full ${state.status === "ready" ? "bg-success" : state.status === "error" ? "bg-danger" : downloading ? "bg-info" : "bg-muted-foreground"}`} />
+                                    <span>{t(`config.localModels.status.${state.status}`, { percent: state.percent })}</span>
+                                </div>
                             </div>
                         </div>
                         {downloading ? <Progress className="mt-3" percent={state.percent} size="small" showInfo={false} /> : null}

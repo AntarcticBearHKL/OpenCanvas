@@ -7,7 +7,7 @@ description: Local canvas storage, nodes, media files, and cleanup
 
 ## Storage
 
-Canvas projects and My Assets are stored with localForage in the `infinite-canvas` database and `app_state` store. Image blobs use `image_files`; other media blobs use `media_files`. Project JSON stores display URLs, `storageKey`, and metadata rather than large base64 payloads.
+Canvas projects are stored with localForage in the `infinite-canvas` database and `app_state` store. Image blobs use `image_files`; other media blobs use `media_files`. Project JSON stores display URLs, `storageKey`, and metadata rather than large base64 payloads.
 
 ## Project
 
@@ -54,4 +54,4 @@ Common metadata includes content, prompt, status, generation mode, model, size, 
 
 `uploadImage()` accepts a Blob, data URL, or remote URL. It downloads remote data once, verifies that the Blob decodes as an image, stores it in `image_files` under an `image:<id>` key, and returns an in-memory object URL plus metadata. If CORS blocks byte access but the browser can still display the remote image, it returns that URL without a storage key. Opening a project resolves each stored key into a fresh object URL.
 
-Cleanup is reference-based. After deleting nodes, canvases, or assets, the application collects every still-referenced storage key, removes unreferenced blobs, revokes their object URLs, and removes them from the in-memory cache. This prevents deleting a file still shared by another canvas feature.
+Cleanup is reference-based. After deleting nodes or canvases, the application collects every still-referenced storage key, removes unreferenced blobs, revokes their object URLs, and removes them from the in-memory cache. This prevents deleting a file still shared by another canvas feature.

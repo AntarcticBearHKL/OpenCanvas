@@ -28,7 +28,7 @@ type PsPreview = { data: ImageData; scale: number };
 
 const PREVIEW_MAX_EDGE = 320;
 const ROW_CLASS = "flex min-w-0 items-center gap-2 py-1";
-const LABEL_CLASS = "w-24 shrink-0 text-[11px]";
+const LABEL_CLASS = "w-24 shrink-0 text-sm";
 
 export default function PsFilterDialog({ board, setNodes, nodes, layer, selection, type, onClose, onApplied }: PsFilterDialogProps) {
     const { t } = useTranslation();
@@ -130,10 +130,10 @@ export default function PsFilterDialog({ board, setNodes, nodes, layer, selectio
         }
     };
     return (
-        <Modal open title={t(filter.labelKey)} okText={t("canvas.ps.apply")} cancelText={t("canvas.ps.cancel")} confirmLoading={busy} onCancel={onClose} onOk={() => void apply()} width={400}>
+        <Modal open title={t(filter.labelKey)} okText={t("canvas.ps.apply")} cancelText={t("canvas.ps.cancel")} confirmLoading={busy} onCancel={onClose} onOk={() => void apply()} width={400} classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
             <ImageSettingsTheme theme={theme}>
                 <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-center rounded-md border p-1" style={{ borderColor: theme.toolbar.border, background: theme.toolbar.panel }}>
+                    <div className="flex items-center justify-center rounded-[2px] border p-1 glass-card" style={{ borderColor: theme.toolbar.border }}>
                         <canvas
                             ref={canvasRef}
                             width={size.width || 1}
@@ -162,17 +162,17 @@ export default function PsFilterDialog({ board, setNodes, nodes, layer, selectio
                         />
                     </div>
                     {layer.kind !== "pixel" ? (
-                        <p className="text-[11px]" style={{ color: theme.node.placeholder }}>
+                        <p className="text-sm font-medium" style={{ color: theme.node.danger }}>
                             {t("canvas.ps.filterRasterize")}
                         </p>
                     ) : null}
                     {type === "liquify" ? (
-                        <p className="text-[11px]" style={{ color: theme.node.placeholder }}>
+                        <p className="text-sm" style={{ color: theme.node.muted }}>
                             {t("canvas.ps.filter.liquifyHint")}
                         </p>
                     ) : null}
                     {filter.controls.map((control) => (
-                        <div key={control.key} className={ROW_CLASS} style={{ color: theme.node.muted }}>
+                        <div key={control.key} className={ROW_CLASS} style={{ color: theme.node.label }}>
                             <span className={LABEL_CLASS}>{t(control.labelKey)}</span>
                             {control.kind === "slider" ? (
                                 <>
@@ -186,7 +186,7 @@ export default function PsFilterDialog({ board, setNodes, nodes, layer, selectio
                                         ariaLabelForHandle={t(control.labelKey)}
                                         onChange={(input) => setParams((prev) => ({ ...prev, [control.key]: input }))}
                                     />
-                                    <span className="w-10 shrink-0 text-right text-[11px] tabular-nums" style={{ color: theme.node.text }}>
+                                    <span className="w-10 shrink-0 text-right text-sm tabular-nums" style={{ color: theme.node.text }}>
                                         {value(control.key, control.min ?? 0)}
                                         {control.suffix || ""}
                                     </span>
@@ -210,7 +210,7 @@ export default function PsFilterDialog({ board, setNodes, nodes, layer, selectio
                     <div className="flex justify-end">
                         <button
                             type="button"
-                            className="rounded-md px-2 py-0.5 text-[11px] transition hover:bg-black/5 dark:hover:bg-white/10"
+                            className="rounded-[2px] px-2 py-0.5 text-sm transition hover:bg-hover"
                             style={{ color: theme.node.text }}
                             onClick={() => {
                                 setParams(psFilterParams(type));

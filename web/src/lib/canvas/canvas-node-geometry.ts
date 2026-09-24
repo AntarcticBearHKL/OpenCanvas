@@ -1,4 +1,5 @@
 import { CanvasNodeType, type CanvasNodeData, type CanvasNodeTypeId, type ConnectionHandle } from "@/types/canvas";
+import { inferConnectionRelation } from "@/lib/canvas/canvas-connections";
 import { resolveCanvasDropBinding } from "@/lib/canvas/canvas-drop-bindings";
 
 export function nodeBounds(nodes: CanvasNodeData[]) {
@@ -166,5 +167,6 @@ export function normalizeConnection(firstNodeId: string, secondNodeId: string, n
     const toNode = toSecond ? second : first;
     if (toNode.type === CanvasNodeType.Image) return null;
     if (!isPromptConnectionAllowed(fromNode.type, toNode.type)) return null;
-    return { fromNodeId: fromNode.id, toNodeId: toNode.id };
+    const relation = inferConnectionRelation(fromNode, toNode);
+    return { fromNodeId: fromNode.id, toNodeId: toNode.id, ...(relation ? { relation } : {}) };
 }

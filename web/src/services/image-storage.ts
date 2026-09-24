@@ -2,6 +2,7 @@ import localforage from "localforage";
 
 import { nanoid } from "nanoid";
 import i18n from "@/i18n";
+import { cleanupUnusedMedia } from "@/services/file-storage";
 
 export type UploadedImage = {
     url: string;
@@ -256,6 +257,16 @@ export async function cleanupUnusedImages(usedData: unknown) {
         if (!usedKeys.has(key) && !usedThumbKeys.has(key)) unused.push(key);
     });
     await deleteStoredImages(unused);
+}
+
+export function cleanupUnusedCanvasImages(extra?: unknown) {
+    window.setTimeout(async () => {
+        const { useCanvasStore } = await import("@/stores/canvas/use-canvas-store");
+        const { psPatternCleanupExtra } = await import("@/stores/use-ps-asset-store");
+        const used = { ...(extra as object | undefined), ...psPatternCleanupExtra() };
+        await cleanupUnusedImages({ projects: useCanvasStore.getState().projects, extra: used });
+        await cleanupUnusedMedia({ projects: useCanvasStore.getState().projects, extra: used });
+    }, 0);
 }
 
 function collectImageStorageKeys(value: unknown, keys = new Set<string>()) {

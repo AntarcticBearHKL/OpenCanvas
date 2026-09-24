@@ -72,8 +72,8 @@ export default function AudioMixer({ tracks, masterGain, automation, selectedTra
                     strips.map(renderStrip)
                 ) : (
                     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
-                        <AudioLines className="size-6 opacity-40" style={{ color: theme.node.muted }} />
-                        <span className="text-[11px]" style={{ color: theme.node.placeholder }}>
+                        <AudioLines className="size-6" style={{ color: theme.node.muted }} />
+                        <span className="text-sm" style={{ color: theme.node.placeholder }}>
                             {t("canvas.audioStudio.noTracks")}
                         </span>
                     </div>
@@ -117,15 +117,15 @@ function MixerStrip({ track, tracks, masterGain, automation, selected, audible, 
     return (
         <div
             data-track-strip={track.id}
-            className={`flex shrink-0 flex-col gap-1 border-r px-1.5 py-1.5 ${selected ? "" : "max-md:hidden"}`}
+            className={`flex shrink-0 flex-col gap-1 border-r px-1.5 py-1.5 glass-card ${selected ? "" : "max-md:hidden"}`}
             style={{ width: STRIP_WIDTH, borderColor: theme.toolbar.border, background: selected ? theme.toolbar.activeBg : undefined, opacity: audible ? 1 : 0.45 }}
             onPointerDown={() => onSelectTrack(track.id)}
         >
-            <span className="h-1 w-full shrink-0 rounded-sm" style={{ background: track.color || theme.node.faint }} />
+            <span className="h-1 w-full shrink-0 rounded-[2px]" style={{ background: track.color || theme.node.faint }} />
             {renaming ? (
                 <input
                     autoFocus
-                    className="w-full shrink-0 rounded border bg-transparent px-1 py-0.5 text-[11px] outline-none"
+                    className="w-full shrink-0 rounded-[2px] border bg-transparent px-1 py-0.5 text-sm outline-none"
                     style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
                     value={nameDraft}
                     aria-label={t("canvas.audioStudio.name")}
@@ -142,7 +142,7 @@ function MixerStrip({ track, tracks, masterGain, automation, selected, audible, 
             ) : (
                 <button
                     type="button"
-                    className="w-full shrink-0 truncate rounded px-1 py-0.5 text-left text-[11px] transition hover:bg-black/5 dark:hover:bg-white/10"
+                    className="w-full shrink-0 truncate rounded-[2px] px-1 py-0.5 text-left text-sm transition hover:bg-hover"
                     style={{ color: theme.node.text }}
                     title={t("canvas.audioStudio.trackRename")}
                     onDoubleClick={() => {
@@ -155,7 +155,7 @@ function MixerStrip({ track, tracks, masterGain, automation, selected, audible, 
                 </button>
             )}
             {master || type === "audio" ? null : (
-                <span className="shrink-0 text-center text-[10px]" style={{ color: theme.node.muted }}>
+                <span className="shrink-0 text-center text-sm" style={{ color: theme.node.muted }}>
                     {t(AUDIO_TRACK_TYPE_LABEL_KEYS[type])}
                 </span>
             )}
@@ -192,17 +192,17 @@ function MixerStrip({ track, tracks, masterGain, automation, selected, audible, 
                 <AudioToggle label={t("canvas.audioStudio.mute")} active={track.mute} onClick={() => onTrackPatch(track.id, { mute: !track.mute })}>
                     M
                 </AudioToggle>
-                <AudioToggle label={t("canvas.audioStudio.solo")} active={track.solo} onClick={() => onTrackPatch(track.id, { solo: !track.solo })}>
+                <AudioToggle label={t("canvas.audioStudio.solo")} active={track.solo} activeColor={theme.node.warning} activeBackground={theme.node.warningSoft} onClick={() => onTrackPatch(track.id, { solo: !track.solo })}>
                     S
                 </AudioToggle>
                 {type === "audio" ? (
-                    <AudioToggle label={t("canvas.audioStudio.trackArm")} active={Boolean(track.armed)} activeColor={theme.node.blocked} onClick={() => onTrackPatch(track.id, { armed: !track.armed })}>
+                    <AudioToggle label={t("canvas.audioStudio.trackArm")} active={Boolean(track.armed)} activeColor={theme.node.danger} activeBackground={theme.node.dangerSoft} onClick={() => onTrackPatch(track.id, { armed: !track.armed })}>
                         <Circle className="size-2" fill={track.armed ? "currentColor" : "none"} />
                     </AudioToggle>
                 ) : null}
             </div>
             {master ? (
-                <span className="shrink-0 truncate text-center text-[10px]" style={{ color: theme.node.muted }}>
+                <span className="shrink-0 truncate text-center text-sm" style={{ color: theme.node.muted }}>
                     {t("canvas.audioStudio.trackTypeMaster")}
                 </span>
             ) : (
@@ -230,7 +230,7 @@ function MixerSlider({ label, value, min, max, step, vertical = false, linked = 
     const current = draft ?? value;
     return (
         <div className={vertical ? "flex min-w-0 flex-1 flex-col items-center" : "flex w-full shrink-0 flex-col items-center"} onDoubleClick={linked ? undefined : onReset}>
-            <div className="flex w-full shrink-0 items-center justify-between gap-1 text-[10px]" style={{ color: theme.node.muted }}>
+            <div className="flex w-full shrink-0 items-center justify-between gap-1 text-sm" style={{ color: theme.node.muted }}>
                 <span className="flex min-w-0 items-center gap-0.5">
                     {linked ? (
                         <span className="flex shrink-0" title={t("canvas.audioStudio.automationLink")} aria-hidden>

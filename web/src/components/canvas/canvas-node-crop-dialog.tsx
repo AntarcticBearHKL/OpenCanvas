@@ -4,6 +4,7 @@ import { Check, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useImageEditorViewport } from "@/components/canvas/use-image-editor-viewport";
+import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { readImageMeta } from "@/lib/image-utils";
 
 export type CanvasImageCropRect = {
@@ -21,6 +22,7 @@ const minSize = 0.06;
 const defaultCrop = { x: 0.12, y: 0.12, width: 0.76, height: 0.76 };
 export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { dataUrl: string; open: boolean; onClose: () => void; onConfirm: (crop: CanvasImageCropRect) => void }) {
     const { t } = useTranslation();
+    const theme = useCanvasTheme();
     const [crop, setCrop] = useState<CanvasImageCropRect>(defaultCrop);
     const [ratioPreset, setRatioPreset] = useState("free");
     const [fixedRatio, setFixedRatio] = useState<number | null>(null);
@@ -69,15 +71,15 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
     };
 
     return (
-        <Modal title={t("canvas.editors.cropTitle")} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={780} centered destroyOnHidden transitionName="" maskTransitionName="">
+        <Modal title={t("canvas.editors.cropTitle")} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={780} centered destroyOnHidden transitionName="" maskTransitionName="" classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
             <div className="space-y-4">
                 <div
                     ref={viewport.viewportRef}
                     {...viewport.panHandlers}
-                    className={`relative h-[min(62vh,620px)] min-h-[340px] rounded-lg bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
+                    className={`relative h-[min(62vh,620px)] min-h-[340px] rounded-[2px] bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
                 >
                     <div className="relative" style={viewport.contentStyle}>
-                        <div ref={boxRef} className="absolute isolate overflow-hidden rounded-lg bg-black select-none [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
+                        <div ref={boxRef} className="absolute isolate overflow-hidden rounded-[2px] bg-black select-none [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
                             <div className="absolute left-0 top-0 [backface-visibility:hidden]" style={viewport.mediaStyle}>
                                 <img src={dataUrl} alt="" className="block h-full w-full object-contain opacity-90" draggable={false} />
                             </div>
@@ -106,17 +108,17 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
                     <Tooltip title={t("canvas.editors.zoomOut")}>
                         <Button type="text" icon={<ZoomOut className="size-4" />} disabled={!viewport.canZoomOut} aria-label={t("canvas.editors.zoomOut")} onClick={viewport.zoomOut} />
                     </Tooltip>
-                    <button type="button" className="min-w-14 text-center text-xs font-semibold tabular-nums opacity-70" onClick={viewport.resetZoom}>
+                    <button type="button" className="min-w-14 text-center text-xs font-semibold tabular-nums" style={{ color: theme.node.label }} onClick={viewport.resetZoom}>
                         {Math.round(viewport.zoom * 100)}%
                     </button>
                     <Tooltip title={t("canvas.editors.zoomIn")}>
                         <Button type="text" icon={<ZoomIn className="size-4" />} disabled={!viewport.canZoomIn} aria-label={t("canvas.editors.zoomIn")} onClick={viewport.zoomIn} />
                     </Tooltip>
-                    <span className="w-full text-center text-xs opacity-55 sm:ml-2 sm:w-auto sm:text-left">{t("canvas.editors.cropHint")}</span>
+                    <span className="w-full text-center text-sm sm:ml-2 sm:w-auto sm:text-left" style={{ color: theme.node.muted }}>{t("canvas.editors.cropHint")}</span>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-3 text-sm opacity-80">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2px] border px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-3 text-sm" style={{ color: theme.node.text }}>
                         <span>{t("canvas.editors.cropSize", { size: cropSize ? `${cropSize.width} x ${cropSize.height}` : t("canvas.editors.unknown") })}</span>
                         <span>{t("canvas.editors.ratio", { ratio: cropSize ? formatRatio(cropSize.width, cropSize.height) : t("canvas.editors.unknown") })}</span>
                         {image ? (

@@ -5,7 +5,7 @@ import { Button, InputNumber } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { reasoningEffortLabel, TextSettingsPanel } from "@/components/text-settings-panel";
-import { canvasThemes, frostedSurfaceClass } from "@/lib/canvas-theme";
+import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import type { AiConfig, ReasoningEffort } from "@/stores/use-config-store";
 
@@ -50,7 +50,7 @@ export function CanvasTextSettingsPopover({ config, onConfigChange, count, onCou
     return (
         <>
             <span ref={buttonRef} className="inline-flex min-w-0">
-                <Button size="small" type="text" className={`${buttonClassName || "!h-8 !max-w-[170px] !justify-start !rounded-full !px-2.5"} hover:bg-black/5 dark:hover:bg-white/10`} style={{ color: theme.node.text }} icon={<Settings2 className="size-3.5" />} onClick={() => setOpen((current) => !current)}>
+                <Button size="small" type="text" className={`${buttonClassName || "!h-8 !max-w-[170px] !justify-start !rounded-full !px-2.5"} hover:bg-hover`} style={{ color: theme.node.text }} icon={<Settings2 className="size-3.5" />} onClick={() => setOpen((current) => !current)}>
                     <span className="truncate">{t("canvas.controls.reasoning")} · {reasoningEffortLabel(config.reasoningEffort)}{onCountChange ? ` · ${t("canvas.controls.generations", { count })}` : ""}</span>
                 </Button>
             </span>
@@ -83,7 +83,6 @@ function TextSettingsPortal({ buttonRect, panelRef, placement, theme, config, co
         width,
         left: Math.max(margin, Math.min(window.innerWidth - width - margin, left)),
         ...(topPlacement ? { bottom: window.innerHeight - buttonRect.top + gap } : { top: buttonRect.bottom + gap }),
-        background: theme.toolbar.panel,
         border: `1px solid ${theme.toolbar.border}`,
         borderRadius: 16,
         padding: 18,
@@ -91,7 +90,7 @@ function TextSettingsPortal({ buttonRect, panelRef, placement, theme, config, co
     } as const;
 
     return createPortal(
-        <div ref={panelRef} className={`canvas-image-settings-popover ${frostedSurfaceClass}`} style={style} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+        <div ref={panelRef} className="canvas-image-settings-popover glass-raised" style={style} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
             <TextSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} />
             {onCountChange ? (
                 <div className="mt-4 space-y-2.5">

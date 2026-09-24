@@ -107,7 +107,7 @@ export function CanvasImportDialog({ open, onClose }: { open: boolean; onClose: 
         <Modal title={t("canvas.importDialog.title")} open={open} onCancel={cancel} footer={null} centered>
             <button
                 type="button"
-                className="flex h-44 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 text-center text-sm transition"
+                className="flex h-44 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-[2px] border border-dashed px-4 text-center text-sm transition"
                 style={{ borderColor: dragging ? theme.node.activeStroke : theme.toolbar.border, background: dragging ? theme.toolbar.itemHover : "transparent", color: theme.node.text }}
                 onClick={() => inputRef.current?.click()}
                 onDragOver={(event) => {

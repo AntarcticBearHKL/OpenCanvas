@@ -8,6 +8,7 @@ import { ImageSettingsTheme } from "@/components/image-settings-panel";
 import { useResolvedBoardImageUrls, useResolvedPsLayerUrls } from "@/components/canvas/smart-canvas-node";
 import PsFxPanel from "@/components/canvas/workspace/ps-fx-panel";
 import type { PsLayerCommand } from "@/components/canvas/workspace/ps-actions-panel";
+import { PS_MENU_POPUP } from "@/components/canvas/workspace/ps-menus";
 import { addPsLayer, addPsLayerAbove, commitBoardLayers, duplicatePsLayer, findPsLayer, groupPsLayers, movePsLayerStep, movePsLayerTo, patchPsLayer, removePsLayer, ungroupPsLayer } from "@/components/canvas/workspace/ps-layer-ops";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { CANVAS_BLEND_MODES } from "@/lib/canvas/blend-modes";
@@ -29,9 +30,9 @@ type PsLayersPanelProps = {
 
 type DropPosition = "before" | "after" | "into";
 
-const PANEL_ACTION_CLASS = "grid size-6 shrink-0 place-items-center rounded-md transition hover:bg-black/5 disabled:opacity-25 disabled:hover:bg-transparent dark:hover:bg-white/10 dark:disabled:hover:bg-transparent";
-const ROW_ACTION_CLASS = "grid size-5 shrink-0 place-items-center rounded opacity-70 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10";
-const FOOTER_ACTION_CLASS = "flex h-6 min-w-0 items-center gap-1 rounded-md px-1.5 text-[11px] transition hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-white/10 dark:disabled:hover:bg-transparent";
+const PANEL_ACTION_CLASS = "grid size-6 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover disabled:opacity-25 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent";
+const ROW_ACTION_CLASS = "grid size-5 shrink-0 place-items-center rounded-[2px] transition hover:bg-hover";
+const FOOTER_ACTION_CLASS = "flex h-6 min-w-0 items-center gap-1 rounded-[2px] px-1.5 text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent";
 
 export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId, onSelect, maskTarget, maskView, onMaskTarget, onLayerCommand }: PsLayersPanelProps) {
     const { t } = useTranslation();
@@ -121,7 +122,7 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
         <section className="flex min-h-0 flex-col border-b" style={{ borderColor: theme.toolbar.border }}>
             <div className="flex shrink-0 flex-wrap items-center gap-0.5 px-2 py-1.5">
                 <Layers className="mr-1 size-3.5 shrink-0" style={{ color: theme.node.muted }} />
-                <span className="min-w-0 flex-1 truncate text-xs font-medium">{t("canvas.ps.layers")}</span>
+                <span className="min-w-0 flex-1 truncate text-xs font-medium" style={{ color: theme.node.label }}>{t("canvas.ps.layers")}</span>
                 <PanelAction label={t("canvas.ps.addImage")} onClick={() => setPickerOpen(!pickerOpen)}>
                     <ImagePlus className="size-3.5" />
                 </PanelAction>
@@ -193,36 +194,36 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
                                 ariaLabelForHandle={t("canvas.ps.opacity")}
                                 onChange={(value) => commit(patchPsLayer(layers, selected.id, { opacity: value / 100 }))}
                             />
-                            <span className="w-7 shrink-0 text-right text-[11px] tabular-nums" style={{ color: theme.node.muted }}>
+                            <span className="w-7 shrink-0 text-right text-xs tabular-nums" style={{ color: theme.node.text }}>
                                 {Math.round(selected.opacity * 100)}%
                             </span>
                         </div>
                     </ImageSettingsTheme>
                 ) : (
-                    <p className="px-1 text-[11px]" style={{ color: theme.node.placeholder }}>
+                    <p className="px-1 text-sm" style={{ color: theme.node.muted }}>
                         {t("canvas.ps.selectionNone")}
                     </p>
                 )}
             </div>
 
             {pickerOpen ? (
-                <div className="thin-scrollbar mx-2 mb-1 max-h-40 shrink-0 overflow-y-auto rounded-lg border p-1" style={{ borderColor: theme.toolbar.border }}>
+                <div className="thin-scrollbar mx-2 mb-1 max-h-40 shrink-0 overflow-y-auto border p-1 glass-raised" style={{ borderColor: theme.toolbar.border }}>
                     {imageNodes.length ? (
                         imageNodes.map((node) => (
-                            <button key={node.id} type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }} onClick={() => addImageLayer(node)}>
+                            <button key={node.id} type="button" className="flex w-full items-center gap-2 border-b px-2 py-1.5 text-left text-sm transition hover:bg-hover" style={{ borderColor: theme.toolbar.border, color: theme.node.text }} onClick={() => addImageLayer(node)}>
                                 <ImageIcon className="size-3.5 shrink-0" style={{ color: theme.node.muted }} />
                                 <span className="min-w-0 flex-1 truncate">{node.title || t("canvas.node.untitled")}</span>
                             </button>
                         ))
                     ) : (
-                        <p className="px-2 py-1 text-xs" style={{ color: theme.node.placeholder }}>
+                        <p className="px-2 py-1 text-sm" style={{ color: theme.node.muted }}>
                             {t("canvas.ps.noImageNodes")}
                         </p>
                     )}
                 </div>
             ) : null}
 
-            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-1 pb-1.5">
+            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-1 pb-1.5 glass-card">
                 {rows.length ? (
                     rows.map(({ layer, child }) => {
                         const isSelected = layer.id === selectedId;
@@ -231,13 +232,13 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
                             <div
                                 key={layer.id}
                                 draggable
-                                className={`flex items-center gap-1 rounded-md py-1 pl-1 pr-0.5 ${child ? "ml-3" : ""}`}
+                                className={`flex items-center gap-1 py-1 pl-1 pr-0.5 transition hover:bg-hover ${child ? "ml-3" : ""}`}
                                 style={{
                                     background: isSelected ? theme.toolbar.activeBg : undefined,
-                                    color: theme.node.text,
-                                    boxShadow: drop === "into" ? `inset 0 0 0 1px ${theme.node.activeStroke}` : undefined,
+                                    color: isSelected ? theme.toolbar.activeText : theme.node.text,
+                                    boxShadow: drop === "into" ? `inset 0 0 0 1px ${theme.node.activeStroke}` : isSelected ? `inset 2px 0 0 0 ${theme.node.accent}` : undefined,
                                     borderTop: drop === "after" ? `1px solid ${theme.node.activeStroke}` : "1px solid transparent",
-                                    borderBottom: drop === "before" ? `1px solid ${theme.node.activeStroke}` : "1px solid transparent",
+                                    borderBottom: drop === "before" ? `1px solid ${theme.node.activeStroke}` : `1px solid ${theme.toolbar.border}`,
                                 }}
                                 onClick={() => {
                                     onSelect(layer.id);
@@ -293,7 +294,7 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
                                 </button>
                                 <button
                                     type="button"
-                                    className="shrink-0 rounded-md"
+                                    className="shrink-0 rounded-[2px]"
                                     aria-label={t("canvas.ps.layerTarget")}
                                     title={t("canvas.ps.layerTarget")}
                                     onClick={(event) => {
@@ -307,8 +308,8 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
                                 {layer.maskStorageKey && masks[layer.id] ? (
                                     <button
                                         type="button"
-                                        className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-md"
-                                        style={{ background: theme.toolbar.activeBg, boxShadow: isSelected && maskTarget ? `inset 0 0 0 2px ${theme.node.activeStroke}` : undefined }}
+                                        className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-[2px]"
+                                        style={{ background: theme.node.infoSoft, boxShadow: isSelected && maskTarget ? `inset 0 0 0 2px ${theme.node.info}` : undefined }}
                                         aria-label={t("canvas.ps.maskTarget")}
                                         title={t("canvas.ps.maskHint")}
                                         onClick={(event) => {
@@ -326,7 +327,7 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
                                         autoFocus
                                         value={nameDraft}
                                         maxLength={64}
-                                        className="h-5 min-w-0 flex-1 border-0 border-b border-dashed bg-transparent px-0 text-xs outline-none"
+                                        className="h-5 min-w-0 flex-1 border-0 border-b border-dashed bg-transparent px-0 text-sm outline-none"
                                         style={{ borderColor: theme.node.muted, color: theme.node.text }}
                                         onChange={(event) => setNameDraft(event.target.value)}
                                         onBlur={finishRename}
@@ -339,14 +340,14 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
                                         }}
                                     />
                                 ) : (
-                                    <span className="min-w-0 flex-1 truncate px-0.5 text-xs" style={{ opacity: layer.hidden ? 0.5 : 1 }} title={t("canvas.ps.renameHint")} onDoubleClick={(event) => { event.stopPropagation(); setRenamingId(layer.id); setNameDraft(layer.name); }}>
+                                    <span className="min-w-0 flex-1 truncate px-0.5 text-sm" style={layer.hidden ? { color: theme.node.muted } : undefined} title={t("canvas.ps.renameHint")} onDoubleClick={(event) => { event.stopPropagation(); setRenamingId(layer.id); setNameDraft(layer.name); }}>
                                         {layer.name || t("canvas.node.untitled")}
                                     </span>
                                 )}
                                 <button
                                     type="button"
                                     className={ROW_ACTION_CLASS}
-                                    style={layer.locked ? { opacity: 1, color: theme.node.blocked } : undefined}
+                                    style={layer.locked ? { color: theme.node.danger } : undefined}
                                     aria-label={t(layer.locked ? "canvas.ps.unlock" : "canvas.ps.lock")}
                                     title={t(layer.locked ? "canvas.ps.unlock" : "canvas.ps.lock")}
                                     onClick={(event) => {
@@ -359,15 +360,11 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
                             </div>
                         );
                     })
-                ) : (
-                    <p className="px-2 py-3 text-center text-[11px]" style={{ color: theme.node.placeholder }}>
-                        {t("canvas.ps.emptyLayers")}
-                    </p>
-                )}
+                ) : null}
             </div>
 
             <div className="flex shrink-0 items-center gap-0.5 border-t px-2 py-1" style={{ borderColor: theme.toolbar.border }}>
-                <Dropdown menu={{ items: adjustmentItems, onClick: ({ key }) => addAdjustmentLayer(key as CanvasPsAdjustmentType) }} placement="bottomLeft" styles={{ root: { zIndex: 1300 } }}>
+                <Dropdown menu={{ ...PS_MENU_POPUP, items: adjustmentItems, onClick: ({ key }) => addAdjustmentLayer(key as CanvasPsAdjustmentType) }} placement="bottomLeft" styles={{ root: { zIndex: 1300 } }}>
                     <button type="button" className={FOOTER_ACTION_CLASS} style={{ color: theme.node.text }} aria-label={t("canvas.ps.addAdjustment")} title={t("canvas.ps.addAdjustment")}>
                         <SlidersHorizontal className="size-3.5" />
                         {t("canvas.ps.addAdjustment")}
@@ -397,22 +394,23 @@ function LayerThumb({ layer, url, theme, active }: { layer: CanvasPsLayer; url?:
     if (layer.kind === "group" || layer.kind === "text") {
         const Icon = layer.kind === "group" ? Folder : Type;
         return (
-            <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-md" style={ring}>
+            <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-[2px]" style={ring}>
                 <Icon className="size-3.5" style={{ color: theme.node.muted }} />
             </span>
         );
     }
     const Fallback = layer.kind === "pixel" ? Brush : layer.kind === "shape" ? Shapes : layer.kind === "adjustment" ? SlidersHorizontal : ImageIcon;
     return (
-        <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-md" style={ring}>
+        <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-[2px]" style={ring}>
             {url ? <img src={url} alt="" draggable={false} className="h-full w-full object-cover" /> : <Fallback className="size-3.5" style={{ color: theme.node.muted }} />}
         </span>
     );
 }
 
 function PanelAction({ label, disabled = false, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
+    const theme = useCanvasTheme();
     return (
-        <button type="button" className={PANEL_ACTION_CLASS} aria-label={label} title={label} disabled={disabled} onClick={onClick}>
+        <button type="button" className={PANEL_ACTION_CLASS} style={{ color: theme.node.label }} aria-label={label} title={label} disabled={disabled} onClick={onClick}>
             {children}
         </button>
     );

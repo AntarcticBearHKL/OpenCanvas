@@ -36,7 +36,7 @@ export function PromptNodePanel({
                         <button
                             key={tag}
                             type="button"
-                            className="inline-flex h-7 shrink-0 cursor-pointer items-center rounded-md px-2 text-[11px] transition hover:bg-black/5 dark:hover:bg-white/10"
+                            className="inline-flex h-7 shrink-0 cursor-pointer items-center rounded-[2px] px-2 text-sm transition hover:bg-hover"
                             style={{ color: theme.node.text }}
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => inputRef.current?.insertText(tag)}
@@ -64,7 +64,7 @@ export function PromptNodePanel({
                     references={references}
                     onChange={(value) => onContentChange(node.id, value)}
                     containerClassName="min-h-0 flex-1"
-                    className="thin-scrollbar h-full min-h-0 w-full cursor-text rounded-xl px-2 py-1.5 text-sm leading-6"
+                    className="thin-scrollbar h-full min-h-0 w-full cursor-text rounded-none px-2 py-1.5 text-sm leading-6"
                     style={{ background: "transparent", color: theme.node.text }}
                     placeholder={t(placeholderKey)}
                 />
@@ -90,7 +90,7 @@ function PromptReferenceChips({ references }: { references: CanvasResourceRefere
                 <div
                     key={reference.id}
                     draggable
-                    className="canvas-prompt-ref-chip flex h-7 max-w-32 cursor-grab items-center gap-1 overflow-hidden rounded-md border px-1 text-[11px] leading-none"
+                    className="canvas-prompt-ref-chip flex h-7 max-w-32 cursor-grab items-center gap-1 overflow-hidden rounded-[2px] border px-1 text-sm leading-none"
                     style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke, color: theme.node.text }}
                     title={reference.title || reference.label}
                     onDragStart={(event) => {
@@ -100,7 +100,7 @@ function PromptReferenceChips({ references }: { references: CanvasResourceRefere
                     }}
                     onDragEnd={(event) => event.currentTarget.classList.remove("canvas-prompt-ref-chip-dragging")}
                 >
-                    {reference.previewUrl ? <img src={reference.previewUrl} alt="" draggable={false} className="size-5 shrink-0 rounded object-cover" /> : null}
+                    {reference.previewUrl ? <img src={reference.previewUrl} alt="" draggable={false} className="size-5 shrink-0 rounded-[2px] object-cover" /> : null}
                     <span className="truncate">{reference.label}</span>
                 </div>
             ))}

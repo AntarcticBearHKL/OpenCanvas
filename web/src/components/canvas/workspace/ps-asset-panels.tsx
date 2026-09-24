@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Input, Slider } from "antd";
 import { Check, Plus, Save, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -17,32 +17,11 @@ import type { CanvasNodeData, CanvasPsLayer } from "@/types/canvas";
 
 export type PsGradientPick = { color: string; position: number }[];
 
-export function PsPanelTabs<T extends string>({ tabs, value, onChange }: { tabs: { id: T; label: string; handlers?: ButtonHTMLAttributes<HTMLButtonElement> }[]; value: T; onChange: (id: T) => void }) {
-    const theme = useCanvasTheme();
-    return (
-        <div className="flex shrink-0 items-center gap-0.5 border-b px-1.5 py-1" style={{ borderColor: theme.toolbar.border }}>
-            {tabs.map((tab) => (
-                <button
-                    key={tab.id}
-                    type="button"
-                    {...tab.handlers}
-                    className="min-w-0 shrink-0 rounded-md px-1.5 py-0.5 text-[11px] transition hover:bg-black/5 dark:hover:bg-white/10"
-                    style={tab.id === value ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
-                    aria-pressed={tab.id === value}
-                    onClick={() => onChange(tab.id)}
-                >
-                    <span className="block max-w-[72px] truncate">{tab.label}</span>
-                </button>
-            ))}
-        </div>
-    );
-}
-
 const ROW_CLASS = STUDIO_PANEL_ROW_CLASS;
 const LABEL_CLASS = STUDIO_PANEL_LABEL_CLASS;
 const VALUE_CLASS = STUDIO_PANEL_VALUE_CLASS;
 const FLAT_BUTTON_CLASS = STUDIO_FLAT_BUTTON_CLASS;
-const TILE_CLASS = "size-9 shrink-0 rounded-[3px] border";
+const TILE_CLASS = "size-9 shrink-0 rounded-[2px] border";
 
 function psGradientCss(stops: PsGradientStopPreset[]) {
     return `linear-gradient(to right, ${psExpandGradientStops(stops)
@@ -97,17 +76,17 @@ export function PsGradientsPanel({ foreground, background, onPick }: { foregroun
 
     return (
         <ImageSettingsTheme theme={theme}>
-            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2 text-[11px]" style={{ color: theme.node.text }}>
+            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2 text-sm" style={{ color: theme.node.text }}>
                 {dynamic.map((item) => (
-                    <button key={item.key} type="button" className="flex w-full items-center gap-2 rounded-md px-1 py-1 transition hover:bg-black/5 dark:hover:bg-white/10" onClick={() => { setStops(item.stops.map((stop) => ({ ...stop }))); setEditingId(""); setName(item.label); onPick(psExpandGradientStops(item.stops)); }}>
-                        <span className="h-4 w-16 shrink-0 rounded-sm border" style={{ borderColor: theme.toolbar.border, background: psGradientCss(item.stops) }} />
+                    <button key={item.key} type="button" className="flex w-full items-center gap-2 border-b px-1 py-1 transition hover:bg-hover" style={{ borderColor: theme.toolbar.border }} onClick={() => { setStops(item.stops.map((stop) => ({ ...stop }))); setEditingId(""); setName(item.label); onPick(psExpandGradientStops(item.stops)); }}>
+                        <span className="h-4 w-16 shrink-0 rounded-[2px] border" style={{ borderColor: theme.toolbar.border, background: psGradientCss(item.stops) }} />
                         <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
                     </button>
                 ))}
                 {gradients.map((preset) => (
-                    <div key={preset.id} className="flex w-full items-center gap-1.5 rounded-md px-1 py-1">
+                    <div key={preset.id} className="flex w-full items-center gap-1.5 border-b px-1 py-1" style={{ borderColor: theme.toolbar.border }}>
                         <button type="button" className="flex min-w-0 flex-1 items-center gap-2 transition hover:opacity-80" onClick={() => { load(preset); onPick(psExpandGradientStops(preset.stops)); }}>
-                            <span className="h-4 w-16 shrink-0 rounded-sm border" style={{ borderColor: theme.toolbar.border, background: psGradientCss(preset.stops) }} />
+                            <span className="h-4 w-16 shrink-0 rounded-[2px] border" style={{ borderColor: theme.toolbar.border, background: psGradientCss(preset.stops) }} />
                             <span className="min-w-0 flex-1 truncate text-left">{psGradientPresetName(preset)}</span>
                         </button>
                         <button type="button" className={FLAT_BUTTON_CLASS} style={{ color: theme.node.muted }} aria-label={t("canvas.ps.presetDelete")} title={t("canvas.ps.presetDelete")} onClick={() => removeGradient(preset.id)}>
@@ -118,7 +97,7 @@ export function PsGradientsPanel({ foreground, background, onPick }: { foregroun
                 <div className="mt-1 border-t pt-1.5" style={{ borderColor: theme.toolbar.border }}>
                     <div
                         ref={barRef}
-                        className="relative h-5 w-full cursor-copy rounded-sm border"
+                        className="relative h-5 w-full cursor-copy rounded-[2px] border"
                         style={{ borderColor: theme.toolbar.border, background: psGradientCss(stops) }}
                         onPointerDown={(event) => {
                             const box = barRef.current?.getBoundingClientRect();
@@ -144,21 +123,21 @@ export function PsGradientsPanel({ foreground, background, onPick }: { foregroun
                         ))}
                     </div>
                     <div className={ROW_CLASS}>
-                        <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
+                        <span className={LABEL_CLASS} style={{ color: theme.node.label }}>
                             {t("canvas.ps.gradientStops")}
                         </span>
                         <PsColorPicker value={stops[index].color} ariaLabel={t("canvas.ps.color")} onChange={(hex) => update({ color: hex })} />
                         <Slider className="!mx-0 min-w-0 flex-1" min={0} max={100} value={Math.round(stops[index].position * 100)} ariaLabelForHandle={t("canvas.ps.gradientStop")} onChange={(value) => update({ position: value / 100 })} />
-                        <span className={VALUE_CLASS} style={{ color: theme.node.muted }}>
+                        <span className={VALUE_CLASS} style={{ color: theme.node.text }}>
                             {Math.round(stops[index].position * 100)}%
                         </span>
                     </div>
                     <div className={ROW_CLASS}>
-                        <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
+                        <span className={LABEL_CLASS} style={{ color: theme.node.label }}>
                             {t("canvas.ps.gradientMidpoint")}
                         </span>
                         <Slider className="!mx-0 min-w-0 flex-1" min={1} max={99} value={Math.round((stops[index].midpoint ?? 0.5) * 100)} ariaLabelForHandle={t("canvas.ps.gradientMidpoint")} onChange={(value) => update({ midpoint: value / 100 })} />
-                        <span className={VALUE_CLASS} style={{ color: theme.node.muted }}>
+                        <span className={VALUE_CLASS} style={{ color: theme.node.text }}>
                             {Math.round((stops[index].midpoint ?? 0.5) * 100)}%
                         </span>
                     </div>
@@ -228,7 +207,7 @@ export function PsPatternsPanel({ board, layers, nodes, selection, selected, onP
     };
 
     return (
-        <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2 text-[11px]" style={{ color: theme.node.text }}>
+        <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2 text-sm" style={{ color: theme.node.text }}>
             <div className="flex items-center gap-1.5 py-1">
                 <button type="button" className={FLAT_BUTTON_CLASS} style={{ color: theme.node.text }} disabled={!selected && !selection} onClick={() => void define()}>
                     <Plus className="size-3" />
@@ -245,14 +224,14 @@ export function PsPatternsPanel({ board, layers, nodes, selection, selected, onP
                             <button type="button" className="block" aria-label={preset.name} title={preset.name} onClick={() => { setPickedId(preset.id); onPick(preset); }}>
                                 <img src={urls[preset.id] || ""} alt="" className={TILE_CLASS} style={{ borderColor: pickedId === preset.id ? theme.node.activeStroke : theme.toolbar.border, objectFit: "cover" }} />
                             </button>
-                            <button type="button" className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full border" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.muted }} aria-label={t("canvas.ps.presetDelete")} onClick={() => removePattern(preset.id)}>
+                            <button type="button" className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-[2px] border" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.muted }} aria-label={t("canvas.ps.presetDelete")} onClick={() => removePattern(preset.id)}>
                                 <Trash2 className="size-2.5" />
                             </button>
                         </div>
                     ))}
                 </div>
             ) : (
-                <p style={{ color: theme.node.placeholder }}>{t("canvas.ps.patternEmpty")}</p>
+                <p style={{ color: theme.node.muted }}>{t("canvas.ps.patternEmpty")}</p>
             )}
             <div className="mt-1 flex items-center gap-1.5">
                 <button type="button" className={FLAT_BUTTON_CLASS} style={{ color: theme.node.text }} disabled={!pickedId} onClick={() => { const preset = patterns.find((item) => item.id === pickedId); if (preset) onFill(preset); }}>
@@ -290,11 +269,11 @@ export function PsBrushesPanel({ brush, color, onChange }: { brush: PsBrushPrese
     const [name, setName] = useState("");
     const slider = (key: keyof PsBrushPreset, labelKey: string, min: number, max: number, suffix = "", scale = 1) => (
         <div className={ROW_CLASS} key={key}>
-            <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
+            <span className={LABEL_CLASS} style={{ color: theme.node.label }}>
                 {t(labelKey)}
             </span>
             <Slider className="!mx-0 min-w-0 flex-1" min={min} max={max} value={Math.round((brush[key] as number) * scale)} ariaLabelForHandle={t(labelKey)} onChange={(value) => onChange({ ...brush, [key]: value / scale })} />
-            <span className={VALUE_CLASS} style={{ color: theme.node.muted }}>
+            <span className={VALUE_CLASS} style={{ color: theme.node.text }}>
                 {Math.round((brush[key] as number) * scale)}
                 {suffix}
             </span>
@@ -303,11 +282,11 @@ export function PsBrushesPanel({ brush, color, onChange }: { brush: PsBrushPrese
 
     return (
         <ImageSettingsTheme theme={theme}>
-            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2 text-[11px]" style={{ color: theme.node.text }}>
+            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2 text-sm" style={{ color: theme.node.text }}>
                 {brushes.map((preset) => {
                     const active = preset.id === editingId;
                     return (
-                        <div key={preset.id} className="flex items-center gap-1.5 rounded-md px-1 transition" style={active ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : undefined}>
+                        <div key={preset.id} className="flex items-center gap-1.5 border-b px-1 transition hover:bg-hover" style={active ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText, borderColor: theme.toolbar.border, boxShadow: `inset 2px 0 0 0 ${theme.node.accent}` } : { borderColor: theme.toolbar.border }}>
                             <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 py-0.5" aria-label={psBrushPresetName(preset)} title={psBrushPresetName(preset)} onClick={() => { setEditingId(preset.id); setName(psBrushPresetName(preset)); onChange(preset); }}>
                                 {active ? <Check className="size-3 shrink-0" /> : <span className="size-3 shrink-0" />}
                                 <PsBrushPreviewCanvas brush={preset} color={theme.node.text} />
@@ -355,7 +334,7 @@ export function PsColorPanelBody({ foreground, background, onForeground, onBackg
                     <PsColorFields layout="row" value={foreground} onChange={onForeground} background={background} onBackground={onBackground} ariaLabel={t("canvas.ps.colorForeground")} />
                     <div className="min-w-[180px] flex-1">
                     <div className="flex items-center gap-1.5 pb-1">
-                        <span className="min-w-0 flex-1 truncate text-[11px]" style={{ color: theme.node.muted }}>
+                        <span className="min-w-0 flex-1 truncate text-sm" style={{ color: theme.node.label }}>
                             {t("canvas.ps.swatches")}
                         </span>
                         <button type="button" className={FLAT_BUTTON_CLASS} style={{ color: theme.node.text }} onClick={() => addSwatch(foreground)}>
@@ -368,7 +347,7 @@ export function PsColorPanelBody({ foreground, background, onForeground, onBackg
                             <button
                                 key={`${color}-${index}`}
                                 type="button"
-                                className="size-5 shrink-0 rounded-[3px] border"
+                                className="size-5 shrink-0 rounded-[2px] border"
                                 style={{ background: color, borderColor: theme.toolbar.border }}
                                 aria-label={color}
                                 title={`${color} · ${t("canvas.ps.swatchRemoveHint")}`}
@@ -380,7 +359,7 @@ export function PsColorPanelBody({ foreground, background, onForeground, onBackg
                             />
                         ))}
                     </div>
-                    <p className="pt-1 text-[11px]" style={{ color: theme.node.placeholder }}>
+                    <p className="pt-1 text-xs" style={{ color: theme.node.muted }}>
                         {t("canvas.ps.swatchRemoveHint")}
                     </p>
                     </div>
