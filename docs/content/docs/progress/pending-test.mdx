@@ -7,6 +7,12 @@ description: Implemented changes that still need manual verification
 
 The current release needs manual verification in these areas:
 
+## Audio studio: track menu and media pool
+
+- The audio studio menu bar no longer has a "Track" menu — only Edit / Clip / View / Automation remain. The five add-track entries (audio / instrument / MIDI / group / return) now live behind the "Add track" button, which opens a dropdown; both the row at the end of the lane list and the empty-state button were changed (they no longer add an audio track in one click).
+- The track-level actions moved onto every track row: duplicate / remove / export stems are in a new "⋯" button (label "Track actions") at the right end of the track header. The same menu still opens on right-click. `Remove` stays disabled when only one non-master track remains, and `Export stems` stays disabled while an export is running. Note that "Export stems" exports the **whole project**, not the track whose "⋯" you clicked.
+- The Media pool is now drag-only: the per-row "＋" and the "add to the selected track" click flow are gone. Drag a media-pool row onto any track lane to create a clip at the pointer's timeline position (snapped to the grid); the target lane highlights while a valid drop hovers it, and a non-audio drag or a lane that cannot host clips rejects the drop. The MIDI track's "add region" ＋ and the empty-state "go to canvas" ＋ are unchanged.
+
 ## MCP page namespaces
 
 - The MCP service is now a generic page + action-namespace relay instead of canvas-only. Three generic tools drive any page through the list → describe → call flow: `app_get_state` (read the current page snapshot), `app_describe_actions` (fetch a namespace's JSON Schema) and `app_apply_ops` (apply a batch of namespaced ops). The protocol is now 7 and the tool count is 29 (3 generic + 3 site + 23 canvas shortcut macros); the four old tools (`canvas_get_state`, `canvas_get_selection`, `canvas_export_snapshot`, `canvas_apply_ops`) are gone, while `site_navigate`, `canvas_list_projects` and `generation_get_status` remain.

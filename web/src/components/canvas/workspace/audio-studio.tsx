@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
 import { App, ConfigProvider, Dropdown, InputNumber, Modal, Popover, Segmented, Select, Switch } from "antd";
-import { ArrowLeft, AudioLines, AudioWaveform, ChevronDown, ChevronRight, Circle, CircleStop, Ellipsis, Eraser, Flag, Hand, History, Library, Link, Link2, Lock, Magnet, MousePointer2, Music2, PanelRight, Pause, Pencil, Play, Plus, Repeat, Scissors, Search, Settings2, SkipBack, SlidersHorizontal, SlidersVertical, SquareDashed, Timer, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, AudioLines, AudioWaveform, ChevronDown, ChevronRight, Circle, CircleStop, Ellipsis, Eraser, Flag, Hand, History, Library, Link, Link2, Lock, Magnet, MoreHorizontal, MousePointer2, Music2, PanelRight, Pause, Pencil, Play, Plus, Repeat, Scissors, Search, Settings2, SkipBack, SlidersHorizontal, SlidersVertical, SquareDashed, Timer, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useTranslation } from "react-i18next";
 import * as Tone from "tone";
@@ -9,7 +9,7 @@ import { type DockPanelDef } from "@/components/canvas/dock/dock-layout";
 import { DockArea, useDockLayout } from "@/components/canvas/dock/dock-panel";
 import { DockWindowMenu } from "@/components/canvas/dock/dock-window-menu";
 import { AudioAutomationLane, AudioAutomationPanel, AUTOMATION_LANE_HEIGHT, AUTOMATION_PLOT_HEIGHT } from "@/components/canvas/workspace/audio-automation-lane";
-import { AudioClipContextMenu, AudioLaneContextMenu, AudioMenus, AudioMidiRegionContextMenu, AudioRulerContextMenu, AudioTrackContextMenu, audioCompactMenuItems, audioOptionItems, AUDIO_MENU_BUTTON_CLASS, AUDIO_MENU_POPUP, prefixMenuKeys, type AudioAutomationCommand, type AudioClipCommand, type AudioEditCommand, type AudioLaneCommand, type AudioMidiRegionCommand, type AudioOptionCommand, type AudioTrackCommand, type AudioViewCommand } from "@/components/canvas/workspace/audio-menus";
+import { AudioAddTrackMenu, AudioClipContextMenu, AudioLaneContextMenu, AudioMenus, AudioMidiRegionContextMenu, AudioRulerContextMenu, AudioTrackMenu, audioCompactMenuItems, audioOptionItems, AUDIO_MENU_BUTTON_CLASS, AUDIO_MENU_POPUP, prefixMenuKeys, type AudioAutomationCommand, type AudioClipCommand, type AudioEditCommand, type AudioLaneCommand, type AudioMidiRegionCommand, type AudioOptionCommand, type AudioTrackCommand, type AudioViewCommand } from "@/components/canvas/workspace/audio-menus";
 import AudioMixer from "@/components/canvas/workspace/audio-mixer";
 import { AudioInspectorPanel, AudioMediaPoolPanel, AudioMeter, AudioProjectSettingsPanel, AudioToggle, AudioValueInput, AUDIO_FADE_SHAPE_LABEL_KEYS, AUDIO_FADE_SHAPE_OPTIONS, AUDIO_METER_OPTIONS, AUDIO_NODE_DRAG_MIME, AUDIO_SNAP_LABEL_KEYS, AUDIO_SNAP_OPTIONS, AUDIO_TRACK_TYPE_LABEL_KEYS } from "@/components/canvas/workspace/audio-panels";
 import AudioPianoRoll from "@/components/canvas/workspace/audio-piano-roll";
@@ -1543,7 +1543,6 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
         const [group, ...rest] = key.split(":");
         const command = rest.join(":");
         if (group === "edit") handleEditCommand(command as AudioEditCommand);
-        else if (group === "track") handleTrackCommand(command as AudioTrackCommand);
         else if (group === "clip") handleClipCommand(command as AudioClipCommand);
         else if (group === "view") handleViewCommand(command as AudioViewCommand);
         else if (group === "automation") handleAutomationCommand(command as AudioAutomationCommand);
@@ -2083,10 +2082,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                             hasRange={Boolean(range)}
                             hasCycleRange={cycle.end > cycle.start}
                             canPaste={clipboardCount > 0}
-                            canRemoveTrack={tracks.length > 1 && (!selectedTrack || audioTrackType(selectedTrack) !== "master")}
-                            exporting={exporting}
                             onEdit={handleEditCommand}
-                            onTrack={(command) => handleTrackCommand(command)}
                             onClip={(command) => handleClipCommand(command)}
                             onView={handleViewCommand}
                             onAutomation={handleAutomationCommand}
@@ -2115,7 +2111,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                         <Dropdown
                             placement="bottomLeft"
                             styles={{ root: { zIndex: 1300 } }}
-                            menu={{ ...AUDIO_MENU_POPUP, items: audioCompactMenuItems(t, { clip: primaryClip, view: { grid: grid.enabled, cycle: cycleLoop, metronome: metronome.enabled }, automation: automationFlags, hasClips: Boolean(projectClips.length), hasSelection: Boolean(selectedClipIds.length), hasRange: Boolean(range), hasCycleRange: cycle.end > cycle.start, canPaste: clipboardCount > 0, canRemoveTrack: tracks.length > 1 && (!selectedTrack || audioTrackType(selectedTrack) !== "master"), exporting, ...optionFlags }), onClick: handleCompactMenu }}
+                            menu={{ ...AUDIO_MENU_POPUP, items: audioCompactMenuItems(t, { clip: primaryClip, view: { grid: grid.enabled, cycle: cycleLoop, metronome: metronome.enabled }, automation: automationFlags, hasClips: Boolean(projectClips.length), hasSelection: Boolean(selectedClipIds.length), hasRange: Boolean(range), hasCycleRange: cycle.end > cycle.start, canPaste: clipboardCount > 0, ...optionFlags }), onClick: handleCompactMenu }}
                         >
                             <button type="button" className={`${AUDIO_MENU_BUTTON_CLASS} !h-7`} aria-label={t("canvas.audioStudio.menuOptions")} title={t("canvas.audioStudio.menuOptions")}>
                                 {t("canvas.audioStudio.menuOptions")}
@@ -2399,7 +2395,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                 return (
                                 <Fragment key={track.id}>
                                 <div className="flex" style={{ height: LANE_HEIGHT }}>
-                                    <AudioTrackContextMenu canRemove={tracks.length > 1 && audioTrackType(track) !== "master"} exporting={exporting} onCommand={(command) => handleTrackCommand(command, track.id)}>
+                                    <AudioTrackMenu canRemove={tracks.length > 1 && audioTrackType(track) !== "master"} exporting={exporting} onCommand={(command) => handleTrackCommand(command, track.id)}>
                                         <div
                                             className="sticky left-0 z-30 shrink-0 px-2 py-1.5 glass-surface"
                                             style={{ width: trackWidth, background: track.id === selectedTrack?.id ? theme.toolbar.activeBg : undefined, borderBottom: `1px solid ${theme.toolbar.border}`, borderLeft: track.armed ? `2px solid ${theme.node.danger}` : "2px solid transparent", opacity: audible?.get(track.id) === false ? 0.45 : 1 }}
@@ -2445,6 +2441,11 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                                 >
                                                     <SlidersHorizontal className="size-3.5" />
                                                 </IconAction>
+                                                <AudioTrackMenu trigger={["click"]} canRemove={tracks.length > 1 && audioTrackType(track) !== "master"} exporting={exporting} onCommand={(command) => handleTrackCommand(command, track.id)}>
+                                                    <button type="button" className={COMPACT_ACTION_CLASS} aria-label={t("canvas.audioStudio.trackActions")} title={t("canvas.audioStudio.trackActions")}>
+                                                        <MoreHorizontal className="size-3.5" />
+                                                    </button>
+                                                </AudioTrackMenu>
                                             </div>
                                             {/* Fixed slots keep M / S / indicator / gain on the same x on every row, so a row missing a control still reserves its column. */}
                                             <div className="mt-1 flex h-7 items-center gap-1">
@@ -2481,7 +2482,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                                 <AudioMeter trackId={track.id} register={registerMeter} className="h-6 max-md:hidden" />
                                             </div>
                                         </div>
-                                    </AudioTrackContextMenu>
+                                    </AudioTrackMenu>
                                     <AudioLaneContextMenu canRemove={tracks.length > 1 && audioTrackType(track) !== "master"} midi={canHostMidi(track)} onCommand={(command) => handleLaneCommand(command, track.id)}>
                                         <div
                                             ref={(element) => {
@@ -2622,10 +2623,12 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                 </Fragment>
                                 );
                             })}
-                            <button type="button" className="flex h-8 items-center gap-1.5 px-2 text-left text-sm transition hover:bg-hover" style={{ color: theme.node.muted, width: trackWidth }} onClick={() => addTrack()}>
-                                <Plus className="size-3.5" />
-                                {t("canvas.audioStudio.addTrack")}
-                            </button>
+                            <AudioAddTrackMenu onCommand={(command) => handleTrackCommand(command)}>
+                                <button type="button" className="flex h-8 items-center gap-1.5 px-2 text-left text-sm transition hover:bg-hover" style={{ color: theme.node.muted, width: trackWidth }}>
+                                    <Plus className="size-3.5" />
+                                    {t("canvas.audioStudio.addTrack")}
+                                </button>
+                            </AudioAddTrackMenu>
                             {range ? (
                                 <div
                                     className="pointer-events-none absolute"
@@ -2655,10 +2658,12 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                             <span className="text-sm" style={{ color: theme.node.placeholder }}>
                                 {t("canvas.audioStudio.noTracks")}
                             </span>
-                            <button type="button" className="pointer-events-auto flex items-center gap-1.5 rounded-md px-2 py-1 text-sm transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => addTrack()}>
-                                <Plus className="size-3.5" />
-                                {t("canvas.audioStudio.addTrack")}
-                            </button>
+                            <AudioAddTrackMenu onCommand={(command) => handleTrackCommand(command)}>
+                                <button type="button" className="pointer-events-auto flex items-center gap-1.5 rounded-md px-2 py-1 text-sm transition hover:bg-hover" style={{ color: theme.node.text }}>
+                                    <Plus className="size-3.5" />
+                                    {t("canvas.audioStudio.addTrack")}
+                                </button>
+                            </AudioAddTrackMenu>
                         </div>
                     ) : null}
                     {view === "arrangement" && laneTracks.length && !hasContent ? (

@@ -20,7 +20,7 @@ export type AudioViewCommand = "grid" | "snap" | "cycle" | "metronome" | "zoomIn
 export type AudioAutomationCommand = "show" | "addGain" | "addPan" | "addSend" | "clearTrack";
 export type AudioAutomationPointCommand = "linear" | "hold" | "sCurve" | "delete";
 export type AudioOptionCommand = "grid" | "loop" | "reverse" | "autoCrossfade" | `snap:${CanvasAudioSnap}` | `fadeShape:${CanvasAudioFadeShape}`;
-export type AudioMenuGroupKey = "edit" | "track" | "clip" | "view" | "automation";
+export type AudioMenuGroupKey = "edit" | "clip" | "view" | "automation";
 type AudioMenuItems = NonNullable<MenuProps["items"]>;
 
 /** The document state every menu row is enabled or checked by. */
@@ -34,8 +34,6 @@ export type AudioMenuFlags = {
     hasRange: boolean;
     hasCycleRange: boolean;
     canPaste: boolean;
-    canRemoveTrack: boolean;
-    exporting: boolean;
 };
 
 /** The contextual options row, as menu items so the narrow layout can host it in one Dropdown. */
@@ -43,7 +41,6 @@ export type AudioOptionFlags = { grid: boolean; snap: CanvasAudioSnap; fadeShape
 
 type AudioMenusProps = AudioMenuFlags & {
     onEdit: (command: AudioEditCommand) => void;
-    onTrack: (command: AudioTrackCommand) => void;
     onClip: (command: AudioClipCommand) => void;
     onView: (command: AudioViewCommand) => void;
     onAutomation: (command: AudioAutomationCommand) => void;
@@ -99,14 +96,19 @@ export function audioClipMenuItems(t: TFunction, clip: CanvasAudioClip | null): 
     ];
 }
 
-export function audioTrackMenuItems(t: TFunction, canRemove: boolean, exporting: boolean): AudioMenuItems {
+export function audioTrackAddMenuItems(t: TFunction): AudioMenuItems {
     return [
         { key: "add", label: item(t("canvas.audioStudio.addAudioTrack")) },
         { key: "addInstrument", label: item(t("canvas.audioStudio.addInstrumentTrack")) },
         { key: "addMidi", label: item(t("canvas.audioStudio.addMidiTrack")) },
         { key: "addGroup", label: item(t("canvas.audioStudio.addGroupTrack")) },
         { key: "addReturn", label: item(t("canvas.audioStudio.addReturnTrack")) },
-        { type: "divider" },
+    ];
+}
+
+/** Per-track actions, used by both the row's `⋯` menu and its right-click menu. */
+export function audioTrackMenuItems(t: TFunction, canRemove: boolean, exporting: boolean): AudioMenuItems {
+    return [
         { key: "duplicate", label: item(t("canvas.audioStudio.duplicateTrack")) },
         { key: "remove", label: item(t("canvas.audioStudio.removeTrack")), disabled: !canRemove },
         { type: "divider" },
@@ -194,7 +196,6 @@ export function audioMenuGroups(t: TFunction, flags: AudioMenuFlags) {
     ];
     return [
         { key: "edit" as AudioMenuGroupKey, labelKey: "canvas.audioStudio.menuEdit", items: editItems },
-        { key: "track" as AudioMenuGroupKey, labelKey: "canvas.audioStudio.menuTrack", items: audioTrackMenuItems(t, flags.canRemoveTrack, flags.exporting) },
         { key: "clip" as AudioMenuGroupKey, labelKey: "canvas.audioStudio.menuClip", items: audioClipMenuItems(t, flags.clip) },
         { key: "view" as AudioMenuGroupKey, labelKey: "canvas.audioStudio.menuView", items: viewItems },
         { key: "automation" as AudioMenuGroupKey, labelKey: "canvas.audioStudio.menuAutomation", items: audioAutomationMenuItems(t, flags.automation) },
@@ -243,14 +244,35 @@ export function AudioClipContextMenu({ clip, onCommand, children }: { clip: Canv
     );
 }
 
-export function AudioTrackContextMenu({ canRemove, exporting = false, onCommand, children }: { canRemove: boolean; exporting?: boolean; onCommand: (command: AudioTrackCommand) => void; children: ReactElement }) {
+/** Per-track actions on `trigger`: right-click by default, `click` for the row's `⋯` button. */
+export function AudioTrackMenu({ canRemove, exporting = false, trigger = ["contextMenu"], onCommand, children }: { canRemove: boolean; exporting?: boolean; trigger?: ("click" | "hover" | "contextMenu")[]; onCommand: (command: AudioTrackCommand) => void; children: ReactElement }) {
     const { t } = useTranslation();
     return (
         <Dropdown
-            trigger={["contextMenu"]}
+            trigger={trigger}
             menu={{
                 ...AUDIO_MENU_POPUP,
                 items: audioTrackMenuItems(t, canRemove, exporting),
+                onClick: ({ key, domEvent }) => {
+                    domEvent.stopPropagation();
+                    onCommand(key as AudioTrackCommand);
+                },
+            }}
+            styles={{ root: { zIndex: 1300 } }}
+        >
+            {children}
+        </Dropdown>
+    );
+}
+
+export function AudioAddTrackMenu({ onCommand, children }: { onCommand: (command: AudioTrackCommand) => void; children: ReactElement }) {
+    const { t } = useTranslation();
+    return (
+        <Dropdown
+            trigger={["click"]}
+            menu={{
+                ...AUDIO_MENU_POPUP,
+                items: audioTrackAddMenuItems(t),
                 onClick: ({ key, domEvent }) => {
                     domEvent.stopPropagation();
                     onCommand(key as AudioTrackCommand);
@@ -343,12 +365,11 @@ export function AudioAutomationPointMenu({ curve, onCommand, children }: { curve
     );
 }
 
-export function AudioMenus({ onEdit, onTrack, onClip, onView, onAutomation, ...flags }: AudioMenusProps) {
+export function AudioMenus({ onEdit, onClip, onView, onAutomation, ...flags }: AudioMenusProps) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     const dispatch: Record<AudioMenuGroupKey, (key: string) => void> = {
         edit: (key) => onEdit(key as AudioEditCommand),
-        track: (key) => onTrack(key as AudioTrackCommand),
         clip: (key) => onClip(key as AudioClipCommand),
         view: (key) => onView(key as AudioViewCommand),
         automation: (key) => onAutomation(key as AudioAutomationCommand),
