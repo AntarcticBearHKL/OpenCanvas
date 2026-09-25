@@ -15,3 +15,10 @@ web/public/plugins
 plugins/canvas/*/dist
 plugins/canvas/*/node_modules
 web/public/plugins
+
+# vst-host build artifacts and the cloned VST3 SDK
+vst-host/external/
+vst-host/build/
+*.pdb
+*.ilk
+*.obj
