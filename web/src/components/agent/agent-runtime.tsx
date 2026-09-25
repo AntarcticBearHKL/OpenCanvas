@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 
 import i18n from "@/i18n";
 import { isSiteTool, runSiteTool } from "@/lib/agent/agent-site-tools";
+import { applyAgentOps, getAgentActions, getAgentSchema, subscribeAgentActions } from "@/lib/agent/action-registry";
+import type { AgentOp, AgentPageSnapshot } from "@/lib/agent/agent-ops";
 import { randomId } from "@/lib/utils";
 import { activateAgentClient, postState, postToolResult } from "@/services/api/canvas-agent";
-import { useAgentStore, type AgentCanvasContext, type AgentPendingToolCall } from "@/stores/use-agent-store";
-import type { CanvasAgentOp, CanvasAgentSnapshot } from "@/lib/canvas/canvas-agent-ops";
+import { useAgentStore, type AgentPageContext, type AgentPendingToolCall } from "@/stores/use-agent-store";
 
-const AGENT_PROTOCOL_VERSION = 6;
+const AGENT_PROTOCOL_VERSION = 7;
 
 type AgentClientGlobal = typeof globalThis & { __infiniteCanvasAgentClientIdPromise?: Promise<string> };
 type AgentHelloEvent = { protocolVersion?: number };
@@ -21,10 +22,33 @@ function parseEventData<T>(event: Event) {
     }
 }
 
+/** Build the page snapshot envelope posted to the server; availableActions carries no schema. */
+function buildPageSnapshot(context: AgentPageContext | null): AgentPageSnapshot | null {
+    if (!context) return null;
+    return { page: context.page, title: context.title, state: context.state, availableActions: getAgentActions() };
+}
+
+/** `app_describe_actions` result: namespaces with their op list and JSON Schema. */
+function describeAgentActions(ns?: string) {
+    return {
+        namespaces: getAgentActions()
+            .filter((action) => !ns || action.ns === ns)
+            .map((action) => ({ ...action, schema: getAgentSchema(action.ns) })),
+    };
+}
+
+/** Tolerate legacy ops that omit `ns` by defaulting them to the canvas namespace. */
+function normalizeAgentOps(ops: unknown): AgentOp[] {
+    if (!Array.isArray(ops)) return [];
+    return ops
+        .filter((op): op is Record<string, unknown> => Boolean(op) && typeof op === "object")
+        .map((op) => ({ ns: "canvas", ...op }) as AgentOp);
+}
+
 /**
- * Headless runtime that owns the invisible Agent machinery: the SSE connection to the same-origin
- * bridge, canvas snapshot publishing, tool-call execution, and the result callback. It renders
- * nothing and is mounted globally so an external MCP agent can drive the canvas without any chat UI.
+ * Headless runtime that owns the invisible Agent machinery: the SSE connection to the local bridge,
+ * page snapshot publishing, tool-call execution, and the result callback. It renders nothing and is
+ * mounted globally so an external MCP agent can drive the page without any chat UI.
  */
 export function AgentRuntime() {
     const navigate = useNavigate();
@@ -34,7 +58,7 @@ export function AgentRuntime() {
     const connected = useAgentStore((state) => state.connected);
     const setAgentState = useAgentStore((state) => state.setAgentState);
     const endpoint = useMemo(() => url.trim().replace(/\/$/, ""), [url]);
-    const canvasContextRef = useRef<AgentCanvasContext | null>(useAgentStore.getState().canvasContext);
+    const pageContextRef = useRef<AgentPageContext | null>(useAgentStore.getState().pageContext);
     const clientIdRef = useRef("");
     const connectedRef = useRef(false);
     const [clientReady, setClientReady] = useState(false);
@@ -50,18 +74,23 @@ export function AgentRuntime() {
         return () => { disposed = true; };
     }, []);
 
-    // Imperatively subscribe to canvasContext to keep the ref current and debounce snapshot reports.
+    // Imperatively subscribe to pageContext (and registry changes) to keep the ref current and debounce reports.
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | null = null;
-        const unsubscribe = useAgentStore.subscribe((state) => {
-            if (state.canvasContext === canvasContextRef.current) return;
-            canvasContextRef.current = state.canvasContext;
+        const publish = () => {
             if (!useAgentStore.getState().connected) return;
             if (timer) clearTimeout(timer);
-            timer = setTimeout(() => void postState(endpoint, clientIdRef.current, canvasContextRef.current?.snapshot || null, token), 300);
+            timer = setTimeout(() => void postState(endpoint, clientIdRef.current, buildPageSnapshot(pageContextRef.current), token), 300);
+        };
+        const unsubscribeStore = useAgentStore.subscribe((state) => {
+            if (state.pageContext === pageContextRef.current) return;
+            pageContextRef.current = state.pageContext;
+            publish();
         });
+        const unsubscribeActions = subscribeAgentActions(publish);
         return () => {
-            unsubscribe();
+            unsubscribeStore();
+            unsubscribeActions();
             if (timer) clearTimeout(timer);
         };
     }, [endpoint, token]);
@@ -69,7 +98,7 @@ export function AgentRuntime() {
     const runToolCall = useCallback(async (endpoint: string, payload: AgentPendingToolCall) => {
         if (isSiteTool(payload.name)) {
             try {
-                const result = await runSiteTool(payload.name, payload.input || {}, navigate, { canvasSnapshot: canvasContextRef.current?.snapshot || null });
+                const result = await runSiteTool(payload.name, payload.input || {}, navigate, { state: pageContextRef.current?.state || null });
                 await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, result }, token);
             } catch (error) {
                 const text = error instanceof Error ? error.message : i18n.t("agent.runtime.toolExecutionFailed");
@@ -78,21 +107,25 @@ export function AgentRuntime() {
             return;
         }
         try {
-            const input: { ops?: CanvasAgentOp[]; path?: string } = payload.input || {};
+            const input: { ops?: AgentOp[]; path?: string; ns?: string } = payload.input || {};
             let result: unknown;
             if (payload.name === "site_navigate") {
                 const path = input.path || "/";
                 navigate(path);
                 result = { ok: true, path };
-            } else if (payload.name === "canvas_apply_ops") {
-                const context = canvasContextRef.current;
-                if (!context) throw new Error(i18n.t("agent.runtime.openCanvasFirst"));
-                result = context.applyOps(input.ops || []);
-                void postState(endpoint, clientIdRef.current, result as CanvasAgentSnapshot, token);
+            } else if (payload.name === "app_get_state") {
+                result = buildPageSnapshot(pageContextRef.current);
+            } else if (payload.name === "app_describe_actions") {
+                result = describeAgentActions(typeof input.ns === "string" && input.ns ? input.ns : undefined);
+            } else if (payload.name === "app_apply_ops") {
+                const applied = applyAgentOps(normalizeAgentOps(input.ops));
+                result = { applied: applied.applied, blocked: applied.blocked, errors: applied.errors, ...(applied.state ? { state: applied.state } : {}) };
+                if (applied.state) {
+                    const context = pageContextRef.current;
+                    void postState(endpoint, clientIdRef.current, context ? { page: context.page, title: context.title, state: applied.state, availableActions: getAgentActions() } : null, token);
+                }
             } else {
-                const snapshot = canvasContextRef.current?.snapshot;
-                if (!snapshot) throw new Error(i18n.t("agent.runtime.openCanvasFirst"));
-                result = snapshot;
+                result = buildPageSnapshot(pageContextRef.current);
             }
             await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, result }, token);
         } catch (error) {
@@ -126,7 +159,7 @@ export function AgentRuntime() {
             }
             connectedRef.current = true;
             setAgentState({ connected: true, activity: i18n.t("agent.runtime.connected"), connectError: "" });
-            void postState(endpoint, clientId, canvasContextRef.current?.snapshot || null, token);
+            void postState(endpoint, clientId, buildPageSnapshot(pageContextRef.current), token);
             if (document.visibilityState === "visible" && document.hasFocus()) void activateAgentClient(endpoint, clientId, token);
         });
         source.addEventListener("tool_call", (event) => {

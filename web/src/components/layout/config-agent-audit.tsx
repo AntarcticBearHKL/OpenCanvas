@@ -1,14 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Empty, Input, Switch } from "antd";
 import { Eraser, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { AGENT_BRIDGE_URL_DEFAULT, setAgentBridgeUrl, setAgentToken } from "@/constant/runtime-config";
-import { AGENT_OP_TYPES, describeAgentOp } from "@/lib/canvas/agent-permissions";
+import { getAgentActions, replayAgentEntry, subscribeAgentActions } from "@/lib/agent/action-registry";
+import { describeAgentOp } from "@/lib/agent/agent-permissions";
 import { useAgentAuditStore, type AgentAuditEntry } from "@/stores/use-agent-audit-store";
 import { useAgentStore } from "@/stores/use-agent-store";
 
 const RECENT_AUDIT_LIMIT = 20;
+
+function useAgentNamespaces() {
+    const [namespaces, setNamespaces] = useState(() => getAgentActions());
+    useEffect(() => subscribeAgentActions(() => setNamespaces(getAgentActions())), []);
+    return namespaces;
+}
 
 export function ConfigAgentAudit() {
     const { t } = useTranslation();
@@ -17,7 +24,7 @@ export function ConfigAgentAudit() {
     const setPermission = useAgentAuditStore((state) => state.setPermission);
     const resetPermissions = useAgentAuditStore((state) => state.resetPermissions);
     const clear = useAgentAuditStore((state) => state.clear);
-    const replayAgentEntry = useAgentStore((state) => state.canvasContext?.replayAgentEntry);
+    const namespaces = useAgentNamespaces();
 
     return (
         <div className="space-y-3">
@@ -34,10 +41,18 @@ export function ConfigAgentAudit() {
                     </Button>
                 </div>
                 <div className="divide-y divide-border dark:divide-border">
-                    {AGENT_OP_TYPES.map((type) => (
-                        <div key={type} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                            <span className="text-sm">{t(`config.agent.ops.${type}`)}</span>
-                            <Switch size="small" checked={permissions[type] !== false} onChange={(allowed) => setPermission(type, allowed)} />
+                    {namespaces.map((action) => (
+                        <div key={action.ns}>
+                            <div className="px-4 py-2 text-xs font-medium text-muted-foreground">{action.title}</div>
+                            {action.ops.map((type) => {
+                                const key = `${action.ns}:${type}`;
+                                return (
+                                    <div key={key} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                                        <span className="text-sm">{t(`config.agent.ops.${type}`, { defaultValue: key })}</span>
+                                        <Switch size="small" checked={permissions[key] !== false} onChange={(allowed) => setPermission(key, allowed)} />
+                                    </div>
+                                );
+                            })}
                         </div>
                     ))}
                 </div>
@@ -52,7 +67,7 @@ export function ConfigAgentAudit() {
                 {records.length ? (
                     <div className="divide-y divide-border dark:divide-border">
                         {records.slice(0, RECENT_AUDIT_LIMIT).map((record) => (
-                            <AuditRow key={record.id} record={record} replayAgentEntry={replayAgentEntry} />
+                            <AuditRow key={record.id} record={record} />
                         ))}
                     </div>
                 ) : (
@@ -114,7 +129,7 @@ function AgentBridgeSettings() {
     );
 }
 
-function AuditRow({ record, replayAgentEntry }: { record: AgentAuditEntry; replayAgentEntry?: (id: string) => boolean }) {
+function AuditRow({ record }: { record: AgentAuditEntry }) {
     const { t } = useTranslation();
     return (
         <div className="flex items-center justify-between gap-4 px-4 py-3">
@@ -127,7 +142,7 @@ function AuditRow({ record, replayAgentEntry }: { record: AgentAuditEntry; repla
                 <div className="mt-0.5 truncate text-xs text-muted-foreground">{new Date(record.at).toLocaleString()}</div>
                 <div className="mt-0.5 truncate text-xs text-muted-foreground">{record.ops.slice(0, 2).map(describeAgentOp).join(" · ")}</div>
             </div>
-            <Button size="small" type="text" icon={<RotateCcw className="size-3.5" />} disabled={!replayAgentEntry || !record.ops.length} onClick={() => replayAgentEntry?.(record.id)}>
+            <Button size="small" type="text" icon={<RotateCcw className="size-3.5" />} disabled={!record.ops.length} onClick={() => replayAgentEntry(record.id)}>
                 {t("config.agent.replay")}
             </Button>
         </div>

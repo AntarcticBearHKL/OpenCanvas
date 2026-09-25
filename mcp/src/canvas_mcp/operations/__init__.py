@@ -25,9 +25,9 @@ from canvas_mcp.operations.nodes import (
 from canvas_mcp.operations.shared import CanvasToolRequest
 from canvas_mcp.operations.transform import align_nodes
 from canvas_mcp.operations.view import connect_nodes, select_nodes, set_viewport
-from canvas_mcp.types import CanvasSnapshot
+from canvas_mcp.types import AgentSnapshot
 
-CanvasToolHandler = Callable[[dict[str, Any], CanvasSnapshot | None], CanvasToolRequest]
+CanvasToolHandler = Callable[[dict[str, Any], AgentSnapshot | None], CanvasToolRequest]
 
 HANDLERS: dict[str, CanvasToolHandler] = {
     "canvas_create_node": create_node,
@@ -56,10 +56,8 @@ HANDLERS: dict[str, CanvasToolHandler] = {
 }
 
 
-def build_canvas_tool_request(name: str, input_data: dict[str, Any], state: CanvasSnapshot | None) -> CanvasToolRequest:
-    """Convert an upper-level tool call into a front-end ``canvas_apply_ops`` request."""
-    if name == "canvas_apply_ops":
-        return {"name": name, "input": input_data}
+def build_canvas_tool_request(name: str, input_data: dict[str, Any], state: AgentSnapshot | None) -> CanvasToolRequest:
+    """Convert an upper-level tool call into a front-end ``app_apply_ops`` request."""
     handler = HANDLERS.get(name)
     if handler:
         return handler(input_data, state)

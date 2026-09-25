@@ -1,5 +1,5 @@
 import i18n from "@/i18n";
-import type { CanvasAgentSnapshot } from "@/lib/canvas/canvas-agent-ops";
+import type { AgentPageSnapshot } from "@/lib/agent/agent-ops";
 
 class AgentApiError<T = unknown> extends Error {
     constructor(readonly status: number, readonly response: T & { code?: string; error?: string; msg?: string }) {
@@ -14,12 +14,12 @@ function agentHeaders(token: string, headers?: Record<string, string>) {
     return next;
 }
 
-export async function postState(endpoint: string, clientId: string, snapshot: CanvasAgentSnapshot | null, token = "") {
+export async function postState(endpoint: string, clientId: string, snapshot: AgentPageSnapshot | null, token = "") {
     try {
         const response = await fetch(`${endpoint}/canvas/state?clientId=${encodeURIComponent(clientId)}`, {
             method: "POST",
             headers: agentHeaders(token, { "content-type": "application/json" }),
-            body: JSON.stringify(snapshot ? { ...snapshot, hasCanvas: true } : { hasCanvas: false }),
+            body: JSON.stringify(snapshot ?? { hasCanvas: false }),
         });
         return response.ok;
     } catch {

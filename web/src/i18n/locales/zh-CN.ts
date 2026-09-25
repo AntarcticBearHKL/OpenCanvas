@@ -380,6 +380,7 @@ export default {
             window: "窗口",
             reset: "重置面板布局",
             resize: "拖动调整面板区域大小",
+            resizeSplit: "拖动调整上下分组高度",
             more: "全部面板",
         },
         ps: {
@@ -1040,10 +1041,12 @@ export default {
             delete: "删除服务商",
             deleteConfirm: "删除该服务商？",
             modelCount: "{{count}} 个模型",
+            models: "模型列表",
+            noModels: "暂无模型",
         },
         models: {
             title: "模型",
-            description: "按能力汇总各服务商的模型，并为每种能力指定默认模型。",
+            description: "为每种能力指定默认模型；模型列表在服务商卡片中维护。",
             defaultModel: "默认模型",
             empty: "暂无该能力的模型",
             provider: "服务商",
@@ -1065,6 +1068,7 @@ export default {
     },
     agent: {
         state: { ready: "就绪", requestFailed: "本地 Agent 请求失败" },
+        namespace: { canvas: { title: "画布", description: "在当前画布上增删改节点、连线、选区、视口，并可触发节点生成。" }, image: { title: "图像工作台", description: "在当前智能画板里增删改和变换图层、调整文档尺寸与画板设置，并可触发滤镜、合成与导出。" }, audio: { title: "音频工作台", description: "在音频工作台中管理轨道、片段、MIDI、混音、标记、自动化与工程设置，并可触发混音导出与分轨导出。" }, config: { title: "配置", description: "读取和修改 AI 渠道、模型与生成参数；密钥默认脱敏，仅在显式授权后由 reveal_key 返回原始值。" } },
         siteTools: { canvasList: "画布列表", generationStatus: "生成任务状态", imageConfig: "生图配置", imageGenerate: "生图工作台生成", videoConfig: "视频配置", videoGenerate: "视频创作台生成", unknownTool: "未知工具：{{name}}", canvasLoading: "画布还在加载中，请稍后重试", canvasHint: "用 site_navigate 跳转 /canvas/{id} 打开对应画布", imageGenerationStarted: "已跳转生图工作台并触发生成，可用 generation_get_status 查询任务", imageConfigApplied: "已跳转生图工作台并填入参数，未触发生成", videoGenerationStarted: "已跳转视频创作台并触发生成，可用 generation_get_status 查询任务", videoConfigApplied: "已跳转视频创作台并填入参数，未触发生成" },
         runtime: { agentOutdated: "本地 Agent 版本过旧，请重启 Canvas Agent 后重新连接", restartRequired: "需要重启 Agent", connected: "已连接", connectionLostDescription: "本地 Agent 连接失败或已断开", connectionFailedDescription: "连接失败，请检查地址和 token", connectionLost: "连接断开", connectionFailed: "连接失败", toolExecutionFailed: "工具执行失败", openCanvasFirst: "当前不在画布页，请先用 site_navigate 打开画布", canvasOperationFailed: "画布操作失败",
         },

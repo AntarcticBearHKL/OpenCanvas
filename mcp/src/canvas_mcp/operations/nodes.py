@@ -7,14 +7,14 @@ from typing import Any
 
 from canvas_mcp.operations.shared import apply_ops, find_node, omit_none, text_node_op
 from canvas_mcp.tools import next_canvas_x
-from canvas_mcp.types import CanvasSnapshot
+from canvas_mcp.types import AgentSnapshot
 
 
 def _number(value: Any, fallback: float) -> float:
     return fallback if value is None else float(value)
 
 
-def create_node(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dict[str, Any]:
+def create_node(input_data: dict[str, Any], state: AgentSnapshot | None) -> dict[str, Any]:
     return apply_ops(
         [
             omit_none(
@@ -35,13 +35,13 @@ def create_node(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dic
     )
 
 
-def create_text_node(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dict[str, Any]:
+def create_text_node(input_data: dict[str, Any], state: AgentSnapshot | None) -> dict[str, Any]:
     x = _number(input_data.get("x"), next_canvas_x(state))
     y = _number(input_data.get("y"), 0)
     return apply_ops([text_node_op(input_data, x, y)])
 
 
-def create_text_nodes(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dict[str, Any]:
+def create_text_nodes(input_data: dict[str, Any], state: AgentSnapshot | None) -> dict[str, Any]:
     x = _number(input_data.get("x"), next_canvas_x(state))
     y = _number(input_data.get("y"), 0)
     gap = _number(input_data.get("gap"), 40)
@@ -54,7 +54,7 @@ def create_text_nodes(input_data: dict[str, Any], state: CanvasSnapshot | None) 
     return apply_ops(ops)
 
 
-def update_node(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> dict[str, Any]:
+def update_node(input_data: dict[str, Any], _state: AgentSnapshot | None) -> dict[str, Any]:
     return apply_ops(
         [
             omit_none(
@@ -69,14 +69,14 @@ def update_node(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> di
     )
 
 
-def update_node_text(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> dict[str, Any]:
+def update_node_text(input_data: dict[str, Any], _state: AgentSnapshot | None) -> dict[str, Any]:
     patch = {"title": input_data["title"]} if input_data.get("title") else {}
     return apply_ops(
         [{"type": "update_node", "id": input_data["id"], "patch": patch, "metadata": {"content": input_data["text"], "status": "success"}}]
     )
 
 
-def move_nodes(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dict[str, Any]:
+def move_nodes(input_data: dict[str, Any], state: AgentSnapshot | None) -> dict[str, Any]:
     ops = []
     for item in input_data["items"]:
         current = find_node(state, item["id"])
@@ -87,7 +87,7 @@ def move_nodes(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dict
     return apply_ops(ops)
 
 
-def resize_node(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> dict[str, Any]:
+def resize_node(input_data: dict[str, Any], _state: AgentSnapshot | None) -> dict[str, Any]:
     free_resize = input_data.get("freeResize")
     metadata = {"freeResize": free_resize} if free_resize is not None else None
     return apply_ops(
@@ -104,7 +104,7 @@ def resize_node(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> di
     )
 
 
-def set_node_flags(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> dict[str, Any]:
+def set_node_flags(input_data: dict[str, Any], _state: AgentSnapshot | None) -> dict[str, Any]:
     metadata: dict[str, Any] = {}
     if input_data.get("locked") is not None:
         metadata["locked"] = input_data["locked"]
@@ -115,7 +115,7 @@ def set_node_flags(input_data: dict[str, Any], _state: CanvasSnapshot | None) ->
     return apply_ops([{"type": "update_node", "id": node_id, "metadata": metadata} for node_id in input_data["ids"]])
 
 
-def bulk_rename(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> dict[str, Any]:
+def bulk_rename(input_data: dict[str, Any], _state: AgentSnapshot | None) -> dict[str, Any]:
     title = str(input_data["title"]).strip()
     if not title:
         return apply_ops([])
@@ -127,7 +127,7 @@ def bulk_rename(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> di
     return apply_ops(patches)
 
 
-def duplicate_node(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dict[str, Any]:
+def duplicate_node(input_data: dict[str, Any], state: AgentSnapshot | None) -> dict[str, Any]:
     source = find_node(state, input_data["id"])
     if not source:
         return apply_ops([])
@@ -153,5 +153,5 @@ def duplicate_node(input_data: dict[str, Any], state: CanvasSnapshot | None) -> 
     )
 
 
-def delete_nodes(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> dict[str, Any]:
+def delete_nodes(input_data: dict[str, Any], _state: AgentSnapshot | None) -> dict[str, Any]:
     return apply_ops([{"type": "delete_node", "ids": input_data["ids"]}])

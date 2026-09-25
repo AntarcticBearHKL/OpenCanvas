@@ -4,10 +4,18 @@ import { Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { nanoid } from "nanoid";
 
-import { PROVIDER_PRESETS } from "@/lib/provider-presets";
-import { decodeChannelModel, OPENROUTER_BASE_URL, useConfigStore, type ModelChannel } from "@/stores/use-config-store";
+import { isTextOnlyBaseUrl, PROVIDER_PRESETS } from "@/lib/provider-presets";
+import { decodeChannelModel, OPENROUTER_BASE_URL, useConfigStore, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 
-const MODEL_FIELDS = ["textModel", "imageModel", "audioModel", "speechModel", "videoModel"] as const;
+const CAPABILITIES: ModelCapability[] = ["text", "image", "audio", "speech", "video"];
+
+const MODEL_FIELDS: { capability: ModelCapability; field: "textModel" | "imageModel" | "audioModel" | "speechModel" | "videoModel" }[] = [
+    { capability: "text", field: "textModel" },
+    { capability: "image", field: "imageModel" },
+    { capability: "audio", field: "audioModel" },
+    { capability: "speech", field: "speechModel" },
+    { capability: "video", field: "videoModel" },
+];
 
 export function ConfigProviders() {
     const { t } = useTranslation();
@@ -17,11 +25,17 @@ export function ConfigProviders() {
     const [activeKeys, setActiveKeys] = useState<string[]>(() => (channels[0] ? [channels[0].id] : []));
     const [confirmId, setConfirmId] = useState<string | null>(null);
 
-    const commit = (next: ModelChannel[]) => updateConfig("channels", next);
+    const commit = (next: ModelChannel[]) => {
+        updateConfig("channels", next);
+        for (const { capability, field } of MODEL_FIELDS) {
+            const decoded = decodeChannelModel(config[field]);
+            const channel = decoded && next.find((item) => item.id === decoded.channelId);
+            if (decoded && !channel?.models.some((model) => model.name === decoded.model && model.capability === capability)) updateConfig(field, "");
+        }
+    };
     const patch = (id: string, value: Partial<ModelChannel>) => commit(channels.map((channel) => (channel.id === id ? { ...channel, ...value } : channel)));
     const remove = (id: string) => {
         commit(channels.filter((channel) => channel.id !== id));
-        for (const field of MODEL_FIELDS) if (decodeChannelModel(config[field])?.channelId === id) updateConfig(field, "");
         setConfirmId(null);
     };
     const add = () => {
@@ -29,6 +43,19 @@ export function ConfigProviders() {
         commit([...channels, { id, name: t("config.channels.newName"), baseUrl: OPENROUTER_BASE_URL, apiKey: "", apiFormat: "openai", models: [] }]);
         setActiveKeys((keys) => [...keys, id]);
     };
+    const addModel = (channelId: string, name: string, capability: ModelCapability) => {
+        const value = name.trim();
+        if (!value) return;
+        commit(
+            channels.map((channel) => {
+                if (channel.id !== channelId || channel.models.some((model) => model.name === value)) return channel;
+                return { ...channel, models: [...channel.models, { name: value, capability: isTextOnlyBaseUrl(channel.baseUrl) ? "text" : capability }] };
+            }),
+        );
+    };
+    const removeModel = (channelId: string, name: string) => commit(channels.map((channel) => (channel.id === channelId ? { ...channel, models: channel.models.filter((model) => model.name !== name) } : channel)));
+    const changeCapability = (channelId: string, name: string, capability: ModelCapability) =>
+        commit(channels.map((channel) => (channel.id === channelId ? { ...channel, models: channel.models.map((model) => (model.name === name ? { ...model, capability } : model)) } : channel)));
 
     return (
         <div className="space-y-3">
@@ -94,10 +121,67 @@ export function ConfigProviders() {
                                     <Input.Password value={channel.apiKey} onChange={(event) => patch(channel.id, { apiKey: event.target.value })} placeholder="sk-..." />
                                 </Form.Item>
                             </div>
+                            <div className="mt-4">
+                                <div className="mb-2 text-sm">{t("config.providers.models")}</div>
+                                <div className="space-y-2">
+                                    {channel.models.map((model) => (
+                                        <div key={model.name} className="flex items-center gap-2">
+                                            <span className="min-w-0 flex-1 truncate text-sm" title={model.name}>
+                                                {model.name}
+                                            </span>
+                                            {isTextOnlyBaseUrl(channel.baseUrl) ? (
+                                                <span className="w-28 shrink-0 text-sm text-muted-foreground">{t("settingsPanels.model.capabilities.text")}</span>
+                                            ) : (
+                                                <Select
+                                                    size="small"
+                                                    className="w-28 shrink-0"
+                                                    value={model.capability}
+                                                    aria-label={t("config.models.capability")}
+                                                    onChange={(next) => changeCapability(channel.id, model.name, next)}
+                                                    options={CAPABILITIES.map((item) => ({ value: item, label: t(`settingsPanels.model.capabilities.${item}`) }))}
+                                                />
+                                            )}
+                                            <Button size="small" type="text" danger icon={<Trash2 className="size-4" />} onClick={() => removeModel(channel.id, model.name)} aria-label={t("config.models.remove")} />
+                                        </div>
+                                    ))}
+                                    {channel.models.length ? null : <div className="text-sm text-muted-foreground">{t("config.providers.noModels")}</div>}
+                                    <AddModelRow channel={channel} onAdd={addModel} />
+                                </div>
+                            </div>
                         </Form>
                     ),
                 }))}
             />
+        </div>
+    );
+}
+
+function AddModelRow({ channel, onAdd }: { channel: ModelChannel; onAdd: (channelId: string, name: string, capability: ModelCapability) => void }) {
+    const { t } = useTranslation();
+    const [name, setName] = useState("");
+    const [capability, setCapability] = useState<ModelCapability>("text");
+    const submit = () => {
+        if (!name.trim()) return;
+        onAdd(channel.id, name, capability);
+        setName("");
+    };
+
+    return (
+        <div className="flex flex-wrap items-center gap-2">
+            <Input size="small" className="w-56" value={name} onChange={(event) => setName(event.target.value)} onPressEnter={submit} placeholder={t("config.models.modelId")} />
+            {isTextOnlyBaseUrl(channel.baseUrl) ? null : (
+                <Select
+                    size="small"
+                    className="w-28 shrink-0"
+                    value={capability}
+                    aria-label={t("config.models.capability")}
+                    onChange={setCapability}
+                    options={CAPABILITIES.map((item) => ({ value: item, label: t(`settingsPanels.model.capabilities.${item}`) }))}
+                />
+            )}
+            <Button size="small" type="primary" icon={<Plus className="size-3.5" />} onClick={submit} disabled={!name.trim()}>
+                {t("config.models.addModel")}
+            </Button>
         </div>
     );
 }

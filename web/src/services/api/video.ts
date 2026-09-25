@@ -7,7 +7,7 @@ import { clampVideoSeconds, computeVideoSize, inferVideoRatio } from "@/lib/medi
 import { isOpenRouterVideoModel, supportedVideoResolution, videoModelCapability, videoModelDuration, VIDEO_REFERENCE_SECONDS_MAX, VIDEO_REFERENCE_SECONDS_MIN, type VideoFrameReference, type VideoModelCapability } from "@/lib/video-generation";
 import { getMediaBlob, resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
-import { boolConfig, buildApiUrl, modelOptionName, resolveModelRequestConfig, resolveModelScript, type AiConfig } from "@/stores/use-config-store";
+import { boolConfig, buildApiUrl, modelOptionName, resolveModelRequestConfig, resolveModelScript, type AiConfig, type ModelRequestConfig } from "@/stores/use-config-store";
 import { runModelPlugin } from "./model-plugin";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
@@ -36,11 +36,11 @@ const pluginVideoResults = new Map<string, VideoGenerationResult>();
 /** OpenRouter returns a per-job polling URL; keep it until the job reaches a terminal state. */
 const openRouterVideoPollUrls = new Map<string, string>();
 
-function aiApiUrl(config: AiConfig, path: string) {
+function aiApiUrl(config: ModelRequestConfig, path: string) {
     return buildApiUrl(config.baseUrl, path);
 }
 
-function aiHeaders(config: AiConfig, contentType?: string) {
+function aiHeaders(config: ModelRequestConfig, contentType?: string) {
     return {
         Authorization: `Bearer ${config.apiKey}`,
         ...(contentType ? { "Content-Type": contentType } : {}),
@@ -94,7 +94,7 @@ async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTa
     return pollOpenAIVideoTask(requestConfig, task, options);
 }
 
-async function createPluginVideoTask(config: AiConfig, model: string, script: string, prompt: string, references: ReferenceImage[], options?: VideoMediaOptions): Promise<VideoGenerationTask> {
+async function createPluginVideoTask(config: ModelRequestConfig, model: string, script: string, prompt: string, references: ReferenceImage[], options?: VideoMediaOptions): Promise<VideoGenerationTask> {
     if (!config.baseUrl.trim()) throw new Error(apiText("baseUrlRequired"));
     if (!config.apiKey.trim()) throw new Error(apiText("apiKeyRequired"));
     const refs = await Promise.all(references.map((image) => imageToDataUrl(image)));
@@ -150,7 +150,7 @@ export async function storeGeneratedVideo(result: VideoGenerationResult): Promis
     throw new Error(apiText("noPlayableVideo"));
 }
 
-async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: VideoMediaOptions): Promise<VideoGenerationTask> {
+async function createOpenAIVideoTask(config: ModelRequestConfig, model: string, prompt: string, references: ReferenceImage[], options?: VideoMediaOptions): Promise<VideoGenerationTask> {
     const images = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     const videos = await Promise.all((options?.videos || []).map((video) => referenceMediaToFile(video, "ref.mp4", "invalidReferenceVideo", options)));
     const audios = await Promise.all((options?.audios || []).map((audio) => referenceMediaToFile(audio, "ref.mp3", "invalidReferenceAudio", options)));
@@ -181,7 +181,7 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
     }
 }
 
-async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
+async function pollOpenAIVideoTask(config: ModelRequestConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     try {
         const video = unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiApiUrl(config, `/videos/${task.id}`), { headers: aiHeaders(config), signal: options?.signal })).data);
         const url = videoResultUrl(video);
@@ -209,7 +209,7 @@ async function videoResultFromUrl(url: string, options?: RequestOptions): Promis
     }
 }
 
-async function createOpenRouterVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: VideoMediaOptions): Promise<VideoGenerationTask> {
+async function createOpenRouterVideoTask(config: ModelRequestConfig, model: string, prompt: string, references: ReferenceImage[], options?: VideoMediaOptions): Promise<VideoGenerationTask> {
     assertVideoConfig(config, config.model);
     const capability = videoModelCapability(config.model);
     const images = await Promise.all(references.map((image) => imageToDataUrl(image)));
@@ -310,7 +310,7 @@ function blobToDataUrl(blob: Blob, errorKey: "invalidReferenceVideo" | "invalidR
     });
 }
 
-async function pollOpenRouterVideoTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
+async function pollOpenRouterVideoTask(config: ModelRequestConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     try {
         const video = (await axios.get<OpenRouterVideoPollResponse>(openRouterVideoPollUrl(config, task.id), { headers: aiHeaders(config), signal: options?.signal })).data;
         if (video.status === "completed") {
@@ -327,7 +327,7 @@ async function pollOpenRouterVideoTask(config: AiConfig, task: VideoGenerationTa
     }
 }
 
-async function downloadOpenRouterVideo(config: AiConfig, id: string, fallbackUrl: string | undefined, cost: number | undefined, options?: RequestOptions): Promise<VideoGenerationResult> {
+async function downloadOpenRouterVideo(config: ModelRequestConfig, id: string, fallbackUrl: string | undefined, cost: number | undefined, options?: RequestOptions): Promise<VideoGenerationResult> {
     const result: VideoGenerationResult = {};
     if (Number.isFinite(cost)) result.cost = cost;
     let content: Blob;
@@ -342,14 +342,14 @@ async function downloadOpenRouterVideo(config: AiConfig, id: string, fallbackUrl
     return { ...result, blob: content, mimeType: content.type || "video/mp4" };
 }
 
-function openRouterVideoPollUrl(config: AiConfig, id: string) {
+function openRouterVideoPollUrl(config: ModelRequestConfig, id: string) {
     const pollingUrl = openRouterVideoPollUrls.get(id);
     if (!pollingUrl) return aiApiUrl(config, `/videos/${id}`);
     if (/^https?:\/\//i.test(pollingUrl)) return pollingUrl;
     return new URL(pollingUrl, aiApiUrl(config, "/")).toString();
 }
 
-function assertVideoConfig(config: AiConfig, model: string) {
+function assertVideoConfig(config: ModelRequestConfig, model: string) {
     if (!model) throw new Error(apiText("videoModelRequired"));
     if (!config.baseUrl.trim()) throw new Error(apiText("baseUrlRequired"));
     if (!config.apiKey.trim()) throw new Error(apiText("apiKeyRequired"));

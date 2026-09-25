@@ -2,15 +2,15 @@ import { create } from "zustand";
 import i18n from "@/i18n";
 import { AGENT_BRIDGE_URL, AGENT_TOKEN } from "@/constant/runtime-config";
 
-import type { CanvasAgentOp, CanvasAgentSnapshot } from "@/lib/canvas/canvas-agent-ops";
+import type { AgentOp } from "@/lib/agent/agent-ops";
 
-export type AgentPendingToolCall = { requestId: string; name: string; input?: { ops?: CanvasAgentOp[]; path?: string } & Record<string, unknown> };
-export type AgentCanvasContext = { snapshot: CanvasAgentSnapshot; applyOps: (ops?: CanvasAgentOp[]) => CanvasAgentSnapshot; undoOps: () => CanvasAgentSnapshot | null; canUndo: boolean; replayAgentEntry: (id: string) => boolean };
+export type AgentPendingToolCall = { requestId: string; name: string; input?: { ops?: AgentOp[]; path?: string; ns?: string } & Record<string, unknown> };
+export type AgentPageContext = { page: string; title: string; state: Record<string, unknown> };
 
-type AgentStorePatch = Partial<Omit<AgentStore, "setAgentState" | "setCanvasContext">>;
+type AgentStorePatch = Partial<Omit<AgentStore, "setAgentState" | "setPageContext">>;
 
 type AgentStore = {
-    canvasContext: AgentCanvasContext | null;
+    pageContext: AgentPageContext | null;
     url: string;
     token: string;
     connected: boolean;
@@ -18,11 +18,11 @@ type AgentStore = {
     activity: string;
     connectError: string;
     setAgentState: (patch: AgentStorePatch) => void;
-    setCanvasContext: (context: AgentCanvasContext | null) => void;
+    setPageContext: (context: AgentPageContext | null) => void;
 };
 
 export const useAgentStore = create<AgentStore>((set) => ({
-    canvasContext: null,
+    pageContext: null,
     url: typeof window === "undefined" ? "" : AGENT_BRIDGE_URL,
     token: typeof window === "undefined" ? "" : AGENT_TOKEN,
     connected: false,
@@ -30,5 +30,5 @@ export const useAgentStore = create<AgentStore>((set) => ({
     activity: i18n.t("agent.state.ready"),
     connectError: "",
     setAgentState: (patch) => set(patch),
-    setCanvasContext: (canvasContext) => set({ canvasContext }),
+    setPageContext: (pageContext) => set({ pageContext }),
 }));

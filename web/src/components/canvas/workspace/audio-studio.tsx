@@ -16,6 +16,10 @@ import AudioPianoRoll from "@/components/canvas/workspace/audio-piano-roll";
 import PsColorPicker from "@/components/canvas/workspace/ps-color-picker";
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
+import i18n from "@/i18n";
+import { registerAgentNamespace } from "@/lib/agent/action-registry";
+import type { AgentOp } from "@/lib/agent/agent-ops";
+import { applyAudioAgentOps, AUDIO_AGENT_EXPORT_TYPES, AUDIO_AGENT_OP_TYPES, AUDIO_AGENT_SCHEMA, duplicateAudioTrack, type AudioAgentOp } from "@/lib/canvas/audio-agent-ops";
 import { AUDIO_AUTOMATION_GAIN, AUDIO_AUTOMATION_PAN, audioAutomationSendTarget, automationLanesForTrack, automationOwns, automationValueRange, createAudioAutomationLane, findAutomationLane, pruneAutomation } from "@/lib/canvas/audio-automation";
 import { applyOverlap, AUDIO_MIN_CLIP_SECONDS, clipEnd, clipsIntersecting, crossfadeClip, duplicateClip, glueClip, moveClip, moveClipsToTrack, patchClip, setClipFade, shiftClips, splitClip, trimClipIn, trimClipOut } from "@/lib/canvas/audio-clip-ops";
 import { applyAudioGraphMix, applyLiveTrackMix, buildAudioGraph, connectAudioGraphMonitor, liveAutomationValue, loadAudioGraphBuffers, type AudioGraph } from "@/lib/canvas/audio-graph";
@@ -25,6 +29,7 @@ import { cutRecordedTake, startAudioRecording, type AudioRecordSession } from "@
 import { AUDIO_DEFAULT_PX_PER_SECOND, barSeconds, beatSeconds, chooseGridStep, chooseSnapStep, clampPxPerSecond, formatBarsBeats, secondsToPosition, snapSeconds } from "@/lib/canvas/audio-timeline";
 import { formatAudioTime, getCachedAudioPeaks, loadAudioPeaks, peakBucketIndex, selectPeakBand, type AudioPeaks } from "@/lib/canvas/audio-waveform";
 import { type CanvasTheme } from "@/lib/canvas-theme";
+import { useAgentStore } from "@/stores/use-agent-store";
 import { STUDIO_BAR_CLASS, STUDIO_DIVIDER_CLASS, STUDIO_ICON_BUTTON_CLASS, STUDIO_LIST_ROW_CLASS, STUDIO_OPTIONS_CLASS, STUDIO_TOOL_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import {
     CanvasNodeType,
@@ -266,6 +271,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     const trackWidthRef = useRef(trackWidth);
     const viewportRef = useRef(viewport);
     const shortcutsRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
+    const audioAgentApplyRef = useRef<(ops: AgentOp[]) => Record<string, unknown> | void>(() => undefined);
     ppsRef.current = pxPerSecond;
     trackWidthRef.current = trackWidth;
     viewportRef.current = viewport;
@@ -302,24 +308,26 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
         [t, tracks],
     );
 
+    // The master bus is mixer-only: its arrangement lane can never host a clip or a MIDI region.
+    const laneTracks = useMemo(() => tracks.filter((track) => audioTrackType(track) !== "master"), [tracks]);
     const laneBlocks = useMemo(() => {
         let top = RULER_HEIGHT;
-        return tracks.map((track) => {
+        return laneTracks.map((track) => {
             const lanes = track.collapsed ? 0 : automationLanesForTrack(automation, track.id).length;
             const block = { top, height: LANE_HEIGHT + lanes * AUTOMATION_LANE_HEIGHT };
             top += block.height;
             return block;
         });
-    }, [tracks, automation]);
+    }, [laneTracks, automation]);
     const lanesHeight = laneBlocks.reduce((total, block) => total + block.height, 0);
     const laneWindow = { from: viewport.top - LANE_OVERSCAN_PX, to: viewport.top + viewport.height + LANE_OVERSCAN_PX };
     const laneView = { from: Math.max(0, viewport.left - trackWidth), to: Math.max(0, viewport.left + viewport.width - trackWidth) };
     const trackAtY = useCallback(
         (y: number) => {
             const index = laneBlocks.findIndex((block) => y >= block.top && y < block.top + block.height);
-            return tracks[index] ?? null;
+            return laneTracks[index] ?? null;
         },
-        [laneBlocks, tracks],
+        [laneBlocks, laneTracks],
     );
 
     const patchMetadata = useCallback(
@@ -336,6 +344,41 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
         },
         [autoCrossfade, patchMetadata],
     );
+
+    // `audio` namespace: pure metadata math from audio-agent-ops, applied through the studio's own commit paths
+    // (`commitClips` runs `applyOverlap`, `patchMetadata` merges the rest) and fire-and-forget exports.
+    audioAgentApplyRef.current = (agentOps) => {
+        if (!project) return;
+        const audioOps = agentOps.map(({ ns, ...op }) => op as AudioAgentOp);
+        const patch = applyAudioAgentOps(project, audioOps);
+        const { audioClips, ...rest } = patch;
+        if (audioClips) commitClips(audioClips);
+        if (Object.keys(rest).length) patchMetadata(rest);
+        audioOps
+            .filter((op) => AUDIO_AGENT_EXPORT_TYPES.includes(op.type))
+            .forEach((op) => {
+                if (op.type === "audio.export.mixdown") void onOutput(project);
+                if (op.type === "audio.export.stems") void onExportStems(project);
+            });
+        const metadata = { ...project.metadata, ...rest, ...(audioClips ? { audioClips: autoCrossfade ? applyOverlap(audioClips) : audioClips } : {}) };
+        return {
+            ...(useAgentStore.getState().pageContext?.state ?? {}),
+            workspace: "audio",
+            nodes: nodes.map((node) => (node.id === project.id ? { ...node, metadata } : node)),
+        };
+    };
+
+    useEffect(() => {
+        const unregister = registerAgentNamespace({
+            ns: "audio",
+            title: i18n.t("agent.namespace.audio.title"),
+            description: i18n.t("agent.namespace.audio.description"),
+            ops: AUDIO_AGENT_OP_TYPES,
+            schema: AUDIO_AGENT_SCHEMA,
+            applyOps: (ops) => audioAgentApplyRef.current(ops),
+        });
+        return unregister;
+    }, []);
 
     useEffect(() => {
         setPlaying(false);
@@ -917,9 +960,9 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
         }
         const firstTrack = trackAtY(Math.min(gesture.y0, gesture.y1));
         const lastTrack = trackAtY(Math.max(gesture.y0, gesture.y1));
-        const fromIndex = firstTrack ? Math.max(0, tracks.indexOf(firstTrack)) : 0;
-        const toIndex = lastTrack ? tracks.indexOf(lastTrack) : tracks.length - 1;
-        const trackIds = tracks.slice(fromIndex, toIndex + 1).map((track) => track.id);
+        const fromIndex = firstTrack ? Math.max(0, laneTracks.indexOf(firstTrack)) : 0;
+        const toIndex = lastTrack ? laneTracks.indexOf(lastTrack) : laneTracks.length - 1;
+        const trackIds = laneTracks.slice(fromIndex, toIndex + 1).map((track) => track.id);
         const hits = clipsIntersecting(clips, trackIds, from, to).map((clip) => clip.id);
         setSelectedClipIds((prev) => (event.shiftKey ? Array.from(new Set([...prev, ...hits])) : event.altKey ? prev.filter((id) => !hits.includes(id)) : hits));
     };
@@ -1005,8 +1048,8 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
             gesture.moved = gesture.moved || Math.abs(start - gesture.startStart) > 0.0001 || trackId !== gesture.trackId;
             if (!gesture.moved) return;
             gesture.next = moveClip(gesture.startClips, gesture.clipId, start, trackId);
-            const from = tracks.findIndex((track) => track.id === gesture.trackId);
-            const to = tracks.findIndex((track) => track.id === trackId);
+            const from = laneTracks.findIndex((track) => track.id === gesture.trackId);
+            const to = laneTracks.findIndex((track) => track.id === trackId);
             const rows = from >= 0 && to >= 0 ? laneBlocks[to].top - laneBlocks[from].top : event.clientY - gesture.startClientY;
             paintDragPreview(gesture.preview, { transform: `translate(${(start - gesture.startStart) * pxPerSecond}px, ${rows}px)` });
             return;
@@ -1153,8 +1196,8 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
             gesture.moved = gesture.moved || startTicks !== gesture.startStartTicks || trackId !== gesture.trackId;
             if (!gesture.moved) return;
             gesture.next = moveRegion(gesture.startRegions, gesture.regionId, startTicks, trackId);
-            const from = tracks.findIndex((track) => track.id === gesture.trackId);
-            const to = tracks.findIndex((track) => track.id === trackId);
+            const from = laneTracks.findIndex((track) => track.id === gesture.trackId);
+            const to = laneTracks.findIndex((track) => track.id === trackId);
             const rows = from >= 0 && to >= 0 ? laneBlocks[to].top - laneBlocks[from].top : event.clientY - gesture.startClientY;
             paintDragPreview(gesture.element, { transform: `translate(${(ticksToSeconds(startTicks, ppqn, tempo) - startSeconds) * pxPerSecond}px, ${rows}px)` });
             return;
@@ -1202,17 +1245,8 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     };
 
     const duplicateTrack = (trackId: string) => {
-        const source = tracks.find((track) => track.id === trackId);
-        if (!source || audioTrackType(source) === "master") return;
-        const id = nanoid();
-        const index = tracks.findIndex((track) => track.id === trackId) + 1;
-        const next = [...tracks];
-        next.splice(index, 0, { ...source, id, name: source.name ? `${source.name} 2` : trackPlaceholder(source) });
-        patchMetadata({
-            audioTracks: next,
-            audioClips: [...projectClips, ...audioTrackClips(projectClips, trackId).map((clip) => ({ ...clip, id: nanoid(), trackId: id }))],
-            audioMidiRegions: [...projectMidi, ...audioTrackRegions(projectMidi, trackId).map((region) => ({ ...duplicateRegion(region), trackId: id }))],
-        });
+        const next = duplicateAudioTrack(tracks, projectClips, projectMidi, trackId, trackPlaceholder);
+        if (next) patchMetadata(next);
     };
 
     const removeTrack = (trackId: string) => {
@@ -2184,6 +2218,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                 onActivate={dock.activate}
                 onMove={dock.move}
                 onResize={dock.resize}
+                onSplit={dock.split}
                 rowClassName="flex-col md:flex-row"
                 edgeClassName={{ left: "hidden lg:flex", bottom: "hidden lg:flex", right: dockOverlay ? "absolute inset-y-0 right-0 z-40 flex outline-none max-md:!hidden md:flex lg:static lg:z-auto glass-raised" : "hidden outline-none lg:flex" }}
                 edgeProps={{ right: { ref: overlayDockRef, tabIndex: -1, onKeyDown: trapDockFocus, "aria-label": t("canvas.audioStudio.dockInspector") } }}
@@ -2330,7 +2365,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                     </div>
                                 </AudioRulerContextMenu>
                             </div>
-                            {tracks.map((track, index) => {
+                            {laneTracks.map((track, index) => {
                                 const trackLanes = automationLanesForTrack(automation, track.id);
                                 const gainAutomated = automationOwns(projectAutomation, track.id, AUDIO_AUTOMATION_GAIN);
                                 const trackRole = audioTrackType(track) === "audio" ? "" : t(AUDIO_TRACK_TYPE_LABEL_KEYS[audioTrackType(track)]);
@@ -2594,7 +2629,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                             <div ref={playheadLaneRef} className="pointer-events-none absolute bottom-0 z-10 w-px" style={{ top: RULER_HEIGHT, left: trackWidth, background: theme.node.accent }} />
                         </div>
                     </div>
-                    {view === "arrangement" && !tracks.length ? (
+                    {view === "arrangement" && !laneTracks.length ? (
                         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center">
                             <AudioLines className="size-7" style={{ color: theme.node.muted }} />
                             <span className="text-sm" style={{ color: theme.node.placeholder }}>
@@ -2606,7 +2641,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                             </button>
                         </div>
                     ) : null}
-                    {view === "arrangement" && tracks.length && !hasContent ? (
+                    {view === "arrangement" && laneTracks.length && !hasContent ? (
                         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center">
                             <AudioLines className="size-6" style={{ color: theme.node.muted }} />
                             <span className="text-sm" style={{ color: theme.node.placeholder }}>

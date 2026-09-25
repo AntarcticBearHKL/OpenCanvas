@@ -9,12 +9,12 @@ from typing import Any
 
 from canvas_mcp.operations.shared import apply_ops, config_node_op, generation_mode, run_generation_op, text_node_op
 from canvas_mcp.tools import next_canvas_x
-from canvas_mcp.types import CanvasSnapshot
+from canvas_mcp.types import AgentSnapshot
 
 _MENTION = re.compile(r"@\[node:([\w-]+)\]", re.ASCII)
 
 
-def generation_flow_ops(input_data: dict[str, Any], state: CanvasSnapshot | None) -> list[Any]:
+def generation_flow_ops(input_data: dict[str, Any], state: AgentSnapshot | None) -> list[Any]:
     """Build the prompt node, config node, reference links and optional auto-run."""
     mode = generation_mode(input_data.get("mode"))
     prompt = str(input_data.get("prompt") or "")
@@ -50,11 +50,11 @@ def generation_flow_ops(input_data: dict[str, Any], state: CanvasSnapshot | None
     return ops
 
 
-def create_image_prompt_flow(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dict[str, Any]:
+def create_image_prompt_flow(input_data: dict[str, Any], state: AgentSnapshot | None) -> dict[str, Any]:
     return apply_ops(generation_flow_ops({**input_data, "mode": "image"}, state))
 
 
-def create_config_node(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dict[str, Any]:
+def create_config_node(input_data: dict[str, Any], state: AgentSnapshot | None) -> dict[str, Any]:
     x = next_canvas_x(state) if input_data.get("x") is None else float(input_data["x"])
     y = 0.0 if input_data.get("y") is None else float(input_data["y"])
     config_id = f"config-{uuid.uuid4()}"
@@ -66,16 +66,16 @@ def create_config_node(input_data: dict[str, Any], state: CanvasSnapshot | None)
     return apply_ops(ops)
 
 
-def create_generation_flow(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dict[str, Any]:
+def create_generation_flow(input_data: dict[str, Any], state: AgentSnapshot | None) -> dict[str, Any]:
     return apply_ops(generation_flow_ops(input_data, state))
 
 
-def auto_generate(mode: str) -> Callable[[dict[str, Any], CanvasSnapshot | None], dict[str, Any]]:
-    def handler(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dict[str, Any]:
+def auto_generate(mode: str) -> Callable[[dict[str, Any], AgentSnapshot | None], dict[str, Any]]:
+    def handler(input_data: dict[str, Any], state: AgentSnapshot | None) -> dict[str, Any]:
         return apply_ops(generation_flow_ops({**input_data, "mode": mode, "autoRun": True}, state))
 
     return handler
 
 
-def run_generation(input_data: dict[str, Any], _state: CanvasSnapshot | None) -> dict[str, Any]:
+def run_generation(input_data: dict[str, Any], _state: AgentSnapshot | None) -> dict[str, Any]:
     return apply_ops([run_generation_op(input_data["nodeId"], generation_mode(input_data.get("mode")), input_data.get("prompt"))])

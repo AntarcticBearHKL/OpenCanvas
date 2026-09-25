@@ -3,7 +3,9 @@
 OpenCanvas 独立 MCP 服务 + 浏览器桥接。它把网页画布暴露给任意 MCP 客户端（opencode、Claude 等），
 同时保留浏览器侧的 `AgentRuntime` 桥接协议：前端静态部署在 Cloudflare 上，MCP 与桥接在本机回环地址运行。
 
-这是 `web/server/**` 内嵌 TypeScript 服务的等价 Python 端口，对外提供完全相同的 30 个工具、端点与协议版本（6）。
+这是 `web/server/**` 内嵌 TypeScript 服务的等价 Python 端口，对外提供完全相同的 29 个工具、端点与协议版本（7）。
+
+通用工具（`app_get_state` / `app_describe_actions` / `app_apply_ops`）通过页面注册的动作命名空间驱动任意页面，当前有 `canvas`、`image`、`audio`、`config` 四个命名空间。其中 `config` 默认标记为 `danger` 且默认拒绝，需显式开启后才可用；其快照始终把密钥脱敏为 `{ hasKey, last4 }`，写入密钥与读取原始密钥需分别授权。
 
 ## 运行
 
@@ -29,8 +31,8 @@ uv run canvas-mcp
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| `POST/GET/DELETE` | `/mcp` | MCP Streamable HTTP，暴露 30 个工具。 |
-| `GET` | `/health` | `{ok, protocolVersion, hasCanvas, clients}`。 |
+| `POST/GET/DELETE` | `/mcp` | MCP Streamable HTTP，暴露 29 个工具。 |
+| `GET` | `/health` | `{ok, protocolVersion, hasPage, page, clients}`。 |
 | `GET` | `/config` | `{ok, protocolVersion, url, hasToken}`。 |
 | `GET` | `/events` | SSE 浏览器桥接：连接后发 `hello`，每 15s 发 `ping`，并转发 `tool_call`。 |
 | `POST` | `/canvas/state` | 浏览器上报画布快照。 |

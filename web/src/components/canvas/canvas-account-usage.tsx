@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { fetchOpenRouterKeyUsage } from "@/services/api/openrouter-account";
-import { useConfigStore } from "@/stores/use-config-store";
+import { resolveModelChannel, useConfigStore } from "@/stores/use-config-store";
 import { useGenerationCostStore } from "@/stores/use-generation-cost-store";
 
 const QUERY_KEY = "openrouter-key-usage";
@@ -14,7 +14,7 @@ const QUERY_KEY = "openrouter-key-usage";
 export function CanvasAccountUsage() {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
-    const apiKey = useConfigStore((state) => state.config.apiKey);
+    const apiKey = useConfigStore((state) => resolveModelChannel(state.config, state.config.model)?.apiKey.trim() || "");
     const queryClient = useQueryClient();
     const recordCount = useGenerationCostStore((state) => state.records.length);
     const previousRecordCount = useRef(recordCount);

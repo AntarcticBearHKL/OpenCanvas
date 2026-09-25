@@ -3,12 +3,12 @@ import { persist, type PersistStorage, type StorageValue } from "zustand/middlew
 
 import { nanoid } from "nanoid";
 import { localForageStorage } from "@/lib/localforage-storage";
-import { DEFAULT_AGENT_PERMISSIONS, mergeAgentPermissions, type AgentPermissionPolicy } from "@/lib/canvas/agent-permissions";
-import type { CanvasAgentOp } from "@/lib/canvas/canvas-agent-ops";
+import { DEFAULT_AGENT_PERMISSIONS, mergeAgentPermissions, type AgentPermissionPolicy } from "@/lib/agent/agent-permissions";
+import type { AgentOp } from "@/lib/agent/agent-ops";
 
-export type AgentAuditEntry = { id: string; at: number; ops: CanvasAgentOp[]; blocked: number; replayedFrom?: string };
+export type AgentAuditEntry = { id: string; at: number; page: string; ops: AgentOp[]; blocked: number; replayedFrom?: string };
 
-type AgentAuditInput = { ops: CanvasAgentOp[]; blocked: number; replayedFrom?: string };
+type AgentAuditInput = { ops: AgentOp[]; blocked: number; page?: string; replayedFrom?: string };
 
 const AGENT_AUDIT_LIMIT = 100;
 
@@ -17,7 +17,7 @@ type AgentAuditStore = {
     permissions: AgentPermissionPolicy;
     append: (input: AgentAuditInput) => string;
     clear: () => void;
-    setPermission: (type: CanvasAgentOp["type"], allowed: boolean) => void;
+    setPermission: (key: string, allowed: boolean) => void;
     resetPermissions: () => void;
 };
 
@@ -39,12 +39,12 @@ export const useAgentAuditStore = create<AgentAuditStore>()(
             permissions: DEFAULT_AGENT_PERMISSIONS,
             append: (input) => {
                 const id = nanoid();
-                const entry: AgentAuditEntry = { id, at: Date.now(), ops: input.ops, blocked: input.blocked, replayedFrom: input.replayedFrom };
+                const entry: AgentAuditEntry = { id, at: Date.now(), page: input.page || "", ops: input.ops, blocked: input.blocked, replayedFrom: input.replayedFrom };
                 set((state) => ({ records: [entry, ...state.records].slice(0, AGENT_AUDIT_LIMIT) }));
                 return id;
             },
             clear: () => set({ records: [] }),
-            setPermission: (type, allowed) => set((state) => ({ permissions: { ...state.permissions, [type]: allowed } })),
+            setPermission: (key, allowed) => set((state) => ({ permissions: { ...state.permissions, [key]: allowed } })),
             resetPermissions: () => set({ permissions: DEFAULT_AGENT_PERMISSIONS }),
         }),
         {

@@ -7,6 +7,15 @@ description: 当前版本已实现但仍需人工验证的变更项
 
 当前版本需要人工验证以下内容：
 
+## MCP 页面命名空间
+
+- MCP 服务从「只服务画布」升级为通用的「页面 + 动作命名空间」中继：三个通用工具按「列出 → 描述 → 调用」驱动任意页面，分别是 `app_get_state`（读取当前页面快照）、`app_describe_actions`（获取某命名空间的 JSON Schema）、`app_apply_ops`（提交一批带命名空间的操作）。协议版本升到 7，工具总数为 29（3 个通用页面工具 + 3 个站点工具 + 23 个画布快捷宏工具）；`canvas_get_state`、`canvas_get_selection`、`canvas_export_snapshot`、`canvas_apply_ops` 四个旧工具已移除，`site_navigate`、`canvas_list_projects`、`generation_get_status` 保留。
+- 往返联调：连接 MCP 客户端，调用 `app_get_state` 确认 `availableActions` 列出四个命名空间（`canvas`、`image`、`audio`、`config`），逐个调用 `app_describe_actions` 确认 schema 正常返回，再通过 `app_apply_ops` 为每个命名空间各提交一个操作，确认页面正确应用。
+- `canvas`（49 个操作）：节点层级 / 锁定 / 隐藏 / 批量重命名 / 字号 / 自由缩放 / 改尺寸 / 内容 / 标题 / metadata / 批量图片 / 对齐，视频槽位，画板比例 / 分辨率 / 背景 / 层级顺序，以及异步操作（裁剪 / 分割 / 放大 / OCR / 移除背景 / 角度 / 重试 / 合成 / 存为节点）。
+- `image`（36 个操作）：图层（新增 / 删除 / 复制 / 编组 / 解组 / 移动 / 变换 / 修补 / 样式 / 栅格化）、图层工厂（像素 / 文字 / 形状 / 调整 / 图片）、文档缩放 / 偏移 / 旋转 / 修剪 / 锚点、画板比例 / 分辨率 / 背景，以及滤镜 / 合成 / 导出。
+- `audio`（65 个操作）：轨道、片段、MIDI 音符与区域、混音（增益 / 声像 / 静音 / 独奏 / 发送）、走带与会话（速度 / 拍号 / 网格 / 循环 / 穿插 / 节拍器 / 预备拍 / 采集 / PPQN）、标记、自动化轨与断点，以及混音导出 / 分轨导出。
+- `config`（12 个操作）：确认它标记为 `danger: true` 且默认拒绝（未获授权前所有 config 操作一律被拦截），快照始终把密钥脱敏为 `{ hasKey, last4 }`，且即使开启 `config:*`，`config.set_provider_key` 与 `config.reveal_key` 仍保持关闭。原始密钥会经过本地 MCP 服务，因此回环 / 令牌 / 来源校验并不能防御恶意的 MCP 客户端。
+
 ## 全局视觉与配色
 
 - 浅色主题按对比度重做：在纸面底色上实测 正文 15.2:1、次要文字 9.0:1、辅助文字 6.7:1、最弱文字 5.0:1（原先辅助文字只有 4.3:1、最弱文字 2.3:1，都不达 WCAG AA）；深色主题同步提升（辅助 10.2:1、最弱 7.2:1）。
@@ -214,8 +223,8 @@ description: 当前版本已实现但仍需人工验证的变更项
 
 ## 画布 MCP 与 Agent 权限
 
-- 画布浏览器桥接与 HTTP MCP 端点融合进前端应用，与画布共用同一端口。执行 `cd web; npm run dev` 后，`http://127.0.0.1:3000/health` 与 `/config` 正常返回，`GET /` 与 `/canvas/<id>` 仍返回前端页面，MCP 客户端连接 `http://127.0.0.1:3000/mcp` 应能看到 30 个画布工具。画布在同源下自动连接，无需 token 或配置文件。
-- `canvas_create_node`、`canvas_apply_ops` 的 `add_node` 与 `delete_node` 支持全部内置节点类型（文本、提示词、音乐提示词、语音提示词、视频提示词、图片、视频、音频、生成配置、图片生成、语音生成、音乐生成、视频生成、智能画布、资源、录音、图片修饰）；未知类型会被拒绝，且不存在 `canvas_group_nodes` / `canvas_ungroup_nodes`。
+- 画布浏览器桥接与 HTTP MCP 端点已改为独立的本地 Python 服务（默认 `http://127.0.0.1:3210`，协议版本 7，29 个 Agent 工具）：执行 `cd infinite-canvas/mcp; uv run canvas-mcp` 后，`/health` 与 `/config` 正常返回，MCP 客户端连接 `http://127.0.0.1:3210/mcp` 能看到这些工具。浏览器在「设置 → Agent」中填写桥接地址与 token 后连接，不再依赖页面同源。
+- `canvas_create_node`、`app_apply_ops` 的 `add_node` 与 `delete_node` 支持全部内置节点类型（文本、提示词、音乐提示词、语音提示词、视频提示词、图片、视频、音频、生成配置、图片生成、语音生成、音乐生成、视频生成、智能画布、资源、录音、图片修饰）；未知类型会被拒绝，且不存在 `canvas_group_nodes` / `canvas_ungroup_nodes`。
 - 节点工具：MCP 客户端可设置锁定/隐藏（`canvas_set_node_flags`）、批量重命名（`canvas_bulk_rename`，单节点用原名，多节点编号为「标题 1」「标题 2」…）、对齐/等距分布（`canvas_align_nodes`，分布需 3 个以上节点）和复制节点（`canvas_duplicate_node`，默认偏移 40/40 并选中副本）。未知 id 会被忽略而不会破坏画布。
 - 设置 → Agent 页为每类画布操作提供一个开关（共 10 类，默认全部允许）；关闭某类后该操作会被拦截、弹出提示并计入被拦截数。
 - 每次 Agent 操作批次都会记入 Agent 审计日志，包含时间、操作数、被拦截数与操作摘要；日志最多保留最近 100 条，「清空」清空列表，「恢复默认」重新开启全部权限。回放一条记录会重新执行同样的操作，并新增一条标记为「已回放」的记录。

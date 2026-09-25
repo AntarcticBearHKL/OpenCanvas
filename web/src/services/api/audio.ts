@@ -4,7 +4,7 @@ import i18n from "@/i18n";
 import { audioMimeType, isOpenRouterMusicModel, musicAudioFormat, normalizeAudioFormatValue, normalizeAudioSpeedValue, normalizeAudioVoiceValue, speechAudioFormat, speechModelOf, speechVoiceOptions } from "@/lib/audio-generation";
 import type { GenerationCost } from "@/lib/canvas/generation-cost";
 import { getMediaBlob, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
-import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, type AiConfig } from "@/stores/use-config-store";
+import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, type AiConfig, type ModelRequestConfig } from "@/stores/use-config-store";
 import type { ReferenceAudio } from "@/types/media";
 import { fetchGenerationCost, readGenerationId } from "./image";
 import { runModelPlugin } from "./model-plugin";
@@ -14,11 +14,11 @@ type ChatAudio = { base64: string; cost?: number };
 type GeneratedAudio = { blob: Blob; cost?: GenerationCost };
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
-function aiApiUrl(config: AiConfig, path: string) {
+function aiApiUrl(config: ModelRequestConfig, path: string) {
     return buildApiUrl(config.baseUrl, path);
 }
 
-function aiHeaders(config: AiConfig) {
+function aiHeaders(config: ModelRequestConfig) {
     return {
         Authorization: `Bearer ${config.apiKey}`,
         "Content-Type": "application/json",
@@ -85,14 +85,14 @@ export async function requestAudioGeneration(config: AiConfig, prompt: string, o
     }
 }
 
-async function lookupAudioCost(config: AiConfig, headers: unknown): Promise<GenerationCost | undefined> {
+async function lookupAudioCost(config: ModelRequestConfig, headers: unknown): Promise<GenerationCost | undefined> {
     const generationId = readGenerationId(headers);
     if (!generationId) return undefined;
     const usd = await fetchGenerationCost(config, generationId);
     return usd === undefined ? undefined : { usd: Number(usd.toFixed(6)), priced: true, source: "lookup" };
 }
 
-async function requestMusicGeneration(config: AiConfig, model: string, prompt: string, format: string, signal?: AbortSignal): Promise<GeneratedAudio> {
+async function requestMusicGeneration(config: ModelRequestConfig, model: string, prompt: string, format: string, signal?: AbortSignal): Promise<GeneratedAudio> {
     const response = await axios.post<string>(
         aiApiUrl(config, "/chat/completions"),
         {
@@ -202,7 +202,7 @@ export async function storeGeneratedAudio(blob: Blob, format = "mp3"): Promise<U
     return uploadMediaFile(audio, "audio");
 }
 
-function assertAudioConfig(config: AiConfig, model: string) {
+function assertAudioConfig(config: ModelRequestConfig, model: string) {
     if (!model) throw new Error(apiText("audioModelRequired"));
     if (!config.baseUrl.trim()) throw new Error(apiText("baseUrlRequired"));
     if (!config.apiKey.trim()) throw new Error(apiText("apiKeyRequired"));

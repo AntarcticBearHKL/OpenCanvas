@@ -6,7 +6,7 @@ import math
 from typing import Any
 
 from canvas_mcp.operations.shared import apply_ops, find_node
-from canvas_mcp.types import CanvasNode, CanvasSnapshot
+from canvas_mcp.types import AgentSnapshot, CanvasNode
 
 
 def _round(value: float) -> int:
@@ -14,7 +14,7 @@ def _round(value: float) -> int:
     return math.floor(value + 0.5)
 
 
-def _align_ops(input_data: dict[str, Any], state: CanvasSnapshot | None) -> list[Any]:
+def _align_ops(input_data: dict[str, Any], state: AgentSnapshot | None) -> list[Any]:
     nodes: list[CanvasNode] = [node for node in (find_node(state, node_id) for node_id in input_data["ids"]) if node]
     if len(nodes) < 2:
         return []
@@ -63,5 +63,5 @@ def _align_ops(input_data: dict[str, Any], state: CanvasSnapshot | None) -> list
     return ops
 
 
-def align_nodes(input_data: dict[str, Any], state: CanvasSnapshot | None) -> dict[str, Any]:
+def align_nodes(input_data: dict[str, Any], state: AgentSnapshot | None) -> dict[str, Any]:
     return apply_ops(_align_ops(input_data, state))

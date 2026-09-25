@@ -1,7 +1,7 @@
 import axios, { type AxiosRequestConfig } from "axios";
 
 import i18n from "@/i18n";
-import { buildApiUrl, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
+import { buildApiUrl, type ModelCapability, type ModelRequestConfig } from "@/stores/use-config-store";
 
 type RequestOptions = { signal?: AbortSignal };
 
@@ -22,7 +22,7 @@ type PluginPollOptions = { intervalMs?: number; timeoutMs?: number };
 type RunPluginArgs = {
     capability: ModelCapability;
     script: string;
-    config: AiConfig;
+    config: ModelRequestConfig;
     prompt?: string;
     images?: string[];
     videos?: File[];
@@ -39,12 +39,12 @@ function pluginHeaders(extra?: Record<string, string>, hasJsonBody = false): Rec
     return { ...headers, ...extra };
 }
 
-function pluginUrl(config: AiConfig, path: string) {
+function pluginUrl(config: ModelRequestConfig, path: string) {
     if (/^https?:/i.test(path)) return path;
     return buildApiUrl(config.baseUrl, path.startsWith("/") ? path : `/${path}`);
 }
 
-function createPluginHttp(config: AiConfig, options?: RequestOptions): PluginHttp {
+function createPluginHttp(config: ModelRequestConfig, options?: RequestOptions): PluginHttp {
     const run = async (method: "get" | "post", path: string, body: unknown, opts?: PluginHttpOptions) => {
         const isForm = typeof FormData !== "undefined" && body instanceof FormData;
         const response = await axios.request({
@@ -66,7 +66,7 @@ function createPluginHttp(config: AiConfig, options?: RequestOptions): PluginHtt
 }
 
 /** Raw request with no automatic auth header — the script controls method, url, headers, body entirely. */
-function createPluginRequest(config: AiConfig, options?: RequestOptions) {
+function createPluginRequest(config: ModelRequestConfig, options?: RequestOptions) {
     return async (requestConfig: AxiosRequestConfig & { url: string }) => {
         const response = await axios.request({ ...requestConfig, url: pluginUrl(config, requestConfig.url), signal: options?.signal });
         return response.data;

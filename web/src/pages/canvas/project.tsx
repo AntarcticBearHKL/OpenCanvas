@@ -57,7 +57,7 @@ import { SmartCanvasSettingsPopover } from "@/components/canvas/smart-canvas-set
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
 import { CanvasSidePanel } from "@/components/canvas/canvas-side-panel";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
-import { useAgentBridge } from "@/pages/canvas/hooks/use-agent-bridge";
+import { useAgentBridge, type CanvasAgentHandlers } from "@/pages/canvas/hooks/use-agent-bridge";
 import { usePluginHost } from "@/pages/canvas/hooks/use-plugin-host";
 import { useCanvasGeneration } from "@/pages/canvas/hooks/use-canvas-generation";
 import { useCanvasInsertion } from "@/pages/canvas/hooks/use-canvas-insertion";
@@ -707,9 +707,52 @@ function InfiniteCanvasPage() {
             }),
         [connections, dragPreview, nodeById, promptReferenceIndexByConnectionId, relatedHighlight, selectConnection, selectedConnectionId, viewport.k],
     );
+    const runAgentNode = (nodeId: string, run: (node: CanvasNodeData) => void) => {
+        const node = nodesRef.current.find((item) => item.id === nodeId);
+        if (node) run(node);
+    };
+    const agentHandlers: CanvasAgentHandlers = {
+        crop_image: (op) => {
+            if (op.type === "crop_image") runAgentNode(op.nodeId, (node) => void cropImageNode(node, op.crop));
+        },
+        split_image: (op) => {
+            if (op.type === "split_image") runAgentNode(op.nodeId, (node) => void splitImageNode(node, { rows: op.rows, columns: op.columns, horizontalLines: op.horizontalLines, verticalLines: op.verticalLines }));
+        },
+        upscale_image: (op) => {
+            if (op.type === "upscale_image") runAgentNode(op.nodeId, (node) => (op.kind === "ai" ? void aiUpscaleImageNode(node, op.prompt || "") : void upscaleImageNode(node, { targetLongEdge: op.targetLongEdge ?? 2048, algorithm: op.algorithm ?? "high" })));
+        },
+        ocr_image: (op) => {
+            if (op.type === "ocr_image") runAgentNode(op.nodeId, (node) => void ocrImageNode(node));
+        },
+        remove_background: (op) => {
+            if (op.type === "remove_background") runAgentNode(op.nodeId, (node) => void removeNodeBackground(node));
+        },
+        generate_angle: (op) => {
+            if (op.type === "generate_angle") runAgentNode(op.nodeId, (node) => void generateAngleNode(node, { horizontalAngle: op.horizontalAngle, pitchAngle: op.pitchAngle, cameraDistance: op.cameraDistance, wideAngle: op.wideAngle }));
+        },
+        generate_image_from_text: (op) => {
+            if (op.type === "generate_image_from_text") runAgentNode(op.nodeId, generateImageFromTextNode);
+        },
+        retry_generation: (op) => {
+            if (op.type === "retry_generation") runAgentNode(op.nodeId, (node) => void handleRetryNode(node));
+        },
+        bake_image_modifier: (op) => {
+            if (op.type === "bake_image_modifier") runAgentNode(op.nodeId, (node) => void bakeImageModifierNode(node, node.metadata?.modifierSource || {}, node.metadata?.modifierParams, node.metadata?.modifierCurve));
+        },
+        capture_video_frame: (op) => {
+            if (op.type === "capture_video_frame") void captureVideoNodeFrame(op.nodeId, op.position);
+        },
+        compose_board: (op) => {
+            if (op.type === "compose_board") runAgentNode(op.id, (node) => void handleComposeBoard(node));
+        },
+        save_board_as_node: (op) => {
+            if (op.type === "save_board_as_node") runAgentNode(op.id, (node) => void handleSaveBoardAsNode(node));
+        },
+    };
     const { applyAgentOps } = useAgentBridge({
         projectId,
         title: currentProject?.title,
+        workspace,
         nodes,
         connections,
         selectedNodeIds,
@@ -719,6 +762,7 @@ function InfiniteCanvasPage() {
         selectedNodeIdsRef,
         viewportRef,
         generateNodeRef,
+        agentHandlers,
         setNodes,
         setConnections,
         setSelectedNodeIds,

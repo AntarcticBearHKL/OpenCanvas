@@ -1,48 +1,89 @@
 ---
 title: How the Local Canvas MCP Connection Works
-description: How the web app exposes the active canvas to MCP clients over HTTP and SSE on the same port
+description: How the standalone local canvas MCP service exposes the active page to MCP clients over HTTP and SSE, and how the browser bridges to it
 ---
 
 # How the Local Canvas MCP Connection Works
 
-The canvas MCP is part of the web app itself. When you run the frontend (`npm run dev`, or `npm run start` for a production preview), the same Vite server on `http://127.0.0.1:3000` also exposes the browser bridge and a Streamable HTTP MCP endpoint at `/mcp`. There is no separate package or process to start.
+The canvas MCP is a standalone local Python service, not part of the web app. The frontend can be served from anywhere — a local `npm run dev` on `http://localhost:3000`, a production preview, or a static host such as Cloudflare Pages — while the service always runs on the user's machine at `http://127.0.0.1:3210`. The browser page connects out to the service; the service is the only listener.
 
 ```text
-MCP client (opencode, ...)      Browser canvas
-              \                    /
-        web app server (HTTP + SSE, port 3000)
+MCP client (opencode, ...)          Browser page (canvas, ...)
+              \                            /
+     canvas-mcp (HTTP + SSE, 127.0.0.1:3210)
 ```
+
+Start it from `infinite-canvas/mcp`:
+
+```bash
+uv run canvas-mcp
+```
+
+It binds `127.0.0.1:3210` by default and prints the listen address. If `CANVAS_MCP_TOKEN` is not set, a random token is generated and printed; paste that token into the frontend's Settings → Agent section.
+
+## Configuration
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `CANVAS_MCP_HOST` | `127.0.0.1` | Listen address. Loopback only — do not set `0.0.0.0`. |
+| `CANVAS_MCP_PORT` | `3210` | Listen port. |
+| `CANVAS_MCP_ORIGINS` | empty | Comma-separated browser `Origin` allowlist, exact match, e.g. `http://localhost:3000,https://your-site.pages.dev`. Empty means browser requests are rejected. |
+| `CANVAS_MCP_TOKEN` | random | Bearer token required by the bridge and MCP endpoints. |
+| `CANVAS_MCP_DEBUG` | off | `1`/`true`/`yes`/`on` enables debug logs. |
 
 ## Browser bridge
 
-The canvas page connects automatically on the same origin — no token, no manual connect:
+The page connects out to the service and reports its state over SSE. The bridge base URL defaults to `http://127.0.0.1:3210` and is configurable in Settings → Agent; the URL and token are stored in the browser's `localStorage` (`canvas-agent-url` / `canvas-agent-token`).
 
 ```text
-GET  /events?clientId=xxx        (SSE)
-POST /canvas/state?clientId=xxx
-POST /canvas/activate?clientId=xxx
-POST /canvas/result?clientId=xxx
+GET  /events?clientId=xxx&token=...      (SSE)
+POST /canvas/state?clientId=xxx          (page snapshot)
+POST /canvas/activate?clientId=xxx       (declare this page the current tool target)
+POST /canvas/result?clientId=xxx         (tool-call result)
 ```
 
-Snapshots contain the canvas ID and title, nodes, edges, selected node IDs, and viewport. The server keeps the latest snapshot in memory, so read tools return structured state rather than the DOM.
+The snapshot is a page envelope: `{ page, title, state, availableActions }`. `state` is the page's read model — for the canvas page it holds the project id and title, nodes, connections, selected node ids, viewport and the active workspace. `availableActions` lists the action namespaces the page exposes. The server keeps the latest snapshot in memory for health and diagnostics; reads are relayed to the browser so they stay fresh.
 
-For a node creation, the MCP client calls a tool, the server converts it to `canvas_apply_ops`, sends an SSE `tool_call`, and the browser applies operations such as `add_node`, `update_node`, `delete_node`, `delete_connections`, `connect_nodes`, `set_viewport`, `select_nodes`, `run_generation`, `arrange_board`, and `place_on_board`. The browser posts the result to `/canvas/result`, which completes the MCP call.
+For a write, the MCP client calls a tool, the server sends an SSE `tool_call`, the browser applies the ops, and posts the result to `/canvas/result`, which completes the MCP call.
 
 ## HTTP MCP
 
-MCP clients connect to the Streamable HTTP endpoint on the same port:
+MCP clients connect to the Streamable HTTP endpoint on the same service:
 
 ```text
-POST http://127.0.0.1:3000/mcp
+POST http://127.0.0.1:3210/mcp
 ```
 
-The server creates one `McpServer` per initialized session and routes later requests by the `mcp-session-id` header. It advertises the `opencanvas-mcp` server name and exposes 30 canvas tools: site-level tools are forwarded to the browser, canvas read tools are answered from the latest snapshot, and the remaining canvas tools are translated into `canvas_apply_ops`. `canvas_create_node` and `canvas_apply_ops` accept every built-in node type (text, prompt, music prompt, speech prompt, image, video, audio, config, image generation, speech generation, music generation, smart canvas, assets, recording, image modifier).
+The server creates one `McpServer` per initialized session and routes later requests by the `mcp-session-id` header. It advertises the `opencanvas-mcp` server name and exposes 29 tools in three groups:
+
+- **Generic page tools** — `app_get_state` (read the current page snapshot), `app_describe_actions` (fetch the JSON Schema for a page's action namespace), and `app_apply_ops` (apply a batch of namespaced ops). This is the `list → describe → call` flow that lets an agent drive any page without one MCP tool per feature.
+- **Site tools** — `site_navigate`, `canvas_list_projects`, `generation_get_status`.
+- **Canvas shortcut tools** — the `canvas_*` macros, which the server compiles into `app_apply_ops` requests.
+
+Ops are flat and namespaced: `{ ns: "canvas", type: "add_node", ...fields }`. Pages register their action namespaces through a module-level action registry. Each registration declares `{ ns, title, description, ops, danger?, schema, applyOps }`, and the registry owns the JSON Schema discriminated union on `type`. Four namespaces ship today: `canvas` (49 ops covering nodes, boards, generation and async processing), `image` (36 ops for the Image Studio compositor), `audio` (65 ops for the Audio studio), and `config` (12 ops for providers, models and API keys). The agent reads `availableActions` from `app_get_state`, fetches a namespace's schema with `app_describe_actions`, then submits ops with `app_apply_ops`. Canvas node ops cover every built-in node type (text, prompt, music prompt, speech prompt, image, video, audio, config, image generation, speech generation, music generation, smart canvas, assets, recording, image modifier).
+
+Permissions are enforced centrally by the registry, keyed `"ns:type"` / `"ns:*"` / `"*"`; a namespace marked `danger` is deny-by-default and none of its ops run until an operator opts in. The `config` namespace is `danger: true`: its published snapshot always redacts secrets to `{ hasKey, last4 }`, and writing a key (`config.set_provider_key`) or reading one raw (`config.reveal_key`) needs its own explicit permission, both staying off even when `config:*` is enabled. Raw keys transit the local MCP service, so the loopback, token and origin guards do not protect against a malicious MCP client.
 
 ## Security boundary
 
-- The service is mounted on the web app's own server and shares its port; it is not a separate listener.
-- Bridge and MCP requests are accepted only from the same origin or localhost; non-browser MCP clients (no `Origin` header) are allowed. There is no token or config file.
-- The MCP client does not directly access the DOM or own the canvas state.
+- The service binds loopback only (`127.0.0.1`); it is never exposed to the network.
+- Every bridge and MCP request must carry the token, compared with `hmac.compare_digest`. Non-browser MCP clients send it as `Authorization: Bearer`; the browser sends it as a query parameter on `EventSource` (which cannot set headers) and as a header on `fetch`.
+- Browser requests are accepted only when their `Origin` exactly matches `CANVAS_MCP_ORIGINS`; anything else gets `403`. Requests without an `Origin` header (non-browser MCP clients) are not origin-checked. Preflight requests return `204` with `Access-Control-Allow-Private-Network: true`, so an HTTPS page can reach the loopback service in Chrome and Firefox (Safari blocks this).
+- The token is pasted into the deployed frontend's Settings and stored in the browser's `localStorage`; it is not written into the build output and is not logged.
+- The MCP client does not directly access the DOM or own the page state.
 - The hosted website does not store local login, API keys, or local file permissions.
 
-In short, reads flow from browser snapshots through the web app server to the MCP client; writes flow from the MCP client through the SSE bridge back to browser React state.
+In short, reads flow from browser snapshots through the local service to the MCP client; writes flow from the MCP client through the SSE bridge back to browser React state.
+
+## MCP client configuration
+
+```jsonc
+"infinite-canvas": {
+  "type": "remote",
+  "url": "http://127.0.0.1:3210/mcp",
+  "enabled": true,
+  "headers": { "Authorization": "Bearer {env:CANVAS_MCP_TOKEN}" }
+}
+```
+
+`type: "remote"` means the MCP client only connects; start `canvas-mcp` yourself before using it. Set `CANVAS_MCP_TOKEN` in the environment of both the server and the MCP client so they share one token.

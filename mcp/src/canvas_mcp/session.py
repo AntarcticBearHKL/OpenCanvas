@@ -14,11 +14,12 @@ from typing import Any
 from canvas_mcp.config import AGENT_PROTOCOL_VERSION
 from canvas_mcp.logger import logger
 from canvas_mcp.operations import build_canvas_tool_request
-from canvas_mcp.tools import compact_canvas_state, compact_node, is_tool_name, parse_tool_input
-from canvas_mcp.types import CanvasSnapshot
+from canvas_mcp.tools import is_tool_name, parse_tool_input
+from canvas_mcp.types import PageSnapshot
 
+GENERIC_TOOLS = frozenset({"app_get_state", "app_describe_actions", "app_apply_ops"})
 SITE_TOOLS = frozenset({"site_navigate", "canvas_list_projects", "generation_get_status"})
-READ_TOOLS = frozenset({"canvas_get_state", "canvas_get_selection", "canvas_export_snapshot"})
+RELAY_TOOLS = SITE_TOOLS | GENERIC_TOOLS
 
 REQUEST_TIMEOUT_SECONDS = 30.0
 
@@ -41,7 +42,7 @@ class CanvasSession:
         self._clients: dict[str, asyncio.Queue[str]] = {}
         self._client_focus_order: dict[str, int] = {}
         self._pending: dict[str, _PendingRequest] = {}
-        self._canvas_states: dict[str, CanvasSnapshot] = {}
+        self._page_states: dict[str, PageSnapshot] = {}
         self._active_client_id = ""
         self._bound_client_id = ""
         self._focus_sequence = 0
@@ -51,22 +52,24 @@ class CanvasSession:
         return self._bound_client_id or self._active_client_id
 
     @property
-    def _canvas_state(self) -> CanvasSnapshot | None:
+    def _page_state(self) -> PageSnapshot | None:
         target = self._target_client_id
-        return self._canvas_states.get(target) if target in self._clients else None
+        return self._page_states.get(target) if target in self._clients else None
 
     def health(self) -> dict[str, Any]:
         """Connection status returned by ``GET /health``."""
+        state = self._page_state or {}
         return {
             "ok": True,
             "protocolVersion": AGENT_PROTOCOL_VERSION,
-            "hasCanvas": bool(self._canvas_state),
+            "hasPage": bool(self._page_state),
+            "page": state.get("page"),
             "clients": len(self._clients),
         }
 
-    def canvas_state_for_client(self, client_id: str) -> CanvasSnapshot | None:
+    def page_state_for_client(self, client_id: str) -> PageSnapshot | None:
         """Read one client's snapshot without focus/binding influence."""
-        return self._canvas_states.get(client_id) if client_id in self._clients else None
+        return self._page_states.get(client_id) if client_id in self._clients else None
 
     def open_events(self, client_id: str) -> asyncio.Queue[str]:
         """Register an SSE client and return the queue its events are pushed to."""
@@ -87,7 +90,7 @@ class CanvasSession:
             return
         self._clients.pop(client_id, None)
         self._client_focus_order.pop(client_id, None)
-        self._canvas_states.pop(client_id, None)
+        self._page_states.pop(client_id, None)
         for request_id, item in list(self._pending.items()):
             if item.client_id != client_id:
                 continue
@@ -103,11 +106,11 @@ class CanvasSession:
         target = client_id or self._active_client_id
         if not target or target not in self._clients:
             return
-        state: CanvasSnapshot = {**(body if isinstance(body, dict) else {}), "clientId": target}
-        self._canvas_states[target] = state
+        state: PageSnapshot = {**(body if isinstance(body, dict) else {}), "clientId": target}
+        self._page_states[target] = state
         logger.debug(
-            "Canvas state updated",
-            {"clientId": target, "nodes": len(state.get("nodes") or []), "connections": len(state.get("connections") or [])},
+            "Page state updated",
+            {"clientId": target, "page": state.get("page"), "title": state.get("title")},
         )
 
     def activate_client(self, client_id: str) -> None:
@@ -153,41 +156,33 @@ class CanvasSession:
             raise ValueError(f"未知工具：{name}")
         logger.info("MCP tool called", {"name": name, "targetClientId": self._target_client_id})
         input_data = parse_tool_input(name, raw_input)
-        if name in SITE_TOOLS:
+        if name in RELAY_TOOLS:
             if not self._clients:
                 raise ValueError("当前没有已连接网页")
-            return await self._request_canvas_tool(name, input_data)
-        if name in READ_TOOLS and (not self._clients or not self._canvas_state):
-            raise ValueError("当前没有已连接画布")
-        if name in ("canvas_get_state", "canvas_export_snapshot"):
-            return compact_canvas_state(self._canvas_state)
-        if name == "canvas_get_selection":
-            selected = set((self._canvas_state or {}).get("selectedNodeIds") or [])
-            nodes = (self._canvas_state or {}).get("nodes") or []
-            return {"nodes": [compact_node(node) for node in nodes if node.get("id") in selected]}
+            return await self._request_browser_tool(name, input_data)
         if not self._clients:
             raise ValueError("当前没有已连接画布")
-        request = build_canvas_tool_request(name, input_data, self._canvas_state)
-        return await self._request_canvas_tool(request["name"], request["input"])
+        request = build_canvas_tool_request(name, input_data, self._page_state)
+        return await self._request_browser_tool(request["name"], request["input"])
 
     def _send_event(self, client_id: str, event_type: str, payload: Any) -> None:
         queue = self._clients.get(client_id)
         if queue is not None:
             queue.put_nowait(format_sse(event_type, payload))
 
-    async def _request_canvas_tool(self, name: str, input_data: dict[str, Any]) -> Any:
+    async def _request_browser_tool(self, name: str, input_data: dict[str, Any]) -> Any:
         """Relay a tool request to the target browser and await its result."""
         request_id = str(uuid.uuid4())
         client_id = self._target_client_id
         if client_id not in self._clients:
-            raise ValueError("当前没有已连接画布")
+            raise ValueError("当前没有已连接网页")
         self._send_event(client_id, "tool_call", {"requestId": request_id, "name": name, "input": input_data})
-        logger.debug("Canvas tool request sent", {"requestId": request_id, "name": name, "clientId": client_id})
+        logger.debug("Browser tool request sent", {"requestId": request_id, "name": name, "clientId": client_id})
         future: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
         self._pending[request_id] = _PendingRequest(client_id, future)
         try:
             return await asyncio.wait_for(future, timeout=REQUEST_TIMEOUT_SECONDS)
         except TimeoutError:
             self._pending.pop(request_id, None)
-            logger.warn("Canvas tool request timed out", {"requestId": request_id, "name": name, "clientId": client_id})
+            logger.warn("Browser tool request timed out", {"requestId": request_id, "name": name, "clientId": client_id})
             raise ValueError("画布操作超时") from None

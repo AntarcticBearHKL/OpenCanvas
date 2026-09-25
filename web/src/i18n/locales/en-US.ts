@@ -380,6 +380,7 @@ export default {
             window: "Window",
             reset: "Reset panel layout",
             resize: "Resize panel dock",
+            resizeSplit: "Resize stacked group heights",
             more: "All panels",
         },
         ps: {
@@ -1041,10 +1042,12 @@ export default {
             delete: "Delete provider",
             deleteConfirm: "Delete this provider?",
             modelCount: "{{count}} models",
+            models: "Models",
+            noModels: "No models yet",
         },
         models: {
             title: "Models",
-            description: "Collect models from every provider by capability and set a default model for each.",
+            description: "Set a default model for each capability; model lists are managed in each provider card.",
             defaultModel: "Default model",
             empty: "No models for this capability",
             provider: "Provider",
@@ -1066,6 +1069,7 @@ export default {
     },
     agent: {
         state: { ready: "Ready", requestFailed: "Local Agent request failed" },
+        namespace: { canvas: { title: "Canvas", description: "Create, edit, connect, select and arrange nodes on the current canvas, manage the viewport and trigger node generation." }, image: { title: "Image Studio", description: "Create, edit and transform layers on the current Smart Canvas board, resize the document, change board settings, and trigger filters, compositing and export." }, audio: { title: "Audio Studio", description: "Manage tracks, clips, MIDI, the mixer, markers, automation and project settings in the audio studio, and trigger mixdown or stem export." }, config: { title: "Configuration", description: "Read and update AI channels, models and generation settings; raw keys stay hidden unless explicitly revealed through reveal_key." } },
         siteTools: { canvasList: "Canvas list", generationStatus: "Generation task status", imageConfig: "Image configuration", imageGenerate: "Generate in Image Studio", videoConfig: "Video configuration", videoGenerate: "Generate in Video Studio", unknownTool: "Unknown tool: {{name}}", canvasLoading: "The canvas is still loading. Try again shortly.", canvasHint: "Use site_navigate to open /canvas/{id}", imageGenerationStarted: "Opened Image Studio and started generation. Use generation_get_status to query the task.", imageConfigApplied: "Opened Image Studio and applied the parameters without starting generation.", videoGenerationStarted: "Opened Video Studio and started generation. Use generation_get_status to query the task.", videoConfigApplied: "Opened Video Studio and applied the parameters without starting generation." },
         runtime: { agentOutdated: "The local Agent is outdated. Restart Canvas Agent and reconnect.", restartRequired: "Agent restart required", connected: "Connected", connectionLostDescription: "The local Agent connection failed or was interrupted", connectionFailedDescription: "Connection failed. Check the address and token.", connectionLost: "Connection lost", connectionFailed: "Connection failed", toolExecutionFailed: "Tool execution failed", openCanvasFirst: "The canvas is not open. Use site_navigate to open it first.", canvasOperationFailed: "Canvas operation failed",
         },

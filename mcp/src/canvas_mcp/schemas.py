@@ -1,13 +1,15 @@
-"""The 30 canvas tools: names, verbatim descriptions, and input schemas.
+"""The 29 agent tools: names, verbatim descriptions, and input schemas.
 
-Port of ``web/server/canvas/schemas.ts``. Tool names and Chinese descriptions are
-copied verbatim; the zod schemas are re-expressed as Pydantic models whose JSON
+Three generic relay tools (``app_*``) forward straight to the browser, three site
+tools are relayed verbatim too, and the 23 ``canvas_*`` tools are compiled
+server-side into ``app_apply_ops`` requests. Tool names and Chinese descriptions
+are copied verbatim; the zod schemas are re-expressed as Pydantic models whose JSON
 Schema is equivalent.
 """
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,10 +38,10 @@ AlignMode = Literal["left", "center-x", "right", "top", "center-y", "bottom", "d
 TOOL_NAMES: tuple[str, ...] = (
     "site_navigate",
     "canvas_list_projects",
-    "canvas_get_state",
-    "canvas_get_selection",
-    "canvas_export_snapshot",
-    "canvas_apply_ops",
+    "generation_get_status",
+    "app_get_state",
+    "app_describe_actions",
+    "app_apply_ops",
     "canvas_create_node",
     "canvas_create_text_node",
     "canvas_create_text_nodes",
@@ -63,110 +65,13 @@ TOOL_NAMES: tuple[str, ...] = (
     "canvas_select_nodes",
     "canvas_set_viewport",
     "canvas_run_generation",
-    "generation_get_status",
 )
-
-
-class PositionInput(BaseModel):
-    x: float
-    y: float
 
 
 class ViewportInput(BaseModel):
     x: float
     y: float
     k: float
-
-
-class _Op(BaseModel):
-    """Canvas op: zod used ``.passthrough()``, so unknown keys are preserved."""
-
-    model_config = ConfigDict(extra="allow")
-
-
-class AddNodeOp(_Op):
-    type: Literal["add_node"]
-    nodeType: NodeType | None = None
-    id: str | None = None
-    title: str | None = None
-    x: float | None = None
-    y: float | None = None
-    width: float | None = None
-    height: float | None = None
-    position: PositionInput | None = None
-    metadata: dict[str, Any] | None = None
-
-
-class UpdateNodeOp(_Op):
-    type: Literal["update_node"]
-    id: str
-    patch: dict[str, Any] | None = None
-    metadata: dict[str, Any] | None = None
-
-
-class DeleteNodeOp(_Op):
-    type: Literal["delete_node"]
-    id: str | None = None
-    ids: list[str] | None = None
-    nodeType: NodeType | None = None
-
-
-class DeleteConnectionsOp(_Op):
-    type: Literal["delete_connections"]
-    id: str | None = None
-    ids: list[str] | None = None
-    all: bool | None = None
-
-
-class ConnectNodesOp(_Op):
-    type: Literal["connect_nodes"]
-    id: str | None = None
-    fromNodeId: str
-    toNodeId: str
-    relation: str | None = None
-
-
-class SetViewportOp(_Op):
-    type: Literal["set_viewport"]
-    viewport: ViewportInput
-
-
-class SelectNodesOp(_Op):
-    type: Literal["select_nodes"]
-    ids: list[str]
-
-
-class RunGenerationOp(_Op):
-    type: Literal["run_generation"]
-    nodeId: str
-    mode: GenerationMode | None = None
-    prompt: str | None = None
-
-
-class ArrangeBoardOp(_Op):
-    type: Literal["arrange_board"]
-    id: str
-
-
-class PlaceOnBoardOp(_Op):
-    type: Literal["place_on_board"]
-    nodeId: str
-    boardId: str | None = None
-
-
-CanvasOp = Annotated[
-    AddNodeOp
-    | UpdateNodeOp
-    | DeleteNodeOp
-    | DeleteConnectionsOp
-    | ConnectNodesOp
-    | SetViewportOp
-    | SelectNodesOp
-    | RunGenerationOp
-    | ArrangeBoardOp
-    | PlaceOnBoardOp,
-    Field(discriminator="type"),
-]
 
 
 class TextNodeInput(BaseModel):
@@ -220,6 +125,18 @@ class PassthroughInput(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class AppGetStateInput(PassthroughInput):
+    pass
+
+
+class AppDescribeActionsInput(PassthroughInput):
+    ns: str | None = None
+
+
+class AppApplyOpsInput(PassthroughInput):
+    ops: list[dict[str, Any]]
+
+
 class SiteNavigateInput(BaseModel):
     path: str
 
@@ -228,10 +145,6 @@ class ListProjectsInput(BaseModel):
     keyword: str | None = None
     page: float | None = None
     pageSize: float | None = None
-
-
-class ApplyOpsInput(BaseModel):
-    ops: list[CanvasOp]
 
 
 class CreateNodeInput(BaseModel):
@@ -377,10 +290,10 @@ class GenerationStatusInput(BaseModel):
 INPUT_MODELS: dict[str, type[BaseModel]] = {
     "site_navigate": SiteNavigateInput,
     "canvas_list_projects": ListProjectsInput,
-    "canvas_get_state": PassthroughInput,
-    "canvas_get_selection": PassthroughInput,
-    "canvas_export_snapshot": PassthroughInput,
-    "canvas_apply_ops": ApplyOpsInput,
+    "generation_get_status": GenerationStatusInput,
+    "app_get_state": AppGetStateInput,
+    "app_describe_actions": AppDescribeActionsInput,
+    "app_apply_ops": AppApplyOpsInput,
     "canvas_create_node": CreateNodeInput,
     "canvas_create_text_node": CreateTextNodeInput,
     "canvas_create_text_nodes": CreateTextNodesInput,
@@ -404,7 +317,6 @@ INPUT_MODELS: dict[str, type[BaseModel]] = {
     "canvas_select_nodes": SelectNodesInput,
     "canvas_set_viewport": SetViewportInput,
     "canvas_run_generation": RunGenerationInput,
-    "generation_get_status": GenerationStatusInput,
 }
 
 INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
@@ -414,10 +326,9 @@ INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
 TOOL_DESCRIPTIONS: dict[str, str] = {
     "site_navigate": "跳转网站页面。path 可为 / (首页)、/canvas (我的画布)、/canvas/:id (指定画布)、/config (配置)、/write (作品库)、/write/:id (指定作品)。操作画布前若不在画布页，先用本工具打开画布。",
     "canvas_list_projects": "列出用户全部画布（仅标题、创建/更新时间、节点数、连线数，不含完整数据），支持 keyword 搜索和 page/pageSize 分页。返回的 id 可配合 site_navigate 跳转到 /canvas/:id 打开对应画布。",
-    "canvas_get_state": "读取当前网页画布的节点、连线、选区和视口。",
-    "canvas_get_selection": "读取当前网页画布选中的节点。",
-    "canvas_export_snapshot": "导出当前画布快照，用于理解布局。",
-    "canvas_apply_ops": "批量操作当前网页画布。ops 支持 add_node、update_node、delete_node、delete_connections、connect_nodes、set_viewport、select_nodes、run_generation、arrange_board、place_on_board。arrange_board / place_on_board 操作的是智能画板自包含的图层文档（metadata.boardLayers），不会移动画布上的节点。",
+    "app_get_state": "读取当前网页的页面快照，返回 { page, title, state, availableActions }。availableActions 列出当前页可用的操作命名空间（ns）、标题、说明和 op 名称（不含 schema）。操作任何页面前先调用本工具确认当前页面。",
+    "app_describe_actions": "读取操作的 schema。传入 ns 返回该命名空间的可用操作及字段定义；省略 ns 返回全部可用命名空间及其 schema，用于构造 app_apply_ops 的 ops。",
+    "app_apply_ops": "向当前网页提交一批操作。ops 为扁平、带 ns 标记的操作对象数组，例如 { ns: \"canvas\", type: \"add_node\", ... }；每个 op 的字段以 app_describe_actions 返回的 schema 为准。",
     "canvas_create_node": "创建任意类型节点。nodeType 可为 text、prompt、music-prompt、speech-prompt、video-prompt、image、video、audio、config、image-generation、speech-generation、music-generation、video-generation、smart-canvas、assets、recording、image-modifier。适合创建占位图、媒体占位、提示词节点、配置节点或自定义 metadata 节点。",
     "canvas_create_text_node": "在当前画布创建单个文本节点。",
     "canvas_create_text_nodes": "批量创建文本节点，适合生成标题、段落、脚本、说明等内容块。",

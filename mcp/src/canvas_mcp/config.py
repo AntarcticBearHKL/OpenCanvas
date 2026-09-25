@@ -13,8 +13,8 @@ from pathlib import Path
 
 VERSION = "0.1.0"
 
-# Protocol version exchanged with the browser bridge (agent-runtime.tsx expects 6).
-AGENT_PROTOCOL_VERSION = 6
+# Protocol version exchanged with the browser bridge (agent-runtime.tsx expects 7).
+AGENT_PROTOCOL_VERSION = 7
 
 _INSTRUCTIONS_PATH = Path(__file__).with_name("agent-instructions.md")
 

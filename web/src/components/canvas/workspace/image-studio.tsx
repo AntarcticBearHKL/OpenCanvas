@@ -31,12 +31,17 @@ import { psPaintPath, psPathPaintSource, psPathToSelection } from "@/components/
 import { STUDIO_BAR_CLASS, STUDIO_DIVIDER_CLASS, STUDIO_ICON_BUTTON_CLASS, STUDIO_LABEL_CLASS, STUDIO_LIST_ROW_CLASS, STUDIO_OPTIONS_CLASS, STUDIO_TOOL_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import { psImageColorAt, psSelectionAll, psSelectionBlob, psSelectionBounds, psSelectionClear, psSelectionCombine, psSelectionCreate, psSelectionFeather, psSelectionInvert, psSelectionPolygon, psSelectionQuick, psSelectionRect, psSelectionToLayerSpace, psSelectionWand, type PsSelectionMode } from "@/components/canvas/workspace/ps-selection";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
+import i18n from "@/i18n";
+import { registerAgentNamespace } from "@/lib/agent/action-registry";
+import type { AgentOp } from "@/lib/agent/agent-ops";
 import { CANVAS_BLEND_MODES } from "@/lib/canvas/blend-modes";
+import { IMAGE_AGENT_ASYNC_TYPES, IMAGE_AGENT_OP_TYPES, IMAGE_AGENT_SCHEMA, applyImageAgentOps, type ImageAgentOp } from "@/lib/canvas/image-agent-ops";
 import { createPsPath, psPathAnchor } from "@/lib/canvas/ps-path";
 import { PS_TRANSFORM_MODES, psApplyNumericTransform, psClearTransform, psMoveTransformHandle, psTransformHandlesDoc, type PsNumericTransform, type PsTransformMode } from "@/lib/canvas/ps-transform";
-import { createPsAdjustmentLayer, createPsPixelLayer, createPsShapeLayer, psBoxUnion, psLayerBox, psTextRenderStyle, psTopLayers, renderPsLayerBitmap, smartCanvasBackground, smartCanvasBackgroundOpacity, smartCanvasFill, smartCanvasLayers, smartCanvasRatio, smartCanvasResolution, smartCanvasSizeForRatio } from "@/lib/canvas/smart-canvas";
+import { composeSmartCanvas, createPsAdjustmentLayer, createPsPixelLayer, createPsShapeLayer, psBoxUnion, psLayerBox, psTextRenderStyle, psTopLayers, renderPsLayerBitmap, smartCanvasBackground, smartCanvasBackgroundOpacity, smartCanvasFill, smartCanvasLayers, smartCanvasRatio, smartCanvasResolution, smartCanvasSizeForRatio } from "@/lib/canvas/smart-canvas";
 import { PS_ADJUSTMENT_NAME_KEYS } from "@/lib/canvas/ps-adjustments";
 import { inferMediaRatio } from "@/lib/media-size";
+import { useAgentStore } from "@/stores/use-agent-store";
 import { PS_BRUSH_DEFAULT, type PsActionStep, type PsBrushPreset, type PsPatternPreset } from "@/stores/use-ps-asset-store";
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { CanvasNodeType, type CanvasNodeData, type CanvasNodeMetadata, type CanvasPsAdjustmentType, type CanvasPsLayer, type CanvasPsPath, type CanvasPsShapeKind } from "@/types/canvas";
@@ -172,6 +177,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     const draftRef = useRef<CanvasPsLayer[] | null>(null);
     const fittedRef = useRef("");
     const userViewRef = useRef(false);
+    const imageAgentApplyRef = useRef<(ops: AgentOp[]) => Record<string, unknown> | void>(() => undefined);
     const [selectedLayerId, setSelectedLayerId] = useState("");
     const [tool, setTool] = useState<PsTool>("move");
     const [paint, setPaint] = useState<PsBrushOptions & { background: string; stop: number }>({ ...PS_BRUSH_DEFAULT, tolerance: 32, color: "#000000", background: "#ffffff", stop: 1 });
@@ -1184,6 +1190,41 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
         commit(rasterizePsLayer(latest.layers, latest.selected.id, uploaded.storageKey), t("canvas.ps.historyFilter"));
     };
 
+    // `image` namespace: pure layer math from image-agent-ops, applied through the studio's own commit / resize / async handlers.
+    imageAgentApplyRef.current = (agentOps) => {
+        if (!board) return;
+        const imageOps = agentOps.map(({ ns, ...op }) => op as ImageAgentOp);
+        const result = applyImageAgentOps({ board, nodes }, imageOps);
+        if (result.layers !== boardLayers) commit(result.layers);
+        if (result.metadata) onBoardChange(board.id, result.metadata);
+        if (result.size && !result.metadata?.boardRatio) resizeDocument(result.size.width, result.size.height);
+        if (result.size || result.metadata?.boardRatio) resetSelection();
+        imageOps
+            .filter((op) => IMAGE_AGENT_ASYNC_TYPES.includes(op.type))
+            .forEach((op) => {
+                if (op.type === "filter.apply") void applyFilterStep(op.filter, op.params || {});
+                if (op.type === "document.compose") void composeSmartCanvas(board, nodes);
+                if (op.type === "document.export") onOutput(board);
+            });
+        return {
+            ...(useAgentStore.getState().pageContext?.state ?? {}),
+            workspace: "image",
+            nodes: nodes.map((node) => (node.id === board.id ? { ...node, ...(result.size || {}), metadata: { ...node.metadata, ...(result.metadata || {}), ...(result.layers !== boardLayers ? { boardLayers: result.layers } : {}) } } : node)),
+        };
+    };
+
+    useEffect(() => {
+        const unregister = registerAgentNamespace({
+            ns: "image",
+            title: i18n.t("agent.namespace.image.title"),
+            description: i18n.t("agent.namespace.image.description"),
+            ops: IMAGE_AGENT_OP_TYPES,
+            schema: IMAGE_AGENT_SCHEMA,
+            applyOps: (ops) => imageAgentApplyRef.current(ops),
+        });
+        return unregister;
+    }, []);
+
     const layerCommand = (command: PsLayerCommand) => {
         const latest = latestRef.current;
         if (!latest.board || !latest.selected) return;
@@ -1600,7 +1641,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                 ) : null}
             </div>
 
-            <DockArea defs={PS_DOCK_PANELS} layout={dock.layout} renderPanel={renderPsPanel} onActivate={dock.activate} onMove={dock.move} onResize={dock.resize}>
+            <DockArea defs={PS_DOCK_PANELS} layout={dock.layout} renderPanel={renderPsPanel} onActivate={dock.activate} onMove={dock.move} onResize={dock.resize} onSplit={dock.split}>
                 <div className="thin-scrollbar flex shrink-0 flex-col items-center gap-0.5 overflow-y-auto px-1.5 py-1.5 glass-surface">
                     {TOOLS.map((item) => {
                         const Icon = item.icon;

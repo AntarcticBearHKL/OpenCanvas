@@ -1,48 +1,89 @@
 ---
 title: 本地画布 MCP 连接原理
-description: 前端画布如何在同一端口上通过 HTTP 与 SSE 向 MCP 客户端暴露当前画布
+description: 独立的本地画布 MCP 服务如何通过 HTTP 与 SSE 向 MCP 客户端暴露当前页面，以及浏览器如何桥接到它
 ---
 
 # 本地画布 MCP 连接原理
 
-画布 MCP 已经融合进前端本身：运行前端时（`npm run dev`，或 `npm run start` 预览生产构建），同一个 Vite 服务在 `http://127.0.0.1:3000` 上同时提供浏览器桥接和 `/mcp` 的 Streamable HTTP MCP 端点，不需要再单独启动任何包或进程。
+画布 MCP 是一个独立的本地 Python 服务，不属于前端本身。前端可以部署在任何地方——本地 `npm run dev` 的 `http://localhost:3000`、生产预览，或 Cloudflare Pages 之类的静态托管——而服务始终运行在用户机器上的 `http://127.0.0.1:3210`。浏览器页面主动连出到该服务，服务是唯一的监听方。
 
 ```text
-MCP 客户端（opencode 等）        浏览器画布
+MCP 客户端（opencode 等）        浏览器页面（画布等）
               \                    /
-        前端服务（HTTP + SSE，端口 3000）
+     canvas-mcp（HTTP + SSE，127.0.0.1:3210）
 ```
+
+在 `infinite-canvas/mcp` 下启动：
+
+```bash
+uv run canvas-mcp
+```
+
+默认绑定 `127.0.0.1:3210` 并打印监听地址。若未设置 `CANVAS_MCP_TOKEN`，会随机生成一个并打印；把该 token 粘贴到前端「设置 → Agent」中。
+
+## 配置
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `CANVAS_MCP_HOST` | `127.0.0.1` | 监听地址。仅限回环，勿改成 `0.0.0.0`。 |
+| `CANVAS_MCP_PORT` | `3210` | 监听端口。 |
+| `CANVAS_MCP_ORIGINS` | 空 | 浏览器 `Origin` 白名单，逗号分隔、精确匹配，例如 `http://localhost:3000,https://your-site.pages.dev`。为空时浏览器请求一律拒绝。 |
+| `CANVAS_MCP_TOKEN` | 随机 | 桥接与 MCP 端点所需的 Bearer token。 |
+| `CANVAS_MCP_DEBUG` | 关 | `1`/`true`/`yes`/`on` 打开调试日志。 |
 
 ## 浏览器桥接
 
-画布页面在同源下自动连接，无需 token、无需手动连接：
+页面主动连出到服务，并通过 SSE 上报自身状态。桥接地址默认 `http://127.0.0.1:3210`，可在「设置 → Agent」中修改；地址与 token 保存在浏览器 `localStorage`（`canvas-agent-url` / `canvas-agent-token`）。
 
 ```text
-GET  /events?clientId=xxx        （SSE）
-POST /canvas/state?clientId=xxx
-POST /canvas/activate?clientId=xxx
-POST /canvas/result?clientId=xxx
+GET  /events?clientId=xxx&token=...      （SSE）
+POST /canvas/state?clientId=xxx          （页面快照）
+POST /canvas/activate?clientId=xxx       （声明本页为当前工具目标）
+POST /canvas/result?clientId=xxx         （工具调用结果）
 ```
 
-快照包含画布 ID 与标题、节点、连线、选中节点 ID 和视口。服务端在内存中保存最新快照，因此读取类工具返回的是结构化状态，而不是 DOM。
+快照是一个页面信封：`{ page, title, state, availableActions }`。`state` 是该页面的读模型——画布页里包含项目 id 与标题、节点、连线、选中节点 id、视口和当前工作台。`availableActions` 列出该页面暴露的动作命名空间。服务端在内存中保留最新快照用于健康检查与诊断；读取类请求会转发给浏览器以保证新鲜度。
 
-执行节点创建时，MCP 客户端调用工具，服务端把它转换成 `canvas_apply_ops`，通过 SSE 发送 `tool_call`，浏览器应用 `add_node`、`update_node`、`delete_node`、`delete_connections`、`connect_nodes`、`set_viewport`、`select_nodes`、`run_generation`、`arrange_board`、`place_on_board` 等操作，再把结果 POST 回 `/canvas/result`，完成这次 MCP 调用。
+写入时，MCP 客户端调用工具，服务端经 SSE 发送 `tool_call`，浏览器应用操作后把结果 POST 到 `/canvas/result`，完成这次 MCP 调用。
 
 ## HTTP MCP
 
-MCP 客户端连接同一个端口上的 Streamable HTTP 端点：
+MCP 客户端连接同一服务上的 Streamable HTTP 端点：
 
 ```text
-POST http://127.0.0.1:3000/mcp
+POST http://127.0.0.1:3210/mcp
 ```
 
-服务端为每个已初始化的会话创建一个 `McpServer`，后续请求按 `mcp-session-id` 请求头路由。它对外声明 `opencanvas-mcp` 服务名并暴露 30 个画布工具：站点级工具转发给浏览器，画布读取类工具用最新快照直接回答，其余画布工具转换成 `canvas_apply_ops`。`canvas_create_node` 与 `canvas_apply_ops` 支持全部内置节点类型（文本、提示词、音乐提示词、语音提示词、图片、视频、音频、生成配置、图片生成、语音生成、音乐生成、智能画布、素材、录音、图片修饰）。
+服务端为每个已初始化的会话创建一个 `McpServer`，后续请求按 `mcp-session-id` 请求头路由。它对外声明 `opencanvas-mcp` 服务名，共暴露 29 个工具，分三组：
+
+- **通用页面工具** —— `app_get_state`（读取当前页面快照）、`app_describe_actions`（获取某个动作命名空间的 JSON Schema）、`app_apply_ops`（提交一批带命名空间的操作）。这就是 `列出 → 描述 → 调用` 流程，使 agent 能驱动任意页面而无需为每个功能单独建一个工具。
+- **站点工具** —— `site_navigate`、`canvas_list_projects`、`generation_get_status`。
+- **画布快捷工具** —— `canvas_*` 宏工具，服务端会把它们编译成 `app_apply_ops` 请求。
+
+操作是扁平且带命名空间的：`{ ns: "canvas", type: "add_node", ...fields }`。页面通过模块级动作注册表注册自己的动作命名空间。每项注册声明 `{ ns, title, description, ops, danger?, schema, applyOps }`，并按 `type` 判别生成 JSON Schema 联合。当前共有四个命名空间：`canvas`（49 个操作，覆盖节点、画板、生成与异步处理）、`image`（36 个操作，图像工作台合成器）、`audio`（65 个操作，音频合成器）、`config`（12 个操作，提供商、模型与 API Key）。agent 先通过 `app_get_state` 读取 `availableActions`，再用 `app_describe_actions` 取得某命名空间的 schema，最后用 `app_apply_ops` 提交操作。画布节点操作覆盖全部内置节点类型（文本、提示词、音乐提示词、语音提示词、图片、视频、音频、生成配置、图片生成、语音生成、音乐生成、智能画布、素材、录音、图片修饰）。
+
+权限由注册表集中校验，键为 `"ns:type"` / `"ns:*"` / `"*"`；标记为 `danger` 的命名空间默认拒绝，未获授权前其操作一律不执行。`config` 命名空间即 `danger: true`：它发布的快照始终把密钥脱敏为 `{ hasKey, last4 }`，写入密钥（`config.set_provider_key`）与读取原始密钥（`config.reveal_key`）各自需要显式权限，即使开启 `config:*` 这两项仍保持关闭。原始密钥会经过本地 MCP 服务，因此回环、令牌与来源校验并不能防御恶意的 MCP 客户端。
 
 ## 安全边界
 
-- 服务挂载在前端自身的服务器上、共用同一个端口，不是独立监听。
-- 桥接与 MCP 请求只接受同源或本机来源；没有 `Origin` 请求头的非浏览器 MCP 客户端放行。不再有 token 或配置文件。
-- MCP 客户端不直接访问 DOM，也不持有画布状态。
+- 服务只绑定回环地址（`127.0.0.1`），不对外网暴露。
+- 所有桥接与 MCP 请求都必须携带 token，使用 `hmac.compare_digest` 常量时间比较。非浏览器 MCP 客户端用 `Authorization: Bearer`；浏览器在 `EventSource` 上用查询参数（无法设置请求头），在 `fetch` 上用请求头。
+- 浏览器请求只有在 `Origin` 精确命中 `CANVAS_MCP_ORIGINS` 时才放行，否则返回 `403`。没有 `Origin` 请求头的非浏览器 MCP 客户端不做来源校验。预检请求返回 `204` 并带 `Access-Control-Allow-Private-Network: true`，因此在 Chrome 与 Firefox 中 HTTPS 页面可以访问该回环服务（Safari 会拦截）。
+- token 只粘贴进已部署前端的「设置」并保存在浏览器 `localStorage`，不写入构建产物，也不打印日志。
+- MCP 客户端不直接访问 DOM，也不持有页面状态。
 - 线上站点不保存本地登录态、API Key 或本地文件权限。
 
-简而言之：读取时，数据从浏览器快照经前端服务流到 MCP 客户端；写入时，指令从 MCP 客户端经 SSE 桥接回到浏览器 React 状态。
+简而言之：读取时，数据从浏览器快照经本地服务流到 MCP 客户端；写入时，指令从 MCP 客户端经 SSE 桥接回到浏览器 React 状态。
+
+## MCP 客户端配置
+
+```jsonc
+"infinite-canvas": {
+  "type": "remote",
+  "url": "http://127.0.0.1:3210/mcp",
+  "enabled": true,
+  "headers": { "Authorization": "Bearer {env:CANVAS_MCP_TOKEN}" }
+}
+```
+
+`type: "remote"` 表示 MCP 客户端只负责连接；使用前需自行启动 `canvas-mcp`。请让服务端与 MCP 客户端在同一环境变量里设置同一个 `CANVAS_MCP_TOKEN`。

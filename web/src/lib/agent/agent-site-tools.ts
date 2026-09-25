@@ -1,8 +1,8 @@
 import type { NavigateFunction } from "react-router-dom";
 
 import i18n from "@/i18n";
-import type { CanvasAgentSnapshot } from "@/lib/canvas/canvas-agent-ops";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
+import type { CanvasNodeData } from "@/types/canvas";
 
 // Execute site-level Agent tools in the browser, including canvas lists and generation status.
 // Their data lives locally in the browser through localforage and Zustand, so this module accesses the relevant stores directly.
@@ -20,7 +20,7 @@ function siteText(key: string, options?: Record<string, unknown>) {
 }
 
 type SiteToolInput = Record<string, unknown>;
-type SiteToolContext = { canvasSnapshot?: CanvasAgentSnapshot | null };
+type SiteToolContext = { state?: Record<string, unknown> | null };
 type GenerationStatus = "idle" | "queued" | "running" | "succeeded" | "failed";
 type GenerationStatusItem = { id: string; source: "canvas" | "image" | "video"; status: GenerationStatus; kind?: string; title?: string; prompt?: string; projectId?: string; createdAt?: string; updatedAt?: string; successCount?: number; failCount?: number; error?: string };
 
@@ -30,26 +30,27 @@ export async function runSiteTool(name: SiteToolName, input: SiteToolInput, navi
         case "canvas_list_projects":
             return listCanvasProjects(input);
         case "generation_get_status":
-            return getGenerationStatus(input, context.canvasSnapshot);
+            return getGenerationStatus(input, context.state);
         default:
             throw new Error(siteText("unknownTool", { name }));
     }
 }
 
-function getGenerationStatus(input: SiteToolInput, canvasSnapshot?: CanvasAgentSnapshot | null) {
+function getGenerationStatus(input: SiteToolInput, state?: Record<string, unknown> | null) {
     const nodeIds = new Set(Array.isArray(input.nodeIds) ? input.nodeIds.filter((id): id is string => typeof id === "string") : []);
     const limit = Math.max(1, Math.min(100, Math.floor(Number(input.limit)) || 20));
     const tasks: GenerationStatusItem[] = [];
+    const rawNodes = state?.nodes;
+    const nodes = Array.isArray(rawNodes) ? (rawNodes as CanvasNodeData[]) : [];
+    const projectId = typeof state?.projectId === "string" ? state.projectId : "";
 
-    if (canvasSnapshot) {
-        canvasSnapshot.nodes.forEach((node) => {
-            const status = normalizeCanvasGenerationStatus(node.metadata?.status);
-            if (!status || (nodeIds.size && !nodeIds.has(node.id))) return;
-            const metadata = node.metadata || {};
-            if (!nodeIds.size && node.type !== "config" && status !== "running" && status !== "failed" && !metadata.generationMode && !metadata.generationType && !metadata.model) return;
-            tasks.push({ id: node.id, source: "canvas", status, kind: metadata.generationMode || node.type, title: node.title, prompt: compactPrompt(metadata.prompt || metadata.composerContent), projectId: canvasSnapshot.projectId, error: metadata.errorDetails });
-        });
-    }
+    nodes.forEach((node) => {
+        const status = normalizeCanvasGenerationStatus(node.metadata?.status);
+        if (!status || (nodeIds.size && !nodeIds.has(node.id))) return;
+        const metadata = node.metadata || {};
+        if (!nodeIds.size && node.type !== "config" && status !== "running" && status !== "failed" && !metadata.generationMode && !metadata.generationType && !metadata.model) return;
+        tasks.push({ id: node.id, source: "canvas", status, kind: metadata.generationMode || node.type, title: node.title, prompt: compactPrompt(metadata.prompt || metadata.composerContent), projectId, error: metadata.errorDetails });
+    });
 
     tasks.sort((a, b) => generationStatusOrder(a.status) - generationStatusOrder(b.status) || (b.updatedAt || "").localeCompare(a.updatedAt || ""));
     const summary: Record<GenerationStatus, number> = { idle: 0, queued: 0, running: 0, succeeded: 0, failed: 0 };

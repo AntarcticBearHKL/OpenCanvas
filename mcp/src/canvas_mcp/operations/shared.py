@@ -1,17 +1,17 @@
-"""Shared builders for translating high-level tools into ``canvas_apply_ops``."""
+"""Shared builders for translating high-level tools into ``app_apply_ops``."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from canvas_mcp.types import CanvasNode, CanvasSnapshot
+from canvas_mcp.types import AgentSnapshot, CanvasNode
 
 CanvasToolRequest = dict[str, Any]
 
 
 def apply_ops(ops: list[Any]) -> CanvasToolRequest:
     """Wrap a list of canvas ops into the single batch tool request."""
-    return {"name": "canvas_apply_ops", "input": {"ops": ops}}
+    return {"name": "app_apply_ops", "input": {"ops": ops}}
 
 
 def omit_none(data: dict[str, Any]) -> dict[str, Any]:
@@ -94,7 +94,7 @@ def generation_title(mode: str) -> str:
     return "图片生成"
 
 
-def find_node(state: CanvasSnapshot | None, node_id: str) -> CanvasNode | None:
+def find_node(state: AgentSnapshot | None, node_id: str) -> CanvasNode | None:
     """Find a node by id in the current canvas snapshot."""
     return next((node for node in (state or {}).get("nodes") or [] if node.get("id") == node_id), None)
 

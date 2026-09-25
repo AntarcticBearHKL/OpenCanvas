@@ -28,8 +28,6 @@ export type ModelChannel = {
 
 export type AiConfig = {
     channelMode: "remote" | "local";
-    baseUrl: string;
-    apiKey: string;
     apiFormat: ApiCallFormat;
     channels: ModelChannel[];
     model: string;
@@ -58,6 +56,9 @@ export type AiConfig = {
     canvasBackgroundMode: CanvasBackgroundMode;
 };
 
+/** A model request resolved to the channel that owns the model, so `baseUrl`/`apiKey` always live with their provider. */
+export type ModelRequestConfig = AiConfig & { baseUrl: string; apiKey: string };
+
 export type ConfigTabKey = "channels" | "models" | "appearance" | "generation" | "local-models" | "local-storage" | "cost" | "agent" | "about";
 
 type ChannelCredentialsImportResult = {
@@ -72,8 +73,6 @@ export const IMAGE_MODEL = "openai/gpt-image-2.5-sunburst";
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
-    baseUrl: OPENROUTER_BASE_URL,
-    apiKey: "",
     apiFormat: "openai",
     channels: PROVIDER_PRESETS.map(
         (preset): ModelChannel => ({
@@ -178,7 +177,7 @@ export function resolveModelScript(config: AiConfig, value: string) {
 }
 
 function isAiConfigReady(config: AiConfig, model: string) {
-    return Boolean(model.trim() && (resolveModelChannel(config, model)?.apiKey?.trim() || config.apiKey.trim()));
+    return Boolean(model.trim() && resolveModelChannel(config, model)?.apiKey?.trim());
 }
 
 export const useConfigStore = create<ConfigStore>()(
@@ -282,7 +281,7 @@ function createModelChannel(channel?: Partial<ModelChannel>): ModelChannel {
 
 function applyPresetModelDefaults(config: AiConfig): AiConfig {
     if (config.textModel.trim()) return config;
-    const hasKey = (channel: ModelChannel) => Boolean(channel.apiKey.trim() || config.apiKey.trim());
+    const hasKey = (channel: ModelChannel) => Boolean(channel.apiKey.trim());
     const channel = config.channels.find((item) => hasKey(item) && isTextOnlyBaseUrl(item.baseUrl) && item.models.length === 1 && item.models[0].capability === "text");
     if (!channel) return config;
     return { ...config, textModel: encodeChannelModel(channel.id, channel.models[0].name) };
@@ -294,10 +293,18 @@ function upsertChannelCredentials(
 ): ChannelCredentialsImportResult & { config: AiConfig } {
     const rawBaseUrl = input.baseUrl?.trim() || "";
     if (!rawBaseUrl) return { status: "missing-base-url", config };
-    if (!findPresetByBaseUrl(rawBaseUrl) && !isHttpBaseUrl(rawBaseUrl)) return { status: "invalid-base-url", config };
+    const preset = findPresetByBaseUrl(rawBaseUrl);
+    if (!preset && !isHttpBaseUrl(rawBaseUrl)) return { status: "invalid-base-url", config };
 
-    const apiKey = input.apiKey?.trim() || config.apiKey;
-    return { status: "updated", channelName: config.channels[0]?.name || "OpenRouter", config: { ...config, apiKey } };
+    const apiKey = input.apiKey?.trim() || "";
+    const targetBaseUrl = normalizeBaseUrl(preset?.baseUrl || rawBaseUrl);
+    const existing = config.channels.find((channel) => normalizeBaseUrl(channel.baseUrl) === targetBaseUrl);
+    if (existing) {
+        const channels = config.channels.map((channel) => (channel.id === existing.id ? { ...channel, apiKey: apiKey || channel.apiKey } : channel));
+        return { status: "updated", channelName: existing.name, config: { ...config, channels } };
+    }
+    const channel = createModelChannel({ name: preset?.name, baseUrl: preset?.baseUrl || rawBaseUrl, apiKey, models: preset?.models });
+    return { status: "created", channelName: channel.name, config: { ...config, channels: [...config.channels, channel] } };
 }
 
 function isHttpBaseUrl(baseUrl: string) {
@@ -354,20 +361,24 @@ export function resolveModelChannel(config: AiConfig, value: string): ModelChann
     return owner || config.channels[0];
 }
 
-export function resolveModelRequestConfig(config: AiConfig, value: string) {
+export function resolveModelRequestConfig(config: AiConfig, value: string): ModelRequestConfig {
     const channel = resolveModelChannel(config, value);
     return {
         ...config,
         model: modelOptionName(value || config.model),
-        baseUrl: channel?.baseUrl?.trim() || config.baseUrl || OPENROUTER_BASE_URL,
-        apiKey: channel?.apiKey?.trim() || config.apiKey,
+        baseUrl: channel?.baseUrl?.trim() || OPENROUTER_BASE_URL,
+        apiKey: channel?.apiKey?.trim() || "",
         apiFormat: "openai" as const,
     };
 }
 
+function normalizeBaseUrl(baseUrl: string) {
+    return baseUrl.trim().replace(/\/+$/, "").toLowerCase();
+}
+
 function findPresetByBaseUrl(baseUrl: string) {
-    const normalized = baseUrl.trim().replace(/\/+$/, "").toLowerCase();
-    return PROVIDER_PRESETS.find((preset) => preset.baseUrl.toLowerCase() === normalized);
+    const normalized = normalizeBaseUrl(baseUrl);
+    return PROVIDER_PRESETS.find((preset) => normalizeBaseUrl(preset.baseUrl) === normalized);
 }
 
 function normalizeChannels(config: AiConfig) {

@@ -1,7 +1,7 @@
 import axios from "axios";
 
 import i18n from "@/i18n";
-import { IMAGE_MODEL, buildApiUrl, resolveModelRequestConfig, resolveModelScript, type AiConfig } from "@/stores/use-config-store";
+import { IMAGE_MODEL, buildApiUrl, resolveModelRequestConfig, resolveModelScript, type AiConfig, type ModelRequestConfig } from "@/stores/use-config-store";
 import { estimateGenerationCost, estimateTokenCost, type GenerationCost } from "@/lib/canvas/generation-cost";
 import { normalizePluginImages, runModelPlugin } from "./model-plugin";
 import { nanoid } from "nanoid";
@@ -226,7 +226,7 @@ export function readGenerationId(headers: unknown) {
     return typeof value === "string" && value ? value : undefined;
 }
 
-export async function fetchGenerationCost(config: AiConfig, generationId: string) {
+export async function fetchGenerationCost(config: ModelRequestConfig, generationId: string) {
     try {
         const response = await axios.get<{ data?: { total_cost?: number | null; usage?: number | null } | null; total_cost?: number | null; usage?: number | null }>(aiApiUrl(config, "/generation"), {
             params: { id: generationId },
@@ -243,7 +243,7 @@ export async function fetchGenerationCost(config: AiConfig, generationId: string
     return undefined;
 }
 
-async function resolveImageCost(config: AiConfig, usage: ImageUsage | undefined, generationId: string | undefined, hasReference: boolean): Promise<GenerationCost> {
+async function resolveImageCost(config: ModelRequestConfig, usage: ImageUsage | undefined, generationId: string | undefined, hasReference: boolean): Promise<GenerationCost> {
     const billed = usage?.cost == null ? Number.NaN : Number(usage.cost);
     if (Number.isFinite(billed)) return { usd: Number(billed.toFixed(6)), priced: true, source: "api" };
     if (generationId) {
@@ -318,11 +318,11 @@ function withSystemPrompt(config: AiConfig, prompt: string) {
     return systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
 }
 
-function aiApiUrl(config: AiConfig, path: string) {
+function aiApiUrl(config: ModelRequestConfig, path: string) {
     return buildApiUrl(config.baseUrl, path);
 }
 
-function aiHeaders(config: AiConfig, contentType?: string) {
+function aiHeaders(config: ModelRequestConfig, contentType?: string) {
     return {
         Authorization: `Bearer ${config.apiKey}`,
         ...(contentType ? { "Content-Type": contentType } : {}),
@@ -439,7 +439,7 @@ function consumeResponseStreamText(state: ResponseStreamState, text: string, onD
     }
 }
 
-async function requestStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
+async function requestStreamingResponse(config: ModelRequestConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
     const response = await fetch(aiApiUrl(config, "/responses"), {
         method: "POST",
         headers: { ...aiHeaders(config, "application/json"), Accept: "text/event-stream" },

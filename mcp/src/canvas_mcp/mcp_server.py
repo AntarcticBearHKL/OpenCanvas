@@ -1,4 +1,4 @@
-"""MCP server wiring: the 30 tools over the official Streamable HTTP transport.
+"""MCP server wiring: the 29 tools over the official Streamable HTTP transport.
 
 Port of ``web/server/mcp.ts`` using the low-level ``Server`` callbacks so tool
 names, descriptions and input schemas are exactly controlled.

@@ -121,7 +121,7 @@ export function WriteStudio() {
                     <ProseEditor />
                 </div>
             ) : (
-                <DockArea defs={WRITE_DOCK_PANELS} layout={dock.layout} renderPanel={renderWritePanel} onActivate={dock.activate} onMove={dock.move} onResize={dock.resize}>
+                <DockArea defs={WRITE_DOCK_PANELS} layout={dock.layout} renderPanel={renderWritePanel} onActivate={dock.activate} onMove={dock.move} onResize={dock.resize} onSplit={dock.split}>
                     <ProseEditor />
                 </DockArea>
             )}
