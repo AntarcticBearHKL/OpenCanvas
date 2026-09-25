@@ -19,6 +19,9 @@
 - 补充时写成明确、可执行的规则，避免只写模糊描述。
 - 新规则应放到最相关的章节；找不到合适章节时放到“项目注意事项”。
 - 不要用 PowerShell 的 `Get-Content` / `Set-Content` / `Out-File` 往返读写仓库文件：PowerShell 5.1 按 GBK 读写，会破坏 UTF-8 中文并写入 BOM，`CHANGELOG.md` 已因此损坏过一次。修改仓库文件一律用编辑器或 Edit 工具；脚本必须写文件时用 `[System.IO.File]::WriteAllText` 配合 `New-Object System.Text.UTF8Encoding($false)`。
+- 委派的后台任务必须有明确的运行时长上限；达到上限就中止并汇报，不要让它无限期跑下去。任务结束前必须关闭自己启动的**一切**进程与服务（本地服务、调试宿主、mock 服务、构建产物），不允许把监听端口的常驻进程留在用户机器上。需要常驻的本地程序必须提供 PID 文件与 `--stop`（或等价的停止方式），并在启动前检查目标端口：端口被占用就直接报出占用者的 PID 与进程名，不要静默重试或换端口硬跑。
+- `.ps1` 脚本一律写成 **ASCII-only**；确实需要中文等非 ASCII 内容时，必须存成 **UTF-8 with BOM**。PowerShell 5.1 按系统 ANSI（本机为 GBK）解析 `.ps1`，含非 ASCII 的 UTF-8 无 BOM 脚本会被当成乱码并直接语法报错（例如 `Missing expression after ','`、`The string is missing the terminator`），不要靠猜去排查。
+- 清理遗留开发进程统一走 `tools/dev-watchdog.ps1`（白名单：只认 `vst-host.exe` / `vst3probe.exe` / `validator.exe`、以及 `vst-host\build\` 下的可执行文件和跑 `vst-mock-host` 的 node，**绝不碰 `node` 开发服务器**）。用法：`-Mode Report` 只报告（默认），`-Mode Reap -MaxAgeMinutes N` 回收超龄进程，`-InstallTask` / `-UninstallTask` 装/卸每 30 分钟自动回收的计划任务。
 
 ## 前端规范
 
