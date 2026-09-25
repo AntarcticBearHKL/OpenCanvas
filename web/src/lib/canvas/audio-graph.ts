@@ -1,8 +1,10 @@
 import * as Tone from "tone";
 
 import { AUDIO_AUTOMATION_GAIN, AUDIO_AUTOMATION_PAN, audioAutomationSendTarget, automationEvents, automationKey, automationSendId, automationValueAt, clampAutomationValue } from "@/lib/canvas/audio-automation";
-import { AUDIO_DEFAULT_PPQN, clampVelocity, instrumentPreset, noteName, sortNotes, ticksToSeconds } from "@/lib/canvas/audio-midi";
-import { AUDIO_DEFAULT_TEMPO, audioRoutingCycle, audioTrackOutputId, canHostClips, canHostMidi, clampClipGain, clampGain, clampPan, computeAudibility } from "@/lib/canvas/audio-project";
+import { AUDIO_DEFAULT_PPQN, clampPitch, clampVelocity, instrumentPreset, noteName, sortNotes, ticksToSeconds } from "@/lib/canvas/audio-midi";
+import { AUDIO_DEFAULT_TEMPO, audioRoutingCycle, audioTrackOutputId, canHostClips, canHostMidi, clampClipGain, clampGain, clampPan, computeAudibility, isVst3Instrument } from "@/lib/canvas/audio-project";
+import { createVstClient, createVstStreamWorker, VST_WORKLET_PROCESSOR, VST_WORKLET_URL, type VstClient } from "@/lib/canvas/audio-vst";
+import { VST_BUFFER_POOL_SIZE, VST_CHANNELS } from "@/lib/canvas/audio-vst-protocol";
 import { loadAudioBuffer } from "@/lib/canvas/audio-waveform";
 import type { CanvasAudioAutomationLane, CanvasAudioClip, CanvasAudioMidiRegion, CanvasAudioTrack } from "@/types/canvas";
 
@@ -23,11 +25,28 @@ export type AudioGraphStrip = {
     postSends: Map<string, Tone.Gain>;
 };
 
+/** Native VST3 source state; the attach is asynchronous, so the fields fill in after `buildAudioGraph` returned. */
+export type AudioGraphVstSource = {
+    pluginId: string;
+    /** `pending` until the attach resolves; `ready` once the host streams; `offline` when a mixdown skipped a real-time VST; `failed` leaves only this track silent. */
+    status: "pending" | "ready" | "offline" | "failed";
+    instanceId?: string;
+    /** Failure text for a `failed` source, or the skipped reason for an `offline` one. */
+    error?: string;
+    framesReceived?: number;
+    framesDropped?: number;
+    droppedBlocks?: number;
+    underruns?: number;
+    streamErrors?: number;
+};
+
 export type AudioGraph = {
     strips: Map<string, AudioGraphStrip>;
     players: Map<string, Tone.Player>;
     synths: Map<string, Tone.PolySynth>;
     automated: Set<string>;
+    /** Native VST3 sources by track id; empty without vst3 instruments, and a failed attach only silences its own track. */
+    vstSources: Map<string, AudioGraphVstSource>;
     /** Re-schedules the ramp events of a new automation state without touching strips or players. */
     scheduleAutomation: (automation: CanvasAudioAutomationLane[]) => void;
     /** Re-schedules the notes of a new MIDI region state without rebuilding the synths. */
@@ -41,6 +60,17 @@ export type AudioGraph = {
 
 type AutomationParam = Tone.Param<"gain"> | Tone.Param<"audioRange">;
 type AutomationBinding = { param: AutomationParam; target: string; points: CanvasAudioAutomationLane["points"]; events: number[] };
+
+/** One attached native bridge: the streaming worker, the worklet fed by it, and the main-thread note timers. */
+type VstBridge = {
+    client: VstClient;
+    worker: Worker;
+    node: AudioWorkletNode;
+    source: AudioGraphVstSource;
+    instanceId: string;
+    held: Set<number>;
+    timers: number[];
+};
 
 /** Load each clip source once, keyed by source node id; unreadable sources are skipped. */
 export async function loadAudioGraphBuffers(clips: CanvasAudioClip[], sources: Record<string, string>) {
@@ -67,6 +97,13 @@ export async function loadAudioGraphBuffers(clips: CanvasAudioClip[], sources: R
  * diverge. `transport` schedules players on the Tone transport, `offline` starts them immediately
  * inside a `Tone.Offline` render. The mute/solo gate precedes the pre-send taps, so a mute or a
  * solo state silences pre- and post-fader sends alike.
+ *
+ * A track whose instrument is the vst3 variant is hosted by the native bridge instead of a poly
+ * synth: the streaming worker owns the host connection, the worklet feeds the same `strip.input`,
+ * and the track's notes go out as `noteOn`/`noteOff` at their transport times. The attach is
+ * asynchronous and soft-fails into `vstSources`, so an unreachable host only silences that track.
+ * A real-time native process cannot run inside `Tone.Offline`, so an offline render reports the
+ * skipped vst3 sources instead of quietly producing a mix without them.
  */
 export function buildAudioGraph(doc: AudioGraphDoc, buffers: Map<string, Tone.ToneAudioBuffer>, options: { mode: "transport" | "offline"; meters?: boolean }): AudioGraph {
     const { tracks, clips } = doc;
@@ -112,13 +149,128 @@ export function buildAudioGraph(doc: AudioGraphDoc, buffers: Map<string, Tone.To
         });
     });
 
-    // Instrument and MIDI tracks own one poly synth each, feeding the same strip input as their players.
+    // Instrument and MIDI tracks own one poly synth each, feeding the same strip input as their players. A track
+    // whose instrument is the vst3 variant owns a native bridge source instead: the streaming worker receives the
+    // host's PCM and forwards it over a MessagePort straight to the worklet, and the worklet feeds the very same
+    // `strip.input`, so gain, pan, mute/solo, sends and master keep working. The attach is asynchronous, never
+    // throws, and only ever silences its own track.
     const synths = new Map<string, Tone.PolySynth>();
+    const vstBridges = new Map<string, VstBridge>();
+    const vstSources = new Map<string, AudioGraphVstSource>();
+    let disposed = false;
+
+    const clearVstTimers = (bridge: VstBridge) => {
+        bridge.timers.forEach((id) => window.clearTimeout(id));
+        bridge.timers.length = 0;
+    };
+    // A reschedule, loop, pause or stop moves playback away from the pending native note timers, so the timers are
+    // dropped and every held note released; otherwise a host note could outlive its transport position.
+    const panicVst = (bridge: VstBridge) => {
+        clearVstTimers(bridge);
+        bridge.held.forEach((pitch) => void bridge.client.noteOff({ instanceId: bridge.instanceId, pitch }).catch(() => undefined));
+        bridge.held.clear();
+    };
+    const panicAllVst = () => vstBridges.forEach(panicVst);
+
+    /** MIDI velocity 1..127 for the host; the document's 0..1 velocity is scaled, never rounded to silence. */
+    const vstVelocity = (velocity: number) => Math.min(127, Math.max(1, Math.round(clampVelocity(velocity) * 127)));
+
+    /** Fire `noteOn`/`noteOff` at the very transport time the PolySynth would have played the note, via real timers. */
+    const scheduleVstNote = (bridge: VstBridge, pitch: number, velocity: number, time: number, length: number) => {
+        if (bridge.source.status !== "ready") return;
+        const delay = Math.max(0, (time - Tone.now()) * 1000);
+        bridge.timers.push(
+            window.setTimeout(() => {
+                if (bridge.source.status !== "ready") return;
+                bridge.held.add(pitch);
+                void bridge.client.noteOn({ instanceId: bridge.instanceId, pitch, velocity: vstVelocity(velocity) }).catch(() => undefined);
+            }, delay),
+        );
+        bridge.timers.push(
+            window.setTimeout(() => {
+                bridge.held.delete(pitch);
+                void bridge.client.noteOff({ instanceId: bridge.instanceId, pitch }).catch(() => undefined);
+            }, delay + length * 1000),
+        );
+    };
+
+    const attachVstBridge = async (trackId: string, pluginId: string, strip: AudioGraphStrip, source: AudioGraphVstSource) => {
+        let client: VstClient | null = null;
+        let worker: Worker | null = null;
+        let node: AudioWorkletNode | null = null;
+        let instanceId = "";
+        try {
+            const context = strip.input.context;
+            await context.addAudioWorkletModule(VST_WORKLET_URL);
+            if (disposed) return;
+            client = createVstClient();
+            instanceId = (await client.load({ pluginId })).instanceId;
+            if (disposed) {
+                void client.unload(instanceId).catch(() => undefined);
+                return;
+            }
+            node = context.createAudioWorkletNode(VST_WORKLET_PROCESSOR, { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [VST_CHANNELS] });
+            worker = createVstStreamWorker();
+            // PCM goes worker -> MessagePort -> worklet; the main thread only wires the channel and never touches a sample.
+            const channel = new MessageChannel();
+            node.port.postMessage({ type: "attach", port: channel.port1 }, [channel.port1]);
+            worker.postMessage({ type: "attach", port: channel.port2 }, [channel.port2]);
+            // A deeper jitter buffer than the processor default, matching the proven bridge test: delivery is bursty.
+            node.port.postMessage({ type: "config", channels: VST_CHANNELS, lookaheadBlocks: 4, maxBufferedBlocks: VST_BUFFER_POOL_SIZE });
+            node.port.onmessage = (event: MessageEvent<{ type?: string; underruns?: number; dropped?: number }>) => {
+                if (event.data?.type !== "stats") return;
+                source.underruns = event.data.underruns;
+                source.droppedBlocks = event.data.dropped;
+            };
+            worker.onmessage = (event: MessageEvent<{ type?: string; framesReceived?: number; framesDropped?: number; streamErrors?: number; code?: string; message?: string }>) => {
+                const message = event.data;
+                if (!message) return;
+                if (message.type === "stats") {
+                    source.framesReceived = message.framesReceived;
+                    source.framesDropped = message.framesDropped;
+                    source.streamErrors = message.streamErrors;
+                } else if (message.type === "error") {
+                    source.status = "failed";
+                    source.error = message.message || message.code || "VST stream error";
+                }
+            };
+            worker.postMessage({ type: "config", baseUrl: client.baseUrl, token: client.token, instanceId });
+            worker.postMessage({ type: "start" });
+            // The same strip input the players and synths feed, so the whole mixer chain stays in front of it.
+            node.connect(strip.input.input);
+            vstBridges.set(trackId, { client, worker, node, source, instanceId, held: new Set(), timers: [] });
+            source.instanceId = instanceId;
+            source.status = "ready";
+        } catch (error) {
+            // Soft failure: this track stays silent, the rest of the graph is untouched, and the reason is reported.
+            source.status = "failed";
+            source.error = error instanceof Error ? error.message : String(error);
+            node?.disconnect();
+            node?.port.close();
+            worker?.terminate();
+            if (client && instanceId) void client.unload(instanceId).catch(() => undefined);
+        }
+    };
+
     tracks.forEach((track) => {
         if (!canHostMidi(track)) return;
         const strip = strips.get(track.id);
         if (!strip) return;
-        const preset = instrumentPreset(track.instrument?.preset);
+        const instrument = track.instrument;
+        if (isVst3Instrument(instrument)) {
+            const source: AudioGraphVstSource = { pluginId: instrument.pluginId, status: "pending" };
+            vstSources.set(track.id, source);
+            // A real-time native host cannot run inside `Tone.Offline`, so an offline mixdown deliberately skips this
+            // source (the track stays silent) and says so on the graph handle; bounce/freeze is a later slice.
+            if (options.mode === "offline") {
+                source.status = "offline";
+                source.error = "offline mixdown skips real-time VST3 instruments";
+                return;
+            }
+            void attachVstBridge(track.id, instrument.pluginId, strip, source);
+            return;
+        }
+        const preset = instrumentPreset(instrument?.preset);
         const synth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: preset.oscillator }, envelope: preset.envelope });
         synth.volume.value = preset.volume;
         synth.connect(strip.input);
@@ -185,22 +337,36 @@ export function buildAudioGraph(doc: AudioGraphDoc, buffers: Map<string, Tone.To
     const scheduleMidi = (regions: CanvasAudioMidiRegion[], ppqn: number, tempo: number) => {
         noteEvents.forEach((id) => transport.clear(id));
         noteEvents.length = 0;
+        // Every reschedule invalidates the pending native note timers, so they are dropped and held notes released.
+        panicAllVst();
         regions.forEach((region) => {
             const synth = synths.get(region.trackId);
-            if (!synth || region.durationTicks <= 0) return;
+            const bridge = vstBridges.get(region.trackId);
+            if ((!synth && !bridge) || region.durationTicks <= 0) return;
             const start = ticksToSeconds(region.startTicks, ppqn, tempo);
             sortNotes(region.notes).forEach((note) => {
                 if (note.tick >= region.durationTicks) return;
                 const at = start + ticksToSeconds(note.tick, ppqn, tempo);
                 const length = Math.max(0.02, ticksToSeconds(note.durationTicks, ppqn, tempo));
-                const pitch = noteName(note.pitch);
                 const velocity = clampVelocity(note.velocity);
-                if (options.mode === "offline") synth.triggerAttackRelease(pitch, length, at, velocity);
-                else noteEvents.push(transport.schedule((time) => synth.triggerAttackRelease(pitch, length, time, velocity), at));
+                if (synth) {
+                    const pitch = noteName(note.pitch);
+                    if (options.mode === "offline") synth.triggerAttackRelease(pitch, length, at, velocity);
+                    else noteEvents.push(transport.schedule((time) => synth.triggerAttackRelease(pitch, length, time, velocity), at));
+                }
+                // The bridge reuses the same note list, tick math and length math as the synth path above.
+                if (bridge) noteEvents.push(transport.schedule((time) => scheduleVstNote(bridge, clampPitch(note.pitch), velocity, time, length), at));
             });
         });
     };
     scheduleMidi(doc.regions ?? [], doc.ppqn ?? AUDIO_DEFAULT_PPQN, doc.tempo ?? AUDIO_DEFAULT_TEMPO);
+
+    if (options.mode === "transport") {
+        // A stop, pause or loop jumps the transport away from pending native note timers, so held notes are released.
+        transport.on("stop", panicAllVst);
+        transport.on("pause", panicAllVst);
+        transport.on("loop", panicAllVst);
+    }
 
     if (options.meters) strips.forEach((strip) => strip.meter && strip.panner.connect(strip.meter));
 
@@ -251,17 +417,31 @@ export function buildAudioGraph(doc: AudioGraphDoc, buffers: Map<string, Tone.To
         players,
         synths,
         automated,
+        vstSources,
         scheduleAutomation: rescheduleAutomation,
         scheduleMidi,
         clickMetronome,
         scheduleMetronome,
         dispose: () => {
+            disposed = true;
             if (clickEvent) transport.clear(clickEvent);
             clickSynth?.dispose();
             transport.off("start", scheduleAutomation);
             transport.off("loop", scheduleAutomation);
+            transport.off("stop", panicAllVst);
+            transport.off("pause", panicAllVst);
+            transport.off("loop", panicAllVst);
             bindings.forEach((binding) => binding.events.forEach((id) => transport.clear(id)));
             noteEvents.forEach((id) => transport.clear(id));
+            vstBridges.forEach((bridge) => {
+                panicVst(bridge);
+                bridge.node.disconnect();
+                bridge.node.port.close();
+                bridge.worker.postMessage({ type: "stop" });
+                bridge.worker.terminate();
+                void bridge.client.unload(bridge.instanceId).catch(() => undefined);
+            });
+            vstBridges.clear();
             players.forEach((player) => player.dispose());
             synths.forEach((synth) => synth.dispose());
             strips.forEach((strip) => {

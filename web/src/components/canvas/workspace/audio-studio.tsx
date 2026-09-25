@@ -495,7 +495,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     // Structural identity: strips, players and send taps follow it. Mix settings, clip gain/fades and automation
     // points are deliberately absent, so those edits never rebuild a player.
     const tracksVersion = [
-        tracks.map((track) => `${track.id}:${audioTrackType(track)}:${track.output ?? ""}:${track.instrument?.preset ?? ""}:${(track.sends ?? []).map((send) => `${send.id}:${send.targetTrackId}:${send.pre ? 1 : 0}:${send.enabled ? 1 : 0}`).join(",")}`).join("|"),
+        tracks.map((track) => `${track.id}:${audioTrackType(track)}:${track.output ?? ""}:${track.instrument?.kind === "vst3" ? `vst3:${track.instrument.pluginId}` : track.instrument?.preset ?? ""}:${(track.sends ?? []).map((send) => `${send.id}:${send.targetTrackId}:${send.pre ? 1 : 0}:${send.enabled ? 1 : 0}`).join(",")}`).join("|"),
         projectClips.map((clip) => `${clip.id}:${clip.trackId}:${clip.sourceNodeId}:${clip.start}:${clip.offset}:${clip.duration}:${clip.loop ? 1 : 0}:${clip.reversed ? 1 : 0}:${clip.muted ? 1 : 0}`).join("|"),
     ].join("||");
     // MIDI regions and their notes only re-schedule the synths, so they stay out of the structural key above.
@@ -585,6 +585,10 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     const previewTrackMix = useCallback((trackId: string, patch: { gain?: number; pan?: number }) => {
         applyLiveTrackMix(graphRef.current, trackId, patch);
     }, []);
+
+    // The piano roll reads one track's native bridge instance straight off the live graph (no second registry);
+    // polling through this callback picks up the `instanceId` the asynchronous attach sets after the build.
+    const getVstSource = useCallback((trackId: string) => graphRef.current?.vstSources.get(trackId) ?? null, []);
 
     // Meters paint straight to the DOM from rAF; no per-frame React state.
     useEffect(() => {
@@ -2285,6 +2289,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                             tempo={tempo}
                             meter={meter}
                             snap={grid.snap}
+                            getVstSource={getVstSource}
                             onRegionPatch={(patch) => {
                                 if (selectedRegion) updateRegion(selectedRegion.id, patch);
                             }}

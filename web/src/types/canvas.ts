@@ -222,7 +222,13 @@ export type CanvasAudioMarker = { id: string; time: number; name?: string; color
 export type CanvasAudioTrackType = "audio" | "instrument" | "midi" | "group" | "return" | "master";
 
 /** Built-in instrument of an instrument/MIDI track; only `synth` is implemented, `sampler` is reserved for a later stage. */
-export type CanvasAudioInstrument = { kind: "synth" | "sampler"; preset?: string; soundFontKey?: string };
+export type CanvasAudioSynthInstrument = { kind: "synth" | "sampler"; preset?: string; soundFontKey?: string };
+
+/** Native VST3 instrument played by the local bridge; `pluginId` is a scanned plugin id, `stateKey` is reserved for later plugin-state persistence. */
+export type CanvasAudioVst3Instrument = { kind: "vst3"; pluginId: string; name?: string; stateKey?: string };
+
+/** Instrument of an instrument/MIDI track: a built-in synth/sampler preset or a native VST3 plugin hosted by the bridge. */
+export type CanvasAudioInstrument = CanvasAudioSynthInstrument | CanvasAudioVst3Instrument;
 
 /** Aux send; `pre` taps before the fader (both taps sit inside the track's mute/solo gate). */
 export type CanvasAudioSend = {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Select } from "antd";
-import { Music2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Music2, SlidersHorizontal, X, ZoomIn, ZoomOut } from "lucide-react";
 import * as Tone from "tone";
 import { useTranslation } from "react-i18next";
 
@@ -30,6 +30,9 @@ import {
     snapTicks,
 } from "@/lib/canvas/audio-midi";
 import { audioTrackType } from "@/lib/canvas/audio-project";
+import type { AudioGraphVstSource } from "@/lib/canvas/audio-graph";
+import { createVstClient } from "@/lib/canvas/audio-vst";
+import type { VstPlugin } from "@/lib/canvas/audio-vst-protocol";
 import type { CanvasAudioMidiRegion, CanvasAudioNote, CanvasAudioSnap, CanvasAudioTrack } from "@/types/canvas";
 
 const KEY_WIDTH = 46;
@@ -42,6 +45,45 @@ const MAX_PX_PER_BEAT = 240;
 const ROLL_ACTION_CLASS = "grid size-6 shrink-0 place-items-center rounded-md transition hover:bg-hover hover:opacity-100 hover:bg-hover";
 const EMPTY_NOTES: CanvasAudioNote[] = [];
 
+type VstScanState = { status: "loading" | "ready" | "unavailable"; plugins: VstPlugin[] };
+type VstEditorSource = { status: AudioGraphVstSource["status"]; instanceId: string };
+
+// The host caches its own scan, so one scan per page load is enough; a failed scan is dropped so
+// opening the roll again retries once the host has been started.
+let vstScanTask: Promise<VstPlugin[]> | null = null;
+
+function vstInstruments() {
+    if (!vstScanTask) {
+        vstScanTask = createVstClient()
+            .scan()
+            .then((plugins) => plugins.filter((plugin) => plugin.isInstrument))
+            .catch((error) => {
+                vstScanTask = null;
+                throw error;
+            });
+    }
+    return vstScanTask;
+}
+
+function useVstInstruments(): VstScanState {
+    const [state, setState] = useState<VstScanState>({ status: "loading", plugins: [] });
+    useEffect(() => {
+        let active = true;
+        void vstInstruments().then(
+            (plugins) => {
+                if (active) setState({ status: "ready", plugins });
+            },
+            () => {
+                if (active) setState({ status: "unavailable", plugins: [] });
+            },
+        );
+        return () => {
+            active = false;
+        };
+    }, []);
+    return state;
+}
+
 type AudioPianoRollProps = {
     track: CanvasAudioTrack | null;
     region: CanvasAudioMidiRegion | null;
@@ -52,6 +94,7 @@ type AudioPianoRollProps = {
     onRegionPatch: (patch: Partial<CanvasAudioMidiRegion>) => void;
     onNotes: (notes: CanvasAudioNote[]) => void;
     onTrackPatch: (patch: Partial<CanvasAudioTrack>) => void;
+    getVstSource: (trackId: string) => AudioGraphVstSource | null;
     onClose: () => void;
 };
 
@@ -68,9 +111,10 @@ type NoteGesture = {
     moved: boolean;
 };
 
-export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap, onRegionPatch, onNotes, onTrackPatch, onClose }: AudioPianoRollProps) {
+export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap, onRegionPatch, onNotes, onTrackPatch, getVstSource, onClose }: AudioPianoRollProps) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
+    const vst = useVstInstruments();
     const scrollRef = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
     const playheadRef = useRef<HTMLSpanElement>(null);
@@ -81,6 +125,11 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
     const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
     const [pxPerBeat, setPxPerBeat] = useState(40);
     const notes = noteDraft ?? region?.notes ?? EMPTY_NOTES;
+    const trackId = track?.id ?? "";
+    const vstPluginId = track?.instrument?.kind === "vst3" ? track.instrument.pluginId : "";
+    const [vstSource, setVstSource] = useState<VstEditorSource | null>(null);
+    const [editorOpening, setEditorOpening] = useState(false);
+    const [editorError, setEditorError] = useState(false);
 
     const noteStep = snapTicks(snap, ppqn, meter);
     const pxPerTick = pxPerBeat / ppqn;
@@ -126,6 +175,40 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
     }, [regionId, region?.startTicks, ppqn, tempo, pxPerTick, gridWidth]);
+
+    // The bridge attach resolves after the graph build, so readiness is polled from the graph handle; the
+    // effect only runs while this track's instrument is a vst3 one.
+    useEffect(() => {
+        setEditorError(false);
+        if (!trackId || !vstPluginId) {
+            setVstSource(null);
+            return;
+        }
+        const sync = () => {
+            const source = getVstSource(trackId);
+            const next: VstEditorSource | null = source ? { status: source.status, instanceId: source.instanceId ?? "" } : null;
+            setVstSource((current) => (current && next && current.status === next.status && current.instanceId === next.instanceId ? current : next));
+        };
+        sync();
+        const timer = window.setInterval(sync, 500);
+        return () => window.clearInterval(timer);
+    }, [trackId, vstPluginId, getVstSource]);
+
+    const openVstEditor = async () => {
+        if (editorOpening) return;
+        const instanceId = getVstSource(trackId)?.instanceId;
+        if (!instanceId) return;
+        setEditorOpening(true);
+        setEditorError(false);
+        try {
+            const result = await createVstClient().openEditor(instanceId);
+            if (!result.opened) setEditorError(true);
+        } catch {
+            setEditorError(true);
+        } finally {
+            setEditorOpening(false);
+        }
+    };
 
     const commitNotes = (notes: CanvasAudioNote[]) => {
         draftRef.current = null;
@@ -238,6 +321,22 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
         );
     }
 
+    const instrumentValue = track.instrument?.kind === "vst3" ? `vst:${track.instrument.pluginId}` : instrumentPreset(track.instrument?.preset).id;
+    const vstOptions = vst.plugins.map((plugin) => ({ value: `vst:${plugin.id}`, label: plugin.vendor ? `${plugin.name} · ${plugin.vendor}` : plugin.name }));
+    if (track.instrument?.kind === "vst3" && !vstOptions.some((option) => option.value === instrumentValue)) vstOptions.unshift({ value: instrumentValue, label: track.instrument.name || track.instrument.pluginId });
+    const instrumentOptions = [
+        { label: t("canvas.audioStudio.rollInstrumentBuiltin"), options: AUDIO_INSTRUMENT_PRESETS.map((preset) => ({ value: preset.id, label: t(preset.labelKey) })) },
+        {
+            label: t("canvas.audioStudio.rollInstrumentVst3"),
+            options: vstOptions.length ? vstOptions : [{ value: "vst-unavailable", label: t(vst.status === "loading" ? "canvas.audioStudio.vstScanning" : "canvas.audioStudio.vstHostDown"), disabled: true }],
+        },
+    ];
+    const vstEditorReady = track.instrument?.kind === "vst3" && vstSource !== null && vstSource.status === "ready" && Boolean(vstSource.instanceId);
+    const vstEditorHint =
+        track.instrument?.kind === "vst3" && vstSource && vstSource.status !== "ready"
+            ? t(vstSource.status === "failed" ? "canvas.audioStudio.vstEditorFailed" : vstSource.status === "offline" ? "canvas.audioStudio.vstEditorOffline" : "canvas.audioStudio.vstEditorPending")
+            : "";
+
     return (
         <div className="flex min-h-0 flex-1 flex-col glass-card">
             <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-2 py-1 text-sm" style={{ borderColor: theme.toolbar.border, color: theme.node.muted }}>
@@ -251,19 +350,59 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
                 />
                 <span className="shrink-0 tabular-nums">{t("canvas.audioStudio.rollNotes", { count: notes.length })}</span>
                 {audioTrackType(track) === "instrument" ? (
-                    <label className="flex shrink-0 items-center gap-1.5">
+                    <label className="flex shrink-0 items-center gap-1.5" data-roll-instrument="true">
                         <span>{t("canvas.audioStudio.rollInstrument")}</span>
                         <Select
                             size="small"
                             className="w-[104px]"
-                            value={instrumentPreset(track.instrument?.preset).id}
-                            options={AUDIO_INSTRUMENT_PRESETS.map((preset) => ({ value: preset.id, label: t(preset.labelKey) }))}
+                            value={instrumentValue}
+                            options={instrumentOptions}
                             popupMatchSelectWidth={false}
                             styles={{ popup: { root: { zIndex: 1300 } } }}
                             aria-label={t("canvas.audioStudio.rollInstrument")}
-                            onChange={(value: string) => onTrackPatch({ instrument: { kind: "synth", preset: value } })}
+                            onChange={(value: string) => {
+                                if (value.startsWith("vst:")) {
+                                    const pluginId = value.slice(4);
+                                    const plugin = vst.plugins.find((item) => item.id === pluginId);
+                                    const name = plugin?.name ?? (track.instrument?.kind === "vst3" ? track.instrument.name : undefined);
+                                    onTrackPatch({ instrument: { kind: "vst3", pluginId, ...(name ? { name } : {}) } });
+                                    return;
+                                }
+                                onTrackPatch({ instrument: { kind: "synth", preset: value } });
+                            }}
                         />
+                        {vst.status === "unavailable" ? (
+                            <span className="shrink-0" style={{ color: theme.node.muted }}>
+                                {t("canvas.audioStudio.vstHostDown")}
+                            </span>
+                        ) : null}
                     </label>
+                ) : null}
+                {vstEditorReady ? (
+                    <>
+                        <button
+                            type="button"
+                            className="flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 transition hover:bg-hover"
+                            style={{ color: theme.node.text }}
+                            data-roll-vst-editor="true"
+                            disabled={editorOpening}
+                            aria-label={t("canvas.audioStudio.vstEditorOpen")}
+                            title={t("canvas.audioStudio.vstEditorOpen")}
+                            onClick={() => void openVstEditor()}
+                        >
+                            <SlidersHorizontal className="size-3.5" />
+                            {t(editorOpening ? "canvas.audioStudio.vstEditorOpening" : "canvas.audioStudio.vstEditorOpen")}
+                        </button>
+                        {editorError ? (
+                            <span className="shrink-0" style={{ color: theme.node.danger }} data-roll-vst-editor-error="true">
+                                {t("canvas.audioStudio.vstEditorOpenFailed")}
+                            </span>
+                        ) : null}
+                    </>
+                ) : vstEditorHint ? (
+                    <span className="shrink-0" style={{ color: theme.node.muted }} data-roll-vst-editor-hint="true">
+                        {vstEditorHint}
+                    </span>
                 ) : null}
                 <span className="flex shrink-0 items-center gap-1">
                     <button type="button" className={ROLL_ACTION_CLASS} style={{ color: theme.node.muted }} aria-label={t("canvas.audioStudio.zoomIn")} title={t("canvas.audioStudio.zoomIn")} onClick={() => setPxPerBeat((prev) => Math.min(MAX_PX_PER_BEAT, prev * 1.25))}>

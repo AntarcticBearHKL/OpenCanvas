@@ -4,3 +4,11 @@ description: Planned follow-up work
 ---
 
 # TODO
+
+## VST3 音源（本地宿主）
+
+- 宿主崩溃隔离：运行时加载插件目前与宿主同进程（插件崩溃可能带走宿主）；扫描已经在隔离子进程里做了。改成每个插件实例独立子进程。
+- 插件状态持久化：把插件自己的 state 存进项目（localforage blob key，并在 `collectMediaStorageKeys` 注册以便随项目清理），重载后恢复插件内部的预置选择；节点 metadata 只保留 `{ pluginId, stateKey }`，不要把 state 直接塞进文档。
+- 冻结 / 就地渲染（bounce）：让离线导出能包含 VST3 音源轨（当前导出会跳过该轨）。同时给导出界面加上对应的提示。
+- VST3 效果器：在音轨 / 发送上使用 VST3 效果插件（当前只支持音源）。
+- 32 位与 ARM64 插件支持；原生低延迟输出（WASAPI 独占 / ASIO）——后者是唯一能把 MIDI → 声音压到 10ms 以内的路径。

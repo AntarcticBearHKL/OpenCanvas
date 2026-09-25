@@ -6,12 +6,14 @@ import {
     CanvasNodeType,
     type CanvasAudioCapture,
     type CanvasAudioClip,
+    type CanvasAudioInstrument,
     type CanvasAudioMarker,
     type CanvasAudioMidiRegion,
     type CanvasAudioSend,
     type CanvasAudioSnap,
     type CanvasAudioTrack,
     type CanvasAudioTrackType,
+    type CanvasAudioVst3Instrument,
     type CanvasNodeData,
 } from "@/types/canvas";
 
@@ -126,10 +128,15 @@ export function canHostClips(track: CanvasAudioTrack) {
     return audioTrackType(track) === "audio";
 }
 
-/** Instrument and MIDI tracks carry MIDI regions; both play through their own built-in synth. */
+/** Instrument and MIDI tracks carry MIDI regions; each plays through its built-in synth or, for the vst3 variant, the native bridge. */
 export function canHostMidi(track: CanvasAudioTrack) {
     const type = audioTrackType(track);
     return type === "instrument" || type === "midi";
+}
+
+/** True when the instrument is the native VST3 variant, which the shared graph builder hosts over the bridge instead of a synth. */
+export function isVst3Instrument(instrument?: CanvasAudioInstrument): instrument is CanvasAudioVst3Instrument {
+    return instrument?.kind === "vst3";
 }
 
 export function audioMasterTrackId(tracks: CanvasAudioTrack[]) {
