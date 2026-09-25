@@ -31,6 +31,8 @@ export const AUDIO_TRACK_TYPE_LABEL_KEYS: Record<CanvasAudioTrackType, string> =
     master: "canvas.audioStudio.trackTypeMaster",
 };
 
+export const AUDIO_NODE_DRAG_MIME = "application/x-infinite-canvas-audio-node";
+
 const ROW_CLASS = STUDIO_PANEL_ROW_CLASS;
 const LABEL_CLASS = STUDIO_PANEL_LABEL_CLASS;
 const SECTION_CLASS = "flex shrink-0 flex-col gap-0.5 px-2 pb-2 pt-1.5";
@@ -422,7 +424,7 @@ export function AudioInspectorPanel({ tracks, selectedTrackId, clips, selectedCl
     );
 }
 
-export function AudioMediaPoolPanel({ audioNodes, canAdd, onAdd, onGoCanvas }: { audioNodes: CanvasNodeData[]; canAdd: boolean; onAdd: (node: CanvasNodeData) => void; onGoCanvas: () => void }) {
+export function AudioMediaPoolPanel({ audioNodes, onGoCanvas }: { audioNodes: CanvasNodeData[]; onGoCanvas: () => void }) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     if (!audioNodes.length) {
@@ -442,22 +444,24 @@ export function AudioMediaPoolPanel({ audioNodes, canAdd, onAdd, onGoCanvas }: {
     return (
         <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto p-1.5 glass-card">
             {audioNodes.map((node) => (
-                <button
+                <div
                     key={node.id}
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-hover disabled:opacity-40 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent"
+                    draggable
+                    className="flex w-full cursor-grab items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-hover"
                     style={{ color: theme.node.text }}
-                    disabled={!canAdd}
-                    title={canAdd ? t("canvas.audioStudio.mediaAdd") : t("canvas.audioStudio.noTracks")}
-                    onClick={() => onAdd(node)}
+                    title={t("canvas.audioStudio.mediaDragHint")}
+                    onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "copy";
+                        event.dataTransfer.setData(AUDIO_NODE_DRAG_MIME, node.id);
+                        event.dataTransfer.setData("text/plain", node.id);
+                    }}
                 >
                     <Music2 className="size-3.5 shrink-0" style={{ color: theme.node.muted }} />
                     <span className="min-w-0 flex-1 truncate">{node.title || t("canvas.node.untitled")}</span>
                     <span className="shrink-0 tabular-nums" style={{ color: theme.node.muted }}>
                         {formatAudioTime((node.metadata?.durationMs || 0) / 1000)}
                     </span>
-                    <Plus className="size-3 shrink-0" style={{ color: theme.node.muted }} />
-                </button>
+                </div>
             ))}
         </div>
     );

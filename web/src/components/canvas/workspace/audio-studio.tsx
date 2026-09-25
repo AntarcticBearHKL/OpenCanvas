@@ -11,7 +11,7 @@ import { DockWindowMenu } from "@/components/canvas/dock/dock-window-menu";
 import { AudioAutomationLane, AudioAutomationPanel, AUTOMATION_LANE_HEIGHT, AUTOMATION_PLOT_HEIGHT } from "@/components/canvas/workspace/audio-automation-lane";
 import { AudioClipContextMenu, AudioLaneContextMenu, AudioMenus, AudioMidiRegionContextMenu, AudioRulerContextMenu, AudioTrackContextMenu, audioCompactMenuItems, audioOptionItems, AUDIO_MENU_BUTTON_CLASS, AUDIO_MENU_POPUP, prefixMenuKeys, type AudioAutomationCommand, type AudioClipCommand, type AudioEditCommand, type AudioLaneCommand, type AudioMidiRegionCommand, type AudioOptionCommand, type AudioTrackCommand, type AudioViewCommand } from "@/components/canvas/workspace/audio-menus";
 import AudioMixer from "@/components/canvas/workspace/audio-mixer";
-import { AudioInspectorPanel, AudioMediaPoolPanel, AudioMeter, AudioProjectSettingsPanel, AudioToggle, AudioValueInput, AUDIO_FADE_SHAPE_LABEL_KEYS, AUDIO_FADE_SHAPE_OPTIONS, AUDIO_METER_OPTIONS, AUDIO_SNAP_LABEL_KEYS, AUDIO_SNAP_OPTIONS, AUDIO_TRACK_TYPE_LABEL_KEYS } from "@/components/canvas/workspace/audio-panels";
+import { AudioInspectorPanel, AudioMediaPoolPanel, AudioMeter, AudioProjectSettingsPanel, AudioToggle, AudioValueInput, AUDIO_FADE_SHAPE_LABEL_KEYS, AUDIO_FADE_SHAPE_OPTIONS, AUDIO_METER_OPTIONS, AUDIO_NODE_DRAG_MIME, AUDIO_SNAP_LABEL_KEYS, AUDIO_SNAP_OPTIONS, AUDIO_TRACK_TYPE_LABEL_KEYS } from "@/components/canvas/workspace/audio-panels";
 import AudioPianoRoll from "@/components/canvas/workspace/audio-piano-roll";
 import PsColorPicker from "@/components/canvas/workspace/ps-color-picker";
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
@@ -227,6 +227,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     const [band, setBand] = useState<AudioBand | null>(null);
     const [range, setRange] = useState<{ start: number; end: number } | null>(null);
     const [picker, setPicker] = useState<{ trackId: string; at: number | null } | null>(null);
+    const [dropTrackId, setDropTrackId] = useState<string | null>(null);
     const [clipDialog, setClipDialog] = useState<"" | "rename" | "properties">("");
     const [autoCrossfade, setAutoCrossfade] = useState(true);
     const [clipboardCount, setClipboardCount] = useState(0);
@@ -1818,7 +1819,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                 />
             );
         if (panelId === "history") return <PanelShell icon={History} hint={t("canvas.audioStudio.historyHint")} theme={theme} />;
-        if (panelId === "media") return <AudioMediaPoolPanel audioNodes={audioNodes} canAdd={Boolean(selectedTrack && canHostClips(selectedTrack))} onAdd={(node) => void addClip(selectedTrack?.id ?? "", node, null)} onGoCanvas={onBack} />;
+        if (panelId === "media") return <AudioMediaPoolPanel audioNodes={audioNodes} onGoCanvas={onBack} />;
         if (panelId === "projectSettings") return <AudioProjectSettingsPanel tempo={tempo} meter={meter} grid={grid} cycle={cycle} punch={punch} metronome={metronome} capture={capture} countIn={countIn} masterGain={masterGain} onPatch={patchMetadata} />;
         if (panelId === "markers")
             return (
@@ -2310,6 +2311,29 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                         onPointerMove={movePan}
                         onPointerUp={endPan}
                         onPointerCancel={endPan}
+                        onDragOver={(event) => {
+                            if (!event.dataTransfer.types.includes(AUDIO_NODE_DRAG_MIME)) return;
+                            const target = trackAtY(contentPoint(event.clientX, event.clientY).y);
+                            if (!target || !canHostClips(target)) {
+                                setDropTrackId(null);
+                                return;
+                            }
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "copy";
+                            setDropTrackId(target.id);
+                        }}
+                        onDragLeave={(event) => {
+                            if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setDropTrackId(null);
+                        }}
+                        onDrop={(event) => {
+                            setDropTrackId(null);
+                            const id = event.dataTransfer.getData(AUDIO_NODE_DRAG_MIME) || event.dataTransfer.getData("text/plain");
+                            const node = id ? audioNodesById.get(id) : undefined;
+                            const target = trackAtY(contentPoint(event.clientX, event.clientY).y);
+                            if (!node || !target || !canHostClips(target)) return;
+                            event.preventDefault();
+                            void addClip(target.id, node, snapTime(timeAt(event.clientX), false));
+                        }}
                     >
                         <div ref={contentRef} className="relative" style={{ width: trackWidth + timelineWidth, minHeight: "100%" }}>
                             <div className="sticky top-0 z-40 flex" style={{ height: RULER_HEIGHT, background: theme.canvas.background }}>
@@ -2400,11 +2424,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                                     aria-label={trackPlaceholder(track)}
                                                     onChange={(event) => updateTrack(track.id, { name: event.target.value })}
                                                 />
-                                                {canHostClips(track) ? (
-                                                    <IconAction label={t("canvas.audioStudio.addClip")} onClick={() => setPicker(picker?.trackId === track.id ? null : { trackId: track.id, at: null })} compact>
-                                                        <Plus className="size-3.5" />
-                                                    </IconAction>
-                                                ) : canHostMidi(track) ? (
+                                                {canHostMidi(track) ? (
                                                     <IconAction label={t("canvas.audioStudio.addRegion")} onClick={() => addRegion(track.id)} compact>
                                                         <Plus className="size-3.5" />
                                                     </IconAction>
@@ -2469,7 +2489,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                                 else laneRefs.current.delete(track.id);
                                             }}
                                             className="relative shrink-0"
-                                            style={{ width: timelineWidth, borderBottom: `1px solid ${theme.toolbar.border}`, backgroundImage: gridImages, opacity: audible?.get(track.id) === false ? 0.45 : 1 }}
+                                            style={{ width: timelineWidth, borderBottom: `1px solid ${theme.toolbar.border}`, backgroundImage: gridImages, opacity: audible?.get(track.id) === false ? 0.45 : 1, backgroundColor: dropTrackId === track.id ? theme.node.accentSoft : undefined, boxShadow: dropTrackId === track.id ? `inset 0 0 0 1px ${theme.node.accent}` : undefined }}
                                             onPointerDown={(event) => beginLaneGesture(event, track.id)}
                                             onPointerMove={moveBand}
                                             onPointerUp={endBand}

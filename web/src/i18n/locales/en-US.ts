@@ -351,7 +351,7 @@ export default {
             historyHint: "Project edit history",
             mediaEmpty: "No audio assets on this canvas yet",
             mediaGoCanvas: "Add on canvas",
-            mediaAdd: "Add to the selected track",
+            mediaDragHint: "Drag onto a track",
             markerAtPlayhead: "Add marker at playhead",
             markerName: "Marker name",
             removeMarker: "Remove marker",

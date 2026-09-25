@@ -351,7 +351,7 @@ export default {
             historyHint: "工程操作历史",
             mediaEmpty: "画布中还没有音频素材",
             mediaGoCanvas: "前往画布添加",
-            mediaAdd: "添加到所选轨道",
+            mediaDragHint: "拖拽到音轨",
             markerAtPlayhead: "在播放头添加标记",
             markerName: "标记名称",
             removeMarker: "删除标记",
