@@ -16,12 +16,16 @@ import {
     VST_BUFFER_POOL_SIZE,
     VST_CHANNELS,
     VST_FRAMES_PER_BLOCK,
+    VST_INPUT_BATCH_BLOCKS,
     decodeRpc,
+    encodeFrames,
     encodeRpc,
+    hashInstanceId,
     readFrame,
     VstError,
     type VstCommand,
     type VstFrame,
+    type VstPluginRole,
     type VstRpcError,
     type VstRpcRequest,
     type VstRpcResponse,
@@ -32,6 +36,7 @@ export type VstWorkerConfig = {
     baseUrl: string;
     token: string;
     instanceId: string;
+    role?: VstPluginRole;
     sampleRate?: number;
     framesPerBlock?: number;
     channels?: number;
@@ -48,15 +53,28 @@ export type VstWorkerOutbound =
     | { type: "started"; instanceId: string }
     | { type: "stopped"; instanceId: string }
     | { type: "ended"; instanceId: string }
-    | { type: "stats"; framesReceived: number; framesDropped: number; bytesReceived: number; streamErrors: number; poolFree: number }
+    | {
+          type: "stats";
+          framesReceived: number;
+          framesDropped: number;
+          bytesReceived: number;
+          streamErrors: number;
+          poolFree: number;
+          framesUploaded: number;
+          uploadErrors: number;
+      }
     | { type: "error"; code: string; message: string }
     | { type: "rpc"; id: number; response: VstRpcResponse };
 
 const post = (message: VstWorkerOutbound) => (self as unknown as { postMessage: (message: VstWorkerOutbound) => void }).postMessage(message);
 
+type InputBlock = { channels: number; framesPerChannel: number; buffer: Float32Array };
+type WorkletPortMessage = { type: "recycle"; buffers?: Float32Array[] } | { type: "input"; channels: number; framesPerChannel: number; buffer: Float32Array };
+
 let baseUrl = "";
 let token = "";
 let instanceId = "";
+let role: VstPluginRole = "instrument";
 let channels = VST_CHANNELS;
 let framesPerBlock = VST_FRAMES_PER_BLOCK;
 let pool: Float32Array[] = [];
@@ -66,7 +84,11 @@ let streaming = false;
 let abort: AbortController | null = null;
 let statsTimer: ReturnType<typeof setInterval> | null = null;
 let nextRpcId = 1;
-const stats = { framesReceived: 0, framesDropped: 0, bytesReceived: 0, streamErrors: 0 };
+let inputQueue: InputBlock[] = [];
+let uploading = false;
+let nextInputSeq = 0;
+let inputHash = 0;
+const stats = { framesReceived: 0, framesDropped: 0, bytesReceived: 0, streamErrors: 0, framesUploaded: 0, uploadErrors: 0 };
 
 function toRpcError(error: unknown): VstRpcError {
     return { code: error instanceof VstError ? error.code : "worker-error", message: error instanceof Error ? error.message : String(error) };
@@ -76,8 +98,12 @@ function configure(config: VstWorkerConfig) {
     baseUrl = (config.baseUrl || "").trim().replace(/\/+$/, "");
     token = (config.token || "").trim();
     instanceId = config.instanceId;
+    role = config.role === "effect" ? "effect" : "instrument";
     channels = config.channels && config.channels > 0 ? config.channels : VST_CHANNELS;
     framesPerBlock = config.framesPerBlock && config.framesPerBlock > 0 ? config.framesPerBlock : VST_FRAMES_PER_BLOCK;
+    inputHash = hashInstanceId(instanceId);
+    nextInputSeq = 0;
+    inputQueue = [];
     pool = [];
     for (let i = 0; i < VST_BUFFER_POOL_SIZE; i++) pool.push(new Float32Array(framesPerBlock * channels));
     pending = null;
@@ -85,12 +111,20 @@ function configure(config: VstWorkerConfig) {
     stats.framesDropped = 0;
     stats.bytesReceived = 0;
     stats.streamErrors = 0;
+    stats.framesUploaded = 0;
+    stats.uploadErrors = 0;
 }
 
 function audioUrl(): string {
     const params = new URLSearchParams({ instance: instanceId });
     if (token) params.set("token", token);
     return `${baseUrl}/audio?${params.toString()}`;
+}
+
+function audioInUrl(): string {
+    const params = new URLSearchParams({ instance: instanceId });
+    if (token) params.set("token", token);
+    return `${baseUrl}/audio-in?${params.toString()}`;
 }
 
 async function postRpc(command: VstCommand, params: Record<string, unknown>, signal?: AbortSignal): Promise<VstRpcSuccess> {
@@ -143,6 +177,62 @@ function consume(chunk: Uint8Array) {
     pending = cursor < merged.byteLength ? merged.slice(cursor) : null;
 }
 
+/** Hand captured input buffers back to the worklet so its pool stays stable. */
+function recycleInput(buffers: Float32Array[]) {
+    if (!workletPort || !buffers.length) return;
+    workletPort.postMessage({ type: "input-recycle", buffers }, buffers.map((buffer) => buffer.buffer));
+}
+
+/**
+ * Queue one captured input block. Effect instances only: an instrument never uploads, and its block is
+ * returned straight away. At most `8 * VST_INPUT_BATCH_BLOCKS` blocks wait for a flight; the oldest is
+ * dropped (and recycled) beyond that, mirroring the worklet's output-side ceiling.
+ */
+function enqueueInput(block: InputBlock) {
+    if (role !== "effect") {
+        recycleInput([block.buffer]);
+        return;
+    }
+    inputQueue.push(block);
+    if (inputQueue.length > VST_INPUT_BATCH_BLOCKS * 8) {
+        const dropped = inputQueue.shift();
+        if (dropped) {
+            stats.framesDropped++;
+            recycleInput([dropped.buffer]);
+        }
+    }
+    void flushInput();
+}
+
+/** Upload full batches sequentially, so a slow host bounds the in-flight memory instead of piling up fetches. */
+async function flushInput() {
+    if (uploading || role !== "effect" || !instanceId || !baseUrl) return;
+    uploading = true;
+    try {
+        while (streaming && inputQueue.length >= VST_INPUT_BATCH_BLOCKS) {
+            const blocks = inputQueue.splice(0, VST_INPUT_BATCH_BLOCKS);
+            const body = encodeFrames(
+                blocks.map((block) => ({
+                    header: { instanceHash: inputHash, seq: nextInputSeq++, channels: block.channels, framesPerChannel: block.framesPerChannel },
+                    planes: Array.from({ length: block.channels }, (_, channel) => block.buffer.subarray(channel * block.framesPerChannel, (channel + 1) * block.framesPerChannel)),
+                })),
+            );
+            recycleInput(blocks.map((block) => block.buffer));
+            let response: Response;
+            try {
+                response = await fetch(audioInUrl(), { method: "POST", headers: { "content-type": "application/octet-stream" }, body, signal: abort ? abort.signal : undefined });
+            } catch (error) {
+                if (!(error instanceof DOMException && error.name === "AbortError")) stats.uploadErrors++;
+                break;
+            }
+            if (response.ok) stats.framesUploaded += blocks.length;
+            else stats.uploadErrors++;
+        }
+    } finally {
+        uploading = false;
+    }
+}
+
 async function startStreaming() {
     if (streaming || !instanceId || !baseUrl) return;
     abort = new AbortController();
@@ -186,6 +276,9 @@ function stopStreaming(notifyHost = true) {
     }
     workletPort?.postMessage({ type: "reset" });
     pending = null;
+    const queued = inputQueue;
+    inputQueue = [];
+    recycleInput(queued.map((block) => block.buffer));
     post({ type: "stopped", instanceId });
     if (notifyHost && instanceId) void postRpc("audioStop", { instanceId }).catch(() => undefined);
 }
@@ -198,11 +291,14 @@ self.onmessage = (event: MessageEvent<VstWorkerInbound>) => {
             break;
         case "attach":
             workletPort = message.port;
-            workletPort.onmessage = (workletEvent: MessageEvent<{ type: string; buffers?: Float32Array[] }>) => {
-                if (workletEvent.data?.type === "recycle" && workletEvent.data.buffers) {
-                    for (const buffer of workletEvent.data.buffers) {
+            workletPort.onmessage = (workletEvent: MessageEvent<WorkletPortMessage>) => {
+                const data = workletEvent.data;
+                if (data?.type === "recycle" && data.buffers) {
+                    for (const buffer of data.buffers) {
                         if (buffer instanceof Float32Array && pool.length < VST_BUFFER_POOL_SIZE) pool.push(buffer);
                     }
+                } else if (data?.type === "input" && data.buffer instanceof Float32Array) {
+                    enqueueInput({ channels: data.channels, framesPerChannel: data.framesPerChannel, buffer: data.buffer });
                 }
             };
             break;

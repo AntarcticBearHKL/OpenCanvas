@@ -16,10 +16,12 @@
 #include "lifecycle.h"
 #include "scan.h"
 #include "util.h"
+#include "worker.h"
 
 #include <httplib.h>
 
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <map>
@@ -33,10 +35,15 @@
 namespace vhost {
 namespace {
 
-constexpr int kLoadTimeoutMs = 20000;    // plug-in setup can be slow (samples)
-constexpr int kCallTimeoutMs = 5000;     // note/param/editor/state/audio calls
+constexpr int kLoadTimeoutMs = 40000;    // plug-in setup can be slow (samples); must exceed the worker's 30 s
+constexpr int kCallTimeoutMs = 15000;    // note/param/editor/state/audio calls; must exceed the worker's 10 s
 constexpr int kUnloadTimeoutMs = 5000;
 constexpr int kScanTimeoutMs = 120000;   // whole scan worker
+constexpr int kRenderStartWaitMs = 15000; // first offline block or an immediate failure
+constexpr int kRenderFrameWaitMs = 30000; // per-block stall limit while streaming a render
+constexpr double kMaxRenderSeconds = 1800.0; // 30 min per /render request
+constexpr size_t kMaxRenderNotes = 65536;
+constexpr size_t kMaxAudioInBytes = 1024 * 1024; // 1 MiB per /audio-in request (~500 blocks)
 
 std::mutex g_zombieMutex;
 std::vector<std::shared_ptr<PluginInstance>> g_zombies;
@@ -90,6 +97,9 @@ public:
 		return origins_.find (origin) != origins_.end ();
 	}
 
+	/** False when no token is configured: the Origin allowlist is then the only guard. */
+	bool tokenRequired () const { return !token_.empty (); }
+
 	bool tokenOk (const std::string& provided) const
 	{
 		if (provided.empty () || provided.size () != token_.size ())
@@ -132,7 +142,7 @@ public:
 		}
 		res.set_header ("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 		res.set_header ("Access-Control-Allow-Headers", "content-type, authorization");
-		res.set_header ("Access-Control-Expose-Headers", "content-type");
+		res.set_header ("Access-Control-Expose-Headers", "content-type, x-vst-latency-samples");
 		res.set_header ("Access-Control-Allow-Private-Network", "true");
 		res.set_header ("Access-Control-Max-Age", "600");
 	}
@@ -156,6 +166,11 @@ public:
 	// ---- routes ----
 	void handleRpc (const httplib::Request& req, httplib::Response& res);
 	void handleAudio (const httplib::Request& req, httplib::Response& res);
+	void handleAudioIn (const httplib::Request& req, httplib::Response& res);
+	void handleRender (const httplib::Request& req, httplib::Response& res);
+
+	/** Stop every instance (and therefore every worker child) before the server exits. */
+	void shutdown ();
 
 private:
 	std::shared_ptr<PluginInstance> findInstance (const std::string& id)
@@ -195,7 +210,7 @@ private:
 	{
 		if (instance->stuck ())
 		{
-			error = "plugin_hang";
+			error = instance->failureCode ().empty () ? "plugin_hang" : instance->failureCode ();
 			return false;
 		}
 		auto future = instance->post (std::forward<F> (fn));
@@ -269,6 +284,17 @@ bool PluginServer::refreshScan (std::string& error)
 	return true;
 }
 
+void PluginServer::shutdown ()
+{
+	std::map<std::string, std::shared_ptr<PluginInstance>> instances;
+	{
+		std::lock_guard<std::mutex> lock (mutex_);
+		instances.swap (instances_);
+	}
+	for (auto& entry : instances)
+		unload (entry.second);
+}
+
 bool PluginServer::resolvePlugin (const std::string& idOrPath, std::string& path, std::string& uid,
                                   std::string& error)
 {
@@ -276,7 +302,7 @@ bool PluginServer::resolvePlugin (const std::string& idOrPath, std::string& path
 	if (std::filesystem::exists (std::filesystem::u8path (idOrPath), ec))
 	{
 		path = idOrPath;
-		uid.clear (); // pick the instrument class
+		uid.clear (); // let `load` pick the class matching the requested role
 		return true;
 	}
 
@@ -357,6 +383,14 @@ void PluginServer::handleRpc (const httplib::Request& req, httplib::Response& re
 		if (channels <= 0)
 			channels = 2;
 
+		const std::string role = request.get ("role").asStringOr ("instrument");
+		if (role != "instrument" && role != "effect")
+		{
+			respond (res, 400, errorResponse (id, "bad_role", "role must be \"instrument\" or \"effect\""));
+			return;
+		}
+		const bool effect = role == "effect";
+
 		std::string path, uid, error;
 		if (!resolvePlugin (pluginId, path, uid, error))
 		{
@@ -379,8 +413,8 @@ void PluginServer::handleRpc (const httplib::Request& req, httplib::Response& re
 		}
 
 		auto future = instance->post (
-		    [instance, path, uid, sampleRate, blockSize, channels] {
-			    return instance->doLoad (path, uid, sampleRate, blockSize, channels);
+		    [instance, path, uid, sampleRate, blockSize, channels, effect] {
+			    return instance->doLoad (path, uid, sampleRate, blockSize, channels, effect);
 		    });
 		LoadResult load;
 		if (future.wait_for (std::chrono::milliseconds (kLoadTimeoutMs)) != std::future_status::ready)
@@ -394,7 +428,7 @@ void PluginServer::handleRpc (const httplib::Request& req, httplib::Response& re
 		if (!load.ok)
 		{
 			unload (instance);
-			respond (res, 500, errorResponse (id, "load_failed", load.error));
+			respond (res, 500, errorResponse (id, load.code.empty () ? "load_failed" : load.code, load.error));
 			return;
 		}
 
@@ -424,6 +458,15 @@ void PluginServer::handleRpc (const httplib::Request& req, httplib::Response& re
 		}
 		unload (instance);
 		respond (res, 200, okResponse (id));
+		return;
+	}
+
+	// A dead worker answers with its own failure code and the message that names
+	// it, so the client sees why instead of a generic timeout; `unload` above
+	// stays available to clean the instance up.
+	if (instance->failed ())
+	{
+		respond (res, 500, errorResponse (id, instance->failureCode (), instance->failureMessage ()));
 		return;
 	}
 
@@ -636,6 +679,11 @@ void PluginServer::handleAudio (const httplib::Request& req, httplib::Response& 
 		respond (res, 404, errorResponse (0, "instance_not_found", "unknown instance: " + instanceId));
 		return;
 	}
+	if (instance->failed ())
+	{
+		respond (res, 500, errorResponse (0, instance->failureCode (), instance->failureMessage ()));
+		return;
+	}
 
 	// Opening the stream also starts audio, so a client that did load + noteOn
 	// can read /audio without an explicit audioStart.
@@ -663,6 +711,159 @@ void PluginServer::handleAudio (const httplib::Request& req, httplib::Response& 
 		    return sink.write (reinterpret_cast<const char*> (frame->data ()), frame->size ());
 	    },
 	    [] (bool) {});
+}
+
+// `POST /audio-in` feeds an effect instance's input bus with the very same frame format `/audio` emits.
+// It is the mirror of the output stream: the browser uploads whole blocks, the instance thread consumes
+// one re-blocked block per rendered block (silence on underrun, oldest dropped past 48 queued blocks),
+// while `GET /audio` drains the rendered output on its own connection. Both only share the per-instance
+// queues under their own mutex, so a stream and an upload can run concurrently without blocking each other.
+void PluginServer::handleAudioIn (const httplib::Request& req, httplib::Response& res)
+{
+	std::string instanceId = req.has_param ("instance") ? req.get_param_value ("instance") : "";
+	auto instance = findInstance (instanceId);
+	if (!instance)
+	{
+		respond (res, 404, errorResponse (0, "instance_not_found", "unknown instance: " + instanceId));
+		return;
+	}
+	if (instance->failed ())
+	{
+		respond (res, 500, errorResponse (0, instance->failureCode (), instance->failureMessage ()));
+		return;
+	}
+	if (!instance->isEffect ())
+	{
+		respond (res, 400, errorResponse (0, "not_effect", "/audio-in requires an instance loaded with role=effect"));
+		return;
+	}
+	if (req.body.size () > kMaxAudioInBytes)
+	{
+		respond (res, 413, errorResponse (0, "audio_in_too_large", "at most 1 MiB and 64 frames per /audio-in request"));
+		return;
+	}
+
+	size_t frames = 0;
+	std::string error;
+	if (!instance->queueInput (reinterpret_cast<const uint8_t*> (req.body.data ()), req.body.size (), frames, error))
+	{
+		respond (res, 400, errorResponse (0, "bad_audio_in", error));
+		return;
+	}
+	Json response = okResponse (0);
+	response.set ("frames", Json::makeNumber (double (frames), true));
+	respond (res, 200, response);
+}
+
+// `POST /render` bounces one already-loaded instance through the same frame format as /audio.
+// Frames stream out while the instance thread renders; a stopped host or a failed plug-in still
+// answers with the same JSON error shape as /rpc. Limits: <= 1800 s and <= 65536 notes per request,
+// and the response ends early (client sees short/absent PCM) when a block stalls for 30 s.
+void PluginServer::handleRender (const httplib::Request& req, httplib::Response& res)
+{
+	Json request;
+	std::string parseError;
+	if (!Json::parse (req.body, request, parseError) || !request.isObject ())
+	{
+		respond (res, 400,
+		         errorResponse (0, "bad_request",
+		                        parseError.empty () ? "request body must be a JSON object" : parseError));
+		return;
+	}
+
+	std::string instanceId = request.get ("instanceId").asStringOr ("");
+	auto instance = findInstance (instanceId);
+	if (!instance)
+	{
+		respond (res, 404, errorResponse (0, "instance_not_found", "unknown instanceId: " + instanceId));
+		return;
+	}
+	if (instance->failed ())
+	{
+		respond (res, 500, errorResponse (0, instance->failureCode (), instance->failureMessage ()));
+		return;
+	}
+
+	double seconds = request.get ("seconds").asNumber ();
+	if (!(seconds > 0.0) || seconds > kMaxRenderSeconds)
+	{
+		respond (res, 400, errorResponse (0, "render_too_long", "seconds must be > 0 and <= 1800"));
+		return;
+	}
+
+	// The optional configuration describes the loaded instance; changing it needs a reload.
+	auto matches = [] (const Json& value, double loaded) {
+		return !value.isNumber () || std::fabs (value.asNumber () - loaded) < 0.5;
+	};
+	if (!matches (request.get ("sampleRate"), instance->sampleRate ()) ||
+	    !matches (request.get ("blockSize"), instance->blockSize ()) ||
+	    !matches (request.get ("channels"), instance->channels ()))
+	{
+		respond (res, 400, errorResponse (0, "render_config_mismatch",
+		                                  "sampleRate/blockSize/channels must match the loaded instance"));
+		return;
+	}
+
+	const Json& notesJson = request.get ("notes");
+	if (!notesJson.isArray ())
+	{
+		respond (res, 400, errorResponse (0, "bad_request", "notes must be an array"));
+		return;
+	}
+	if (notesJson.size () > kMaxRenderNotes)
+	{
+		respond (res, 400, errorResponse (0, "render_too_many_notes", "at most 65536 notes per render"));
+		return;
+	}
+	std::vector<OfflineNote> notes;
+	notes.reserve (notesJson.size ());
+	for (size_t i = 0; i < notesJson.size (); ++i)
+	{
+		const Json& item = notesJson.at (i);
+		if (!item.isObject () || !item.get ("pitch").isNumber () || !item.get ("start").isNumber () ||
+		    !item.get ("length").isNumber ())
+		{
+			respond (res, 400, errorResponse (0, "bad_request", "each note needs numeric pitch, start and length"));
+			return;
+		}
+		OfflineNote note;
+		note.pitch = int (item.get ("pitch").asInt ());
+		note.velocity = item.get ("velocity").isNumber () ? int (item.get ("velocity").asInt ()) : 100;
+		note.start = item.get ("start").asNumber ();
+		note.length = item.get ("length").asNumber ();
+		notes.push_back (note);
+	}
+
+	auto state = instance->renderOffline (seconds, notes);
+	std::string startError;
+	if (!waitRenderStart (state, startError, kRenderStartWaitMs))
+	{
+		cancelRender (state);
+		const bool workerFailure =
+		    startError == "worker_failed" || startError == "worker_hung" || startError == "worker_timeout";
+		respond (res, 500,
+		         errorResponse (0, startError == "plugin_hang" ? "plugin_hang"
+		                          : workerFailure           ? startError
+		                                                    : "render_failed",
+		                        startError));
+		return;
+	}
+
+	res.set_header ("x-vst-latency-samples", std::to_string (long long (std::llround (instance->latencySamples ()))));
+	res.set_chunked_content_provider (
+	    "application/octet-stream",
+	    [state] (size_t, httplib::DataSink& sink) -> bool {
+		    std::shared_ptr<const std::vector<uint8_t>> frame;
+		    if (!popRenderFrame (state, frame, kRenderFrameWaitMs))
+		    {
+			    // Returning false would cancel the connection without the terminal chunk; done()
+			    // ends the body cleanly whether the render finished, stalled or was cancelled.
+			    sink.done ();
+			    return true;
+		    }
+		    return sink.write (reinterpret_cast<const char*> (frame->data ()), frame->size ());
+	    },
+	    [state] (bool) { cancelRender (state); });
 }
 
 } // namespace
@@ -713,12 +914,15 @@ int runServer (const Settings& settings)
 			res.set_content ("{\"error\":\"origin not allowed\"}", "application/json");
 			return httplib::Server::HandlerResponse::Handled;
 		}
-		std::string provided;
-		if (!server.auth ().tokenFromRequest (req, provided) || !server.auth ().tokenOk (provided))
+		if (server.auth ().tokenRequired ())
 		{
-			res.status = 401;
-			res.set_content ("{\"error\":\"unauthorized\"}", "application/json");
-			return httplib::Server::HandlerResponse::Handled;
+			std::string provided;
+			if (!server.auth ().tokenFromRequest (req, provided) || !server.auth ().tokenOk (provided))
+			{
+				res.status = 401;
+				res.set_content ("{\"error\":\"unauthorized\"}", "application/json");
+				return httplib::Server::HandlerResponse::Handled;
+			}
 		}
 		return httplib::Server::HandlerResponse::Unhandled;
 	});
@@ -732,6 +936,12 @@ int runServer (const Settings& settings)
 	});
 	svr.Get ("/audio", [&server] (const httplib::Request& req, httplib::Response& res) {
 		server.handleAudio (req, res);
+	});
+	svr.Post ("/audio-in", [&server] (const httplib::Request& req, httplib::Response& res) {
+		server.handleAudioIn (req, res);
+	});
+	svr.Post ("/render", [&server] (const httplib::Request& req, httplib::Response& res) {
+		server.handleRender (req, res);
 	});
 	svr.set_exception_handler ([] (const httplib::Request&, httplib::Response& res, std::exception_ptr ep) {
 		std::string message = "internal error";
@@ -781,13 +991,18 @@ int runServer (const Settings& settings)
 	for (size_t i = 0; i < settings.origins.size (); ++i)
 		std::printf ("%s%s", i ? ", " : "", settings.origins[i].c_str ());
 	std::printf ("\n");
-	if (settings.tokenGenerated)
-		std::printf ("VST_HOST_TOKEN=%s\n", settings.token.c_str ());
+	if (settings.token.empty ())
+		std::printf ("auth: none (set VST_HOST_TOKEN to require a bearer token)\n");
 	else
-		std::printf ("auth token: from VST_HOST_TOKEN\n");
+		std::printf ("auth: bearer token from VST_HOST_TOKEN\n");
 	std::fflush (stdout);
 
 	svr.listen_after_bind ();
+
+	// Every worker child is terminated here, before the PID file goes away, so a
+	// clean stop never leaves an orphan behind (a hard kill is covered by the
+	// job object's KILL_ON_JOB_CLOSE).
+	server.shutdown ();
 
 	if (stopEvent)
 	{

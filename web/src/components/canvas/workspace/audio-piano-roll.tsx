@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Select } from "antd";
 import { Music2, SlidersHorizontal, X, ZoomIn, ZoomOut } from "lucide-react";
+import { nanoid } from "nanoid";
 import * as Tone from "tone";
 import { useTranslation } from "react-i18next";
 
@@ -33,6 +34,7 @@ import { audioTrackType } from "@/lib/canvas/audio-project";
 import type { AudioGraphVstSource } from "@/lib/canvas/audio-graph";
 import { createVstClient } from "@/lib/canvas/audio-vst";
 import type { VstPlugin } from "@/lib/canvas/audio-vst-protocol";
+import { startVstStateSession, type VstStateSession } from "@/lib/canvas/vst-state";
 import type { CanvasAudioMidiRegion, CanvasAudioNote, CanvasAudioSnap, CanvasAudioTrack } from "@/types/canvas";
 
 const KEY_WIDTH = 46;
@@ -129,7 +131,9 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
     const vstPluginId = track?.instrument?.kind === "vst3" ? track.instrument.pluginId : "";
     const [vstSource, setVstSource] = useState<VstEditorSource | null>(null);
     const [editorOpening, setEditorOpening] = useState(false);
+    const [editorOpened, setEditorOpened] = useState(false);
     const [editorError, setEditorError] = useState(false);
+    const editorSessionRef = useRef<VstStateSession | null>(null);
 
     const noteStep = snapTicks(snap, ppqn, meter);
     const pxPerTick = pxPerBeat / ppqn;
@@ -194,6 +198,17 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
         return () => window.clearInterval(timer);
     }, [trackId, vstPluginId, getVstSource]);
 
+    // Leaving the roll or switching tracks ends an open editor session with a final save; the plug-in's own
+    // window is host-side, so this unmount is the last reliable moment the page is sure to observe.
+    useEffect(() => {
+        setEditorOpened(false);
+        return () => {
+            const session = editorSessionRef.current;
+            editorSessionRef.current = null;
+            void session?.stop();
+        };
+    }, [trackId]);
+
     const openVstEditor = async () => {
         if (editorOpening) return;
         const instanceId = getVstSource(trackId)?.instanceId;
@@ -202,12 +217,43 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
         setEditorError(false);
         try {
             const result = await createVstClient().openEditor(instanceId);
-            if (!result.opened) setEditorError(true);
+            if (!result.opened) {
+                setEditorError(true);
+                return;
+            }
+            // The plug-in's own window is the only place its state changes, so the session is the only moment a
+            // save can happen: a bounded debounce while it is open, plus the final save when it closes.
+            void editorSessionRef.current?.stop();
+            editorSessionRef.current = startVstStateSession(instanceId, track?.instrument?.kind === "vst3" ? track.instrument.stateKey : undefined);
+            setEditorOpened(true);
         } catch {
             setEditorError(true);
         } finally {
             setEditorOpening(false);
         }
+    };
+
+    const closeVstEditor = async () => {
+        if (editorOpening) return;
+        const instanceId = getVstSource(trackId)?.instanceId;
+        setEditorError(false);
+        const session = editorSessionRef.current;
+        editorSessionRef.current = null;
+        if (instanceId) {
+            setEditorOpening(true);
+            try {
+                await createVstClient().closeEditor(instanceId);
+            } catch {
+                setEditorError(true);
+            } finally {
+                setEditorOpening(false);
+                setEditorOpened(false);
+            }
+        } else {
+            setEditorOpened(false);
+        }
+        // The final save runs even when the host already closed the window itself (its editorClose is a no-op then).
+        await session?.stop();
     };
 
     const commitNotes = (notes: CanvasAudioNote[]) => {
@@ -336,6 +382,9 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
         track.instrument?.kind === "vst3" && vstSource && vstSource.status !== "ready"
             ? t(vstSource.status === "failed" ? "canvas.audioStudio.vstEditorFailed" : vstSource.status === "offline" ? "canvas.audioStudio.vstEditorOffline" : "canvas.audioStudio.vstEditorPending")
             : "";
+    const vstEditorActionLabel = editorOpening
+        ? t(editorOpened ? "canvas.audioStudio.vstEditorClosing" : "canvas.audioStudio.vstEditorOpening")
+        : t(editorOpened ? "canvas.audioStudio.vstEditorClose" : "canvas.audioStudio.vstEditorOpen");
 
     return (
         <div className="flex min-h-0 flex-1 flex-col glass-card">
@@ -365,7 +414,8 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
                                     const pluginId = value.slice(4);
                                     const plugin = vst.plugins.find((item) => item.id === pluginId);
                                     const name = plugin?.name ?? (track.instrument?.kind === "vst3" ? track.instrument.name : undefined);
-                                    onTrackPatch({ instrument: { kind: "vst3", pluginId, ...(name ? { name } : {}) } });
+                                    // `stateKey` names this track's plug-in state blob; a fresh key follows a fresh plug-in.
+                                    onTrackPatch({ instrument: { kind: "vst3", pluginId, stateKey: nanoid(), ...(name ? { name } : {}) } });
                                     return;
                                 }
                                 onTrackPatch({ instrument: { kind: "synth", preset: value } });
@@ -386,12 +436,12 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
                             style={{ color: theme.node.text }}
                             data-roll-vst-editor="true"
                             disabled={editorOpening}
-                            aria-label={t("canvas.audioStudio.vstEditorOpen")}
-                            title={t("canvas.audioStudio.vstEditorOpen")}
-                            onClick={() => void openVstEditor()}
+                            aria-label={vstEditorActionLabel}
+                            title={vstEditorActionLabel}
+                            onClick={() => void (editorOpened ? closeVstEditor() : openVstEditor())}
                         >
                             <SlidersHorizontal className="size-3.5" />
-                            {t(editorOpening ? "canvas.audioStudio.vstEditorOpening" : "canvas.audioStudio.vstEditorOpen")}
+                            {vstEditorActionLabel}
                         </button>
                         {editorError ? (
                             <span className="shrink-0" style={{ color: theme.node.danger }} data-roll-vst-editor-error="true">

@@ -57,6 +57,8 @@ add_executable(vst-host
     src/scan.cpp
     src/instance.cpp
     src/server.cpp
+    src/worker.cpp
+    src/worker_child.cpp
     # SDK hosting pieces that sdk_hosting does not compile in.
     "${VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_win32.cpp"
     "${VST3_SDK_DIR}/public.sdk/source/vst/hosting/plugprovider.cpp"

@@ -1,6 +1,6 @@
-// Runtime settings, resolved once from the environment at startup. Mirrors the
-// shape of mcp/src/canvas_mcp/config.py: loopback bind, exact Origin allowlist
-// and a generated Bearer token when none is configured.
+// Runtime settings, resolved once from the environment at startup. Loopback bind
+// and an exact Origin allowlist; the Bearer token is optional (set VST_HOST_TOKEN
+// to require it, leave it unset for a frictionless local host).
 #pragma once
 
 #include <string>
@@ -18,7 +18,6 @@ struct Settings
 	int port {3211};
 	std::vector<std::string> origins;
 	std::string token;
-	bool tokenGenerated {false};
 	std::vector<std::string> pluginDirs;
 	bool debug {false};
 };

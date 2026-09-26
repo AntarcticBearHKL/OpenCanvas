@@ -33,12 +33,9 @@ Settings loadSettings ()
 
 	s.pluginDirs = splitList (getenvString ("VST_HOST_PLUGIN_DIRS"));
 
+	// The Bearer token is optional: unset means the Origin allowlist is the only
+	// guard, so a local host is reachable without any token plumbing.
 	s.token = getenvString ("VST_HOST_TOKEN");
-	if (s.token.empty ())
-	{
-		s.token = generateToken ();
-		s.tokenGenerated = true;
-	}
 
 	std::string debug = getenvString ("VST_HOST_DEBUG");
 	s.debug = (debug == "1" || debug == "true" || debug == "yes" || debug == "on");

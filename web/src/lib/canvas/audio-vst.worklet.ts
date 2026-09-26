@@ -15,6 +15,7 @@ import {
     VST_BUFFER_POOL_SIZE,
     VST_CHANNELS,
     VST_FRAMES_PER_BLOCK,
+    VST_INPUT_POOL_SIZE,
     VST_LOOKAHEAD_BLOCKS,
     VST_MAX_BUFFERED_BLOCKS,
     VST_WORKLET_PROCESSOR,
@@ -32,10 +33,11 @@ const STATS_EVERY = 250;
 
 type Block = { channels: number; framesPerChannel: number; seq: number; buffer: Float32Array };
 type BlockMessage = { type: "block"; channels: number; framesPerChannel: number; seq: number; buffer: Float32Array };
-type BufferInbound = BlockMessage | { type: "reset" };
+type InputRecycleMessage = { type: "input-recycle"; buffers: Float32Array[] };
+type BufferInbound = BlockMessage | InputRecycleMessage | { type: "reset" };
 type ControlInbound =
     | { type: "attach"; port: MessagePort }
-    | { type: "config"; channels?: number; framesPerBlock?: number; lookaheadBlocks?: number; maxBufferedBlocks?: number }
+    | { type: "config"; channels?: number; framesPerBlock?: number; lookaheadBlocks?: number; maxBufferedBlocks?: number; effect?: boolean }
     | { type: "reset" };
 
 class VstSourceProcessor extends AudioWorkletProcessor {
@@ -54,6 +56,12 @@ class VstSourceProcessor extends AudioWorkletProcessor {
     private underruns = 0;
     private dropped = 0;
     private processed = 0;
+    private captureInput = false;
+    private inputPool: Float32Array[] = [];
+    private captureBuffer: Float32Array | null = null;
+    private captureFrames = 0;
+    private inputCaptured = 0;
+    private inputDropped = 0;
 
     constructor() {
         super();
@@ -71,14 +79,31 @@ class VstSourceProcessor extends AudioWorkletProcessor {
             if (message.framesPerBlock && message.framesPerBlock > 0) this.framesPerBlock = message.framesPerBlock;
             if (message.lookaheadBlocks && message.lookaheadBlocks > 0) this.lookahead = Math.min(CAPACITY, message.lookaheadBlocks);
             if (message.maxBufferedBlocks && message.maxBufferedBlocks > 0) this.maxBuffered = Math.min(CAPACITY, message.maxBufferedBlocks);
+            if (typeof message.effect === "boolean") this.configureInput(message.effect);
             return;
         }
         if (message.type === "reset") this.resetQueue();
     }
 
+    /** Input capture is only armed for effect instances; the pool is allocated here, never in `process()`. */
+    private configureInput(effect: boolean) {
+        this.captureInput = effect;
+        this.captureBuffer = null;
+        this.captureFrames = 0;
+        this.inputPool = [];
+        if (!effect) return;
+        for (let i = 0; i < VST_INPUT_POOL_SIZE; i++) this.inputPool.push(new Float32Array(this.framesPerBlock * this.channels));
+    }
+
     private onBuffer(message: BufferInbound) {
         if (message.type === "reset") {
             this.resetQueue();
+            return;
+        }
+        if (message.type === "input-recycle") {
+            for (const buffer of message.buffers ?? []) {
+                if (buffer instanceof Float32Array && this.inputPool.length < VST_INPUT_POOL_SIZE) this.inputPool.push(buffer);
+            }
             return;
         }
         if (this.count >= this.maxBuffered) {
@@ -107,6 +132,11 @@ class VstSourceProcessor extends AudioWorkletProcessor {
         this.count = 0;
         this.cursor = 0;
         this.started = false;
+        if (this.captureBuffer) {
+            this.queueRecycle(this.captureBuffer);
+            this.captureBuffer = null;
+            this.captureFrames = 0;
+        }
         this.flushRecycle();
     }
 
@@ -122,7 +152,7 @@ class VstSourceProcessor extends AudioWorkletProcessor {
         this.bufferPort.postMessage({ type: "recycle", buffers }, buffers.map((buffer) => buffer.buffer));
     }
 
-    process(_inputs: Float32Array[][], outputs: Float32Array[][], _parameters: Record<string, Float32Array>): boolean {
+    process(inputs: Float32Array[][], outputs: Float32Array[][], _parameters: Record<string, Float32Array>): boolean {
         const output = outputs[0];
         if (!output || output.length === 0) return true;
         const left = output[0];
@@ -173,6 +203,8 @@ class VstSourceProcessor extends AudioWorkletProcessor {
             this.cursor++;
         }
 
+        if (this.captureInput) this.capture(inputs[0], frames);
+
         this.processed++;
         if (this.processed >= STATS_EVERY) {
             this.processed = 0;
@@ -184,9 +216,40 @@ class VstSourceProcessor extends AudioWorkletProcessor {
                 queuedBlocks: this.count,
                 framesPerBlock: this.framesPerBlock,
                 channels: this.channels,
+                inputCaptured: this.inputCaptured,
+                inputDropped: this.inputDropped,
             });
         }
         return true;
+    }
+
+    /** Copy the live input block into a pooled input buffer and ship each full block to the worker. */
+    private capture(input: Float32Array[] | undefined, frames: number) {
+        if (!this.bufferPort || !input || input.length === 0) return;
+        if (!this.captureBuffer) {
+            const buffer = this.inputPool.pop();
+            if (!buffer) {
+                this.inputDropped++;
+                return;
+            }
+            this.captureBuffer = buffer;
+            this.captureFrames = 0;
+        }
+        const buffer = this.captureBuffer;
+        const stride = this.framesPerBlock;
+        const take = Math.min(frames, stride - this.captureFrames);
+        for (let channel = 0; channel < this.channels; channel++) {
+            const source = input[Math.min(channel, input.length - 1)];
+            const target = channel * stride + this.captureFrames;
+            for (let i = 0; i < take; i++) buffer[target + i] = source ? source[i] : 0;
+        }
+        this.captureFrames += take;
+        if (this.captureFrames >= stride) {
+            this.captureBuffer = null;
+            this.captureFrames = 0;
+            this.inputCaptured++;
+            this.bufferPort.postMessage({ type: "input", channels: this.channels, framesPerChannel: stride, buffer }, [buffer.buffer]);
+        }
     }
 }
 

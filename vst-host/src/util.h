@@ -133,6 +133,17 @@ inline std::string wideToUtf8 (const std::wstring& w)
 	return out;
 }
 
+inline std::wstring utf8ToWide (const std::string& s)
+{
+	if (s.empty ())
+		return {};
+	int needed = MultiByteToWideChar (CP_UTF8, 0, s.data (), int (s.size ()), nullptr, 0);
+	std::wstring out (size_t (needed > 0 ? needed : 0), L'\0');
+	if (needed > 0)
+		MultiByteToWideChar (CP_UTF8, 0, s.data (), int (s.size ()), out.data (), needed);
+	return out;
+}
+
 inline std::string getenvString (const char* name)
 {
 	char buf[4096];

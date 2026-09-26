@@ -1,16 +1,17 @@
 # vst-host
 
-Local companion process that hosts **VST3 instruments** and streams their audio to the browser.
+Local companion process that hosts **VST3 instruments and effects** and streams their audio to the browser.
 The browser never loads a `.vst3` (it can't — native binaries are sandboxed out); this process
 does, and the web app talks to it over loopback.
 
-It mirrors the trust model of `../mcp/src/canvas_mcp`: bind **127.0.0.1 only**, exact `Origin`
-allowlist, Bearer token, and the page dials out to it.
+It mirrors the trust model of `../mcp/src/canvas_mcp`: bind **127.0.0.1 only** and an exact
+`Origin` allowlist, with an **optional** Bearer token, and the page dials out to it.
 
 ```
 browser (web/src/lib/canvas/audio-vst.*)        vst-host.exe  (this process)
   worker ── POST /rpc (control) ──────────────►  router + auth guard
          ◄── GET /audio (chunked PCM) ───────   one PluginInstance per loaded plugin
+  worker ── POST /audio-in (effect input) ────►  input bus of an effect instance
   worklet ──► strip.input in the studio graph      editor = native HWND (IPlugView)
 ```
 
@@ -27,10 +28,16 @@ Kong Audio QinEngineV3):
 - `--selftest` renders real audio (Retrologue RMS ≈ 0.139) and attaches the plugin editor.
 - `/audio` framing is exact (16-byte header + planar Float32, no partial frames).
 - The browser side is covered by `../web/e2e/vst-bridge.mjs`, `vst-graph.mjs`, `vst-picker.mjs`,
-  `vst-editor.mjs`.
+  `vst-editor.mjs`, `vst-mixdown.mjs`, and `vst-effect.mjs` (the effect path, against the fixture).
+
+**Effects (`role: "effect"`) are implemented but unverified against any real Fx plug-in**: the
+reference machine has no Fx plug-in installed, so the effect path was verified only against the
+VST3 SDK's `again` sample built into a temporary fixture directory (see *Effect test fixture*
+below and `../web/e2e/vst-effect.mjs`). Nothing here has been exercised with a commercial effect.
 
 Not done yet: runtime plugin loading is **in-process** (a plugin crash can take the server down;
-*scanning* is already isolated in a child process), plugin state persistence, offline bounce.
+*scanning* is already isolated in a child process), and offline rendering of effects (`/render`
+runs an effect on silence; an effect has no host-side stem bounce yet).
 
 ## Prerequisites
 
@@ -74,7 +81,7 @@ cmake -S vst-host -B vst-host/build -G "Visual Studio 17 2022" -A x64 `
 ## Run
 
 ```powershell
-$env:VST_HOST_TOKEN   = "dev-vst-token"          # optional: generated + printed when unset
+$env:VST_HOST_TOKEN   = "dev-vst-token"          # optional: leave unset to require no token
 $env:VST_HOST_ORIGINS = "http://localhost:3000"  # comma-separated Origin allowlist
 vst-host\build\bin\vst-host.exe                  # run the server on 127.0.0.1:3211
 ```
@@ -91,7 +98,7 @@ Environment:
 
 | variable | meaning |
 |---|---|
-| `VST_HOST_TOKEN` | Bearer token. Generated and printed at startup when unset. |
+| `VST_HOST_TOKEN` | Optional Bearer token. **Unset (the default) = no token required**, so the browser connects as soon as the host is up; set it to require one. |
 | `VST_HOST_ORIGINS` | Comma-separated `Origin` allowlist. Defaults to the dev-server origins on 3000/5173. |
 | `VST_HOST_PLUGIN_DIRS` | Extra directories to scan for `.vst3`, in addition to the standard ones. |
 
@@ -117,9 +124,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\dev-watchdog.ps1   # r
 
 ## HTTP protocol
 
-Every request must carry an **allowlisted `Origin`** *and* the token — `Authorization: Bearer
-<token>` on `POST`, `?token=<token>` on the `GET` stream (query params are used where the browser
-can't set headers). Wrong origin → **403**; missing/incorrect token → **401**.
+Every request must carry an **allowlisted `Origin`** — wrong origin → **403**. The token is only
+checked when `VST_HOST_TOKEN` is set: then a request must also carry it (`Authorization: Bearer
+<token>` on `POST`, `?token=<token>` on the `GET` stream, since query params are used where the
+browser can't set headers), or it answers **401**.
 
 ### `POST /rpc`
 
@@ -130,7 +138,7 @@ or `{"id":<int>,"ok":false,"error":{"code":"<str>","message":"<str>"}}`.
 |---|---|---|
 | `hello` | — | `{"protocol":1,"host":"vst-host","version":"<semver>"}` |
 | `scan` | — | `{"plugins":[{id,name,vendor,version,category,subCategories,path,packaging,isInstrument}]}` |
-| `load` | `{pluginId, sampleRate?, blockSize?, channels?}` (defaults 48000/256/2) | `{instanceId}` |
+| `load` | `{pluginId, role?, sampleRate?, blockSize?, channels?}` (defaults `role:"instrument"`, 48000/256/2) | `{instanceId}` |
 | `unload` | `{instanceId}` | `{}` |
 | `noteOn` | `{instanceId, pitch, velocity, channel?}` | `{}` |
 | `noteOff` | `{instanceId, pitch, channel?}` | `{}` |
@@ -140,6 +148,16 @@ or `{"id":<int>,"ok":false,"error":{"code":"<str>","message":"<str>"}}`.
 | `editorClose` | `{instanceId}` | `{}` |
 | `getState` / `setState` | `{instanceId}` / `{instanceId, state}` (base64) | `{state}` / `{}` |
 | `audioStart` / `audioStop` | `{instanceId}` | `{}` |
+
+`role` selects the Audio Module Class and the bus layout:
+
+- `"instrument"` (default, omitted in every existing caller): picks the class whose subCategories
+  contain `Instrument`, activates output bus 0 only and sends a zero-input process block — the
+  original behaviour, byte-identical.
+- `"effect"`: picks the class whose subCategories contain `Fx`, activates **input bus 0 and output
+  bus 0**, and sets both bus arrangements (`setBusArrangements(in, out)`). Loading a class that is
+  not `Fx` fails with `no_effect_class` (HTTP 500, `error.code == "no_effect_class"`); a class
+  without an audio input bus fails with `load_failed`. Effects receive audio through `POST /audio-in`.
 
 `packaging` is `"bundle"` (a `.vst3` directory) or `"single"` (a single-file `.vst3` DLL — **valid**,
 not an error; Kong Audio's QinEngineV3 ships this way).
@@ -158,6 +176,53 @@ offset 16 ...     planar (channel-first) Float32: ch0[frames], ch1[frames], ...
 ```
 
 48000 Hz, 256 frames per block, 2 channels → **2064 bytes per frame**.
+
+### `POST /audio-in?instance=<id>&token=<token>`
+
+Feeds the input bus of an instance loaded with `role:"effect"`. The request body is the **same
+frame format as `/audio`** (16-byte LE header + planar Float32) and may concatenate whole frames;
+`channels` is 1 or 2 and a mono body is mirrored to both input channels of a stereo bus, while a
+stereo body is folded to channel 0 of a mono bus. The host re-blocks frames to its own block size,
+so a browser sending 128-frame worklet quanta is fine. Response: `{"ok":true,"frames":<n>}`.
+
+`GET /audio` (output) and `POST /audio-in` (input) are independent connections and are safe to run
+concurrently: the input lands in a per-instance bounded queue and the render thread consumes one
+re-blocked block per rendered block. An empty input queue renders silence (the effect still runs);
+queued input past **48 blocks (~256 ms)** drops the oldest block. Feeding `/audio-in` does not start
+the pump — open `GET /audio` (or call `audioStart`) for that. `/audio-in` against an instrument (or
+an unknown instance) answers `400 not_effect` / `404 instance_not_found`.
+
+Limits and timeouts: at most **1 MiB** and **64 frames** per request (`413 audio_in_too_large` /
+`400 bad_audio_in`); a malformed or truncated frame is rejected with `400 bad_audio_in` and nothing
+is appended; the server's 30 s read timeout applies to the body. The browser worker uploads in
+batches of 4 blocks (~21 ms), keeps at most 32 blocks queued for a slow host (the worklet's capture
+pool holds 8), and drops — returning the pooled buffer to the worklet — past that.
+
+### `POST /render`
+
+Bounces an already-loaded instance offline and streams the result in the **same frame format as
+`/audio`** (`application/octet-stream`, chunked, frames end exactly on a frame boundary). The
+plug-in runs in its offline process mode for the render — faster than real time and higher quality
+where the plug-in supports it — and the notes go through the normal event path with sample-accurate
+offsets.
+
+```json
+{ "instanceId": "1", "seconds": 12.5, "sampleRate": 48000, "blockSize": 256, "channels": 2,
+  "notes": [{ "pitch": 60, "velocity": 100, "start": 0.5, "length": 0.25 }] }
+```
+
+`start` / `length` are seconds from the render start; `sampleRate` / `blockSize` / `channels` are
+optional and must match the loaded instance when present. The response carries
+`x-vst-latency-samples: <n>`, the plug-in's reported latency: the host renders `n` samples extra and
+the caller drops the first `n`, so a bounce is aligned with the timeline (Steinberg plug-ins report 0).
+`/render` does not stop a live `/audio` stream — with the pump active the instance keeps its
+real-time process mode and the stream resumes when the render finishes.
+
+Limits and timeouts (tunable in `src/server.cpp`): at most **1800 s** and **65536 notes** per request
+(`400 render_too_long` / `render_too_many_notes` / `render_config_mismatch`), a **15 s** first-block
+wait (`500 render_failed` / `plugin_hang`), a **30 s** per-block stall limit (the response ends
+early), and the renderer blocks once **64 unread blocks** (~341 ms) are queued, so a slow reader
+cannot grow host memory.
 
 ## curl examples
 
@@ -218,7 +283,35 @@ curl -s --max-time 3 -H "Origin: http://localhost:3000" \
 | `audio-vst.worklet.ts` | `canvas-vst-source` AudioWorklet (lookahead jitter buffer) |
 
 Wired into the studio by `audio-graph.ts`: an instrument track whose instrument is
-`{kind:"vst3", pluginId}` is driven by this bridge instead of a `Tone.PolySynth`.
+`{kind:"vst3", pluginId}` is driven by this bridge instead of a `Tone.PolySynth`. A track with
+`vst3Effect: {kind:"vst3", pluginId}` additionally gets an inline effect worklet inserted between
+`strip.input` and the mute/solo gate, so fader, pan, mute/solo, sends and master stay downstream.
+
+## Effect test fixture
+
+No Fx plug-in is installed on the reference machine, so the effect path is tested with the VST3
+SDK's `again` gain sample built **into a temp directory** (never in this repo and never in a plugin
+directory). It needs the SDK checkout and only this target:
+
+```powershell
+cmake -S vst-host/external/vst3sdk -B "$env:TEMP\opencanvas-vst-effects\sdk" `
+      -G "Visual Studio 17 2022" -A x64 `
+      -DSMTG_ENABLE_VST3_PLUGIN_EXAMPLES=ON -DSMTG_ENABLE_VSTGUI_SUPPORT=ON
+cmake --build "$env:TEMP\opencanvas-vst-effects\sdk" --config Release --target again --parallel
+# the bundle is <build>/VST3/Release/again.vst3; copy it somewhere stable, e.g.:
+#   "$env:TEMP\opencanvas-vst-effects\plugins\again.vst3"
+```
+
+Point the host at that directory and confirm it scans as an effect (`isInstrument: false`):
+
+```powershell
+$env:VST_HOST_PLUGIN_DIRS = "$env:TEMP\opencanvas-vst-effects\plugins"
+vst-host\build\bin\vst-host.exe --scan
+```
+
+`again` is a plain gain: parameter 0 (`Gain`, normalised) scales the input directly, default 1.0.
+`../web/e2e/vst-effect.mjs` uses it end to end (browser source → worklet input → `/audio-in` →
+host → `/audio` → graph master) and asserts the measured gain follows the parameter.
 
 ## Troubleshooting
 

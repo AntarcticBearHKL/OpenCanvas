@@ -38,6 +38,21 @@ export async function setMediaBlob(storageKey: string, blob: Blob) {
     return url;
 }
 
+/** localforage key of the VST3 plug-in state blob owned by one instrument track; derived from the track's small `stateKey`. */
+export function vstStateStorageKey(stateKey: string) {
+    return `vst-state:${stateKey}`;
+}
+
+/** Persist one plug-in state blob (base64 from the native host) without putting a byte of it into the canvas document. */
+export async function saveVstState(stateKey: string, state: unknown) {
+    await store.setItem(vstStateStorageKey(stateKey), state);
+}
+
+/** Read the stored plug-in state blob; null when nothing was ever saved for that key. */
+export async function readVstState(stateKey: string): Promise<unknown> {
+    return (await store.getItem<unknown>(vstStateStorageKey(stateKey))) ?? null;
+}
+
 export async function cleanupUnusedMedia(usedData: unknown) {
     const usedKeys = collectMediaStorageKeys(usedData);
     const unused: string[] = [];
@@ -47,9 +62,12 @@ export async function cleanupUnusedMedia(usedData: unknown) {
     await Promise.all(unused.map((key) => store.removeItem(key)));
 }
 
-function collectMediaStorageKeys(value: unknown, keys = new Set<string>()) {
+export function collectMediaStorageKeys(value: unknown, keys = new Set<string>()) {
     if (!value || typeof value !== "object") return keys;
     if ("storageKey" in value && typeof value.storageKey === "string" && value.storageKey.includes(":")) keys.add(value.storageKey);
+    // A VST3 instrument keeps only its small `stateKey` in the document; the plug-in state blob itself lives in this
+    // store under the derived key, so cleanup must reclaim it with the rest of the project's media.
+    if ("stateKey" in value && typeof value.stateKey === "string" && value.stateKey) keys.add(vstStateStorageKey(value.stateKey));
     Object.values(value).forEach((item) => (Array.isArray(item) ? item.forEach((child) => collectMediaStorageKeys(child, keys)) : collectMediaStorageKeys(item, keys)));
     return keys;
 }

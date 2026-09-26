@@ -1653,6 +1653,7 @@ function InfiniteCanvasPage() {
 
     const handleMixdownAudioProject = useCallback(
         async (target: CanvasNodeData) => {
+            const tracks = audioProjectTracks(target);
             const clips = audioProjectClips(target);
             const regions = audioProjectMidiRegions(target);
             const ppqn = audioProjectPpqn(target);
@@ -1662,11 +1663,12 @@ function InfiniteCanvasPage() {
                 return;
             }
             try {
-                const rendered = await renderAudioMixdown(
-                    { tracks: audioProjectTracks(target), clips, regions, ppqn, tempo, masterGain: audioProjectMasterGain(target), automation: audioProjectAutomation(target) },
+                const { audio, skipped } = await renderAudioMixdown(
+                    { tracks, clips, regions, ppqn, tempo, masterGain: audioProjectMasterGain(target), automation: audioProjectAutomation(target) },
                     nodesRef.current,
                 );
-                const uploaded = await uploadMediaFile(encodeWavBlob(rendered), "audio");
+                if (skipped.length) message.warning(t("canvas.audioStudio.mixdownVstSkipped", { tracks: skipped.map((report) => report.name || t("canvas.audioStudio.trackName", { index: tracks.findIndex((track) => track.id === report.trackId) + 1 })).join(", ") }));
+                const uploaded = await uploadMediaFile(encodeWavBlob(audio), "audio");
                 insertDerivedAsset(
                     {
                         source: target,
@@ -1748,10 +1750,14 @@ function InfiniteCanvasPage() {
             }
             try {
                 const files = await Promise.all(
-                    stems.map(async (stem) => ({
-                        name: stem.track.name || t("canvas.audioStudio.trackName", { index: tracks.indexOf(stem.track) + 1 }),
-                        file: await uploadMediaFile(encodeWavBlob(await renderAudioMixdown({ tracks, clips: stem.clips, regions: stem.regions, ppqn, tempo, masterGain, automation }, nodesRef.current)), "audio"),
-                    })),
+                    stems.map(async (stem) => {
+                        const { audio, skipped } = await renderAudioMixdown({ tracks, clips: stem.clips, regions: stem.regions, ppqn, tempo, masterGain, automation }, nodesRef.current);
+                        if (skipped.length) message.warning(t("canvas.audioStudio.mixdownVstSkipped", { tracks: skipped.map((report) => report.name || t("canvas.audioStudio.trackName", { index: tracks.findIndex((track) => track.id === report.trackId) + 1 })).join(", ") }));
+                        return {
+                            name: stem.track.name || t("canvas.audioStudio.trackName", { index: tracks.indexOf(stem.track) + 1 }),
+                            file: await uploadMediaFile(encodeWavBlob(audio), "audio"),
+                        };
+                    }),
                 );
                 insertDerivedAsset(
                     {

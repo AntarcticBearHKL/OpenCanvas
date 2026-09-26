@@ -224,11 +224,14 @@ export type CanvasAudioTrackType = "audio" | "instrument" | "midi" | "group" | "
 /** Built-in instrument of an instrument/MIDI track; only `synth` is implemented, `sampler` is reserved for a later stage. */
 export type CanvasAudioSynthInstrument = { kind: "synth" | "sampler"; preset?: string; soundFontKey?: string };
 
-/** Native VST3 instrument played by the local bridge; `pluginId` is a scanned plugin id, `stateKey` is reserved for later plugin-state persistence. */
+/** Native VST3 instrument played by the local bridge; `pluginId` is a scanned plugin id, and `stateKey` is the nanoid assigned when the instrument is picked, naming the localforage blob that holds the plug-in's own state. */
 export type CanvasAudioVst3Instrument = { kind: "vst3"; pluginId: string; name?: string; stateKey?: string };
 
 /** Instrument of an instrument/MIDI track: a built-in synth/sampler preset or a native VST3 plugin hosted by the bridge. */
 export type CanvasAudioInstrument = CanvasAudioSynthInstrument | CanvasAudioVst3Instrument;
+
+/** Native VST3 effect inserted inline on a track by the local bridge; `pluginId` is a scanned plugin id. */
+export type CanvasAudioVst3Effect = { kind: "vst3"; pluginId: string; name?: string };
 
 /** Aux send; `pre` taps before the fader (both taps sit inside the track's mute/solo gate). */
 export type CanvasAudioSend = {
@@ -254,6 +257,7 @@ export type CanvasAudioTrack = {
     armed?: boolean; // Record-arm state only; recording itself is not implemented yet.
     collapsed?: boolean; // Fold this track's automation lanes in the arrangement.
     instrument?: CanvasAudioInstrument; // Instrument/MIDI tracks: the built-in synth; unset means the default preset.
+    vst3Effect?: CanvasAudioVst3Effect; // Optional inline VST3 effect on this track's signal; unset keeps the track untouched.
 };
 
 /** Audio compositor clip; times are seconds and sourceNodeId references an AUDIO node, never a copied payload. */

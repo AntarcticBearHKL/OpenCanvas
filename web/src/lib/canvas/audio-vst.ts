@@ -1,7 +1,13 @@
 import {
     decodeRpc,
     encodeRpc,
+    frameByteLength,
+    readFrame,
     VST_BRIDGE_DEFAULT_URL,
+    VST_CHANNELS,
+    VST_FRAMES_PER_BLOCK,
+    VST_LATENCY_HEADER,
+    VST_SAMPLE_RATE,
     VstError,
     type VstCommand,
     type VstEditorResult,
@@ -12,6 +18,8 @@ import {
     type VstParam,
     type VstParamSetParams,
     type VstPlugin,
+    type VstRenderedAudio,
+    type VstRenderParams,
     type VstRpcSuccess,
 } from "@/lib/canvas/audio-vst-protocol";
 
@@ -116,6 +124,10 @@ export type VstClient = {
     audioStop: (instanceId: string) => Promise<void>;
     /** `GET /audio?instance=<id>&token=<token>` — feed to the streaming worker. */
     audioUrl: (instanceId: string) => string;
+    /** `POST /audio-in?instance=<id>&token=<token>` — effect input; the worker uploads captured blocks here. */
+    audioInUrl: (instanceId: string) => string;
+    /** `POST /render` — bounce the instance's loaded plug-in offline into planar PCM (latency already compensated). */
+    renderOffline: (params: VstRenderParams) => Promise<VstRenderedAudio>;
 };
 
 function normalizeBaseUrl(url: string): string {
@@ -204,7 +216,59 @@ export function createVstClient(options: VstClientOptions = {}): VstClient {
             if (token) params.set("token", token);
             return `${baseUrl}/audio?${params.toString()}`;
         },
+        audioInUrl: (instanceId) => {
+            const params = new URLSearchParams({ instance: instanceId });
+            if (token) params.set("token", token);
+            return `${baseUrl}/audio-in?${params.toString()}`;
+        },
+        renderOffline: async (params) => {
+            const headers: Record<string, string> = { "content-type": "application/json" };
+            if (token) headers.authorization = `Bearer ${token}`;
+            let response: Response;
+            try {
+                response = await request(`${baseUrl}/render`, { method: "POST", headers, body: JSON.stringify(params) });
+            } catch {
+                throw new VstError("unreachable", `VST host is not reachable at ${baseUrl}`, 0);
+            }
+            if (!response.ok) {
+                const text = await response.text().catch(() => "");
+                throw new VstError(`http-${response.status}`, text.trim() || `VST render failed (${response.status})`, response.status);
+            }
+            let body: ArrayBuffer;
+            try {
+                body = await response.arrayBuffer();
+            } catch {
+                throw new VstError("render-aborted", "VST render stream was interrupted", response.status);
+            }
+            return decodeRenderedAudio(body, Number(response.headers.get(VST_LATENCY_HEADER) || 0));
+        },
     };
+}
+
+/** Decode a `/render` response body: concatenate the fixed frames and drop the reported plug-in latency. */
+function decodeRenderedAudio(body: ArrayBuffer, latencySamples: number): VstRenderedAudio {
+    const view = new DataView(body);
+    const first = readFrame(view, 0);
+    if (!first) throw new VstError("bad-response", `VST render returned no complete frame (${body.byteLength} bytes)`);
+    const { channels, framesPerChannel } = first;
+    const frameBytes = frameByteLength(channels, framesPerChannel);
+    if (body.byteLength % frameBytes !== 0) throw new VstError("bad-response", `VST render returned ${body.byteLength} bytes, not a multiple of the ${frameBytes}-byte frame`);
+    const blocks = body.byteLength / frameBytes;
+    const frames = blocks * framesPerChannel;
+    const planes = Array.from({ length: channels }, () => new Float32Array(frames));
+    for (let block = 0; block < blocks; block++) {
+        const frame = readFrame(view, block * frameBytes);
+        if (!frame || frame.channels !== channels || frame.framesPerChannel !== framesPerChannel) throw new VstError("bad-frame", "VST render frame header changed mid-stream");
+        for (let channel = 0; channel < channels; channel++) {
+            const source = frame.dataOffset + channel * framesPerChannel * 4;
+            const target = planes[channel];
+            const base = block * framesPerChannel;
+            for (let i = 0; i < framesPerChannel; i++) target[base + i] = view.getFloat32(source + i * 4, true);
+        }
+    }
+    const latency = Math.max(0, Math.round(latencySamples));
+    const trimmed = Math.min(latency, frames);
+    return { channels: trimmed > 0 ? planes.map((plane) => plane.subarray(trimmed)) : planes, frames: frames - trimmed, latencySamples: latency };
 }
 
 /**

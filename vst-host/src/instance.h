@@ -1,4 +1,9 @@
-// One loaded VST3 plug-in instance.
+// One loaded VST3 plug-in instance, hosted in the current process.
+//
+// This is the implementation the per-instance worker child (`--plugin-worker`)
+// and `--selftest` use; the HTTP server talks to the proxy in worker.h, which
+// forwards to a child running this class. A crash or a hang here therefore
+// stays inside the child.
 //
 // Threading contract (this is what keeps the control plane alive):
 //   * Every plug-in call runs on the instance's own worker thread. `post()`
@@ -13,8 +18,7 @@
 //     without joining a stuck thread.
 //
 // The VST3 SDK types are hidden behind Impl so this header (and the HTTP
-// layer) stays SDK-free. A per-instance child process backend can later
-// replace `post`/`popFrame` without touching the server.
+// layer) stays SDK-free.
 #pragma once
 
 #include <atomic>
@@ -36,6 +40,8 @@ struct LoadResult
 {
 	bool ok {false};
 	std::string error;
+	/** Machine-readable failure code (e.g. `no_effect_class`); empty means the generic `load_failed`. */
+	std::string code;
 };
 
 struct RenderStats
@@ -57,14 +63,56 @@ struct ParamInfo
 	int stepCount {0};
 };
 
+/** One note of an offline render request; times are seconds from the render start. */
+struct OfflineNote
+{
+	int pitch {60};
+	int velocity {100};
+	double start {0.0};
+	double length {0.0};
+};
+
+/**
+ * Shared state of one in-flight `/render`: the instance thread renders blocks into `frames`,
+ * an HTTP thread drains them into the response. `cancelled` is set when the client goes away so
+ * the renderer stops instead of filling a queue nobody reads.
+ */
+struct OfflineRenderState
+{
+	std::mutex mutex;
+	std::condition_variable condition;
+	std::deque<std::shared_ptr<const std::vector<uint8_t>>> frames;
+	std::string error;
+	double latencySamples {0.0};
+	uint32_t channels {0};
+	uint32_t framesPerBlock {0};
+	bool finished {false};
+	bool cancelled {false};
+};
+
+/** HTTP-thread side: wait for a first block or an immediate failure (never both: a failure has no frames). */
+bool waitRenderStart (const std::shared_ptr<OfflineRenderState>& state, std::string& error, int timeoutMs);
+/** HTTP-thread side: pop one rendered frame, waiting up to `waitMs`. False = finished, cancelled or stalled. */
+bool popRenderFrame (const std::shared_ptr<OfflineRenderState>& state, std::shared_ptr<const std::vector<uint8_t>>& frame, int waitMs);
+/** HTTP-thread side: tell the renderer to stop (client disconnected or the response ended early). */
+void cancelRender (const std::shared_ptr<OfflineRenderState>& state);
+
+/**
+ * Validate a run of `/audio` frames (`POST /audio-in` body). Returns the number of whole
+ * frames (0 for an empty body) or 0 with `error` set to the same message the instance has
+ * always reported (truncated header/body, malformed header, more than 64 frames). The
+ * worker proxy uses it so a bad body is rejected before it reaches the child's ring.
+ */
+size_t countAudioInFrames (const uint8_t* data, size_t size, std::string& error);
+
 // Set the process-wide IHostApplication context. Call once at startup.
 void initHostApplication ();
 
-class PluginInstance
+class LocalPluginInstance
 {
 public:
-	explicit PluginInstance (std::string id);
-	~PluginInstance ();
+	explicit LocalPluginInstance (std::string id);
+	~LocalPluginInstance ();
 
 	const std::string& id () const { return id_; }
 	uint32_t hash () const { return hash_; }
@@ -76,6 +124,11 @@ public:
 	// detached (hung). Callers must then leak the instance rather than destroy it.
 	bool stop (int timeoutMs);
 	bool stopped () const { return stopped_.load (); }
+
+	// Runs the instance loop on the CALLING thread and blocks until stop(). The worker
+	// child uses this so plug-in calls run on the process main thread (the VST3 rule);
+	// `start()` keeps the self-test path, which owns its own thread.
+	void runOnCurrentThread ();
 
 	// Queue `fn` on the instance thread. All do*() methods below must be run
 	// this way (or from `run()`).
@@ -94,8 +147,10 @@ public:
 	}
 
 	// ---- instance-thread methods (invoke via post()) ----
+	// `effect` selects the Audio Module Class whose subCategories contain "Fx" and activates input bus 0;
+	// the default keeps the instrument path unchanged (input buses deactivated, zero-input process block).
 	LoadResult doLoad (const std::string& modulePath, const std::string& classUid, double sampleRate,
-	                   int blockSize, int channels);
+	                   int blockSize, int channels, bool effect = false);
 	bool doSetProcessing (bool on);
 	RenderStats doRenderBlocks (int blocks);
 	bool doNoteOn (int pitch, int velocity, int channel);
@@ -112,6 +167,23 @@ public:
 	bool pumpOn () const { return pump_.load (); }
 	std::shared_ptr<const std::vector<uint8_t>> popFrame (int waitMs);
 
+	// ---- effect input (called from other threads) ----
+	/** True for an effect instance: input bus 0 is active and the process block reads queued input. */
+	bool isEffect () const;
+	int inputChannels () const;
+	/**
+	 * Feed one `POST /audio-in` body into the instance input queue. The body is the `/audio` frame format
+	 * (16-byte LE header + planar Float32) and may concatenate whole frames; frames are re-blocked to the
+	 * instance block size. Rejects malformed input before appending anything. Queued blocks are bounded
+	 * (dropped oldest) and consumed one per rendered block; an empty queue renders silence.
+	 */
+	bool queueInput (const uint8_t* data, size_t size, size_t& acceptedFrames, std::string& error);
+
+	// Queues an offline render on the instance thread and returns the state the HTTP thread streams
+	// from. The plug-in keeps its loaded configuration; notes are absolute seconds. Runs in the
+	// plug-in's offline process mode when nothing else is streaming.
+	std::shared_ptr<OfflineRenderState> renderOffline (double seconds, const std::vector<OfflineNote>& notes);
+
 	// ---- called from the instance thread only ----
 	void onGuiParamEdit (uint32_t paramId, double value);
 	void resizeEditorWindow (int width, int height);
@@ -127,7 +199,9 @@ private:
 	void run ();
 	void pumpWin32 ();
 	void destroyEditorOnThread ();
-	void processOneBlock (bool emitFrame);
+	void processOneBlock (bool emitFrame, OfflineRenderState* renderTarget = nullptr);
+	void doRenderOffline (const std::shared_ptr<OfflineRenderState>& state, double seconds, std::vector<OfflineNote> notes);
+	bool applyProcessMode (bool offline);
 	void teardownPlugin ();
 
 	std::string id_;

@@ -55,6 +55,56 @@ namespace {
 constexpr size_t kMaxQueuedFrames = 48; // ~256 ms of audio at 48 kHz/256
 constexpr size_t kMaxPendingEvents = 1024;
 constexpr size_t kMaxPendingParams = 512;
+constexpr size_t kMaxOfflineQueuedFrames = 64; // the offline renderer blocks above this many unread blocks
+constexpr size_t kMaxQueuedInputBlocks = 48;   // ~256 ms of unplayed input; the oldest block is dropped past it
+constexpr size_t kMaxAudioInBlocks = 64;       // whole frames accepted by one /audio-in request (host re-blocks)
+
+struct AudioInFrame
+{
+	size_t offset;
+	uint32_t channels;
+	uint32_t frames;
+};
+
+// Walks a run of `/audio` frames (`POST /audio-in` body). `error` carries the
+// exact message the HTTP layer has always reported for a malformed body, so the
+// in-process path and the worker proxy reject with the same text.
+bool walkAudioInFrames (const uint8_t* data, size_t size, std::vector<AudioInFrame>& out, std::string& error)
+{
+	out.clear ();
+	size_t offset = 0;
+	while (offset < size)
+	{
+		if (size - offset < 16)
+		{
+			error = "truncated frame header";
+			return false;
+		}
+		uint32_t frameChannels = 0;
+		uint32_t frames = 0;
+		std::memcpy (&frameChannels, data + offset + 8, 4);
+		std::memcpy (&frames, data + offset + 12, 4);
+		if (frameChannels < 1 || frameChannels > 2 || frames < 1 || frames > 8192)
+		{
+			error = "malformed frame header";
+			return false;
+		}
+		const size_t frameBytes = 16 + size_t (frameChannels) * size_t (frames) * 4;
+		if (offset + frameBytes > size)
+		{
+			error = "truncated frame body";
+			return false;
+		}
+		out.push_back ({offset, frameChannels, frames});
+		offset += frameBytes;
+	}
+	if (out.size () > kMaxAudioInBlocks)
+	{
+		error = "at most 64 frames per request";
+		return false;
+	}
+	return true;
+}
 
 Steinberg::Vst::HostApplication& hostApp ()
 {
@@ -138,7 +188,7 @@ void ensureEditorWindowClass ()
 class InstancePlugFrame : public IPlugFrame
 {
 public:
-	explicit InstancePlugFrame (PluginInstance* instance) : instance_ (instance) {}
+	explicit InstancePlugFrame (LocalPluginInstance* instance) : instance_ (instance) {}
 
 	tresult PLUGIN_API resizeView (IPlugView* view, ViewRect* newSize) override
 	{
@@ -173,7 +223,7 @@ public:
 	HWND hwnd {nullptr};
 
 private:
-	PluginInstance* instance_;
+	LocalPluginInstance* instance_;
 };
 
 //------------------------------------------------------------------------
@@ -184,7 +234,7 @@ private:
 class InstanceComponentHandler : public IComponentHandler
 {
 public:
-	explicit InstanceComponentHandler (PluginInstance* instance) : instance_ (instance) {}
+	explicit InstanceComponentHandler (LocalPluginInstance* instance) : instance_ (instance) {}
 
 	tresult PLUGIN_API beginEdit (ParamID) override { return kResultOk; }
 	tresult PLUGIN_API performEdit (ParamID id, ParamValue value) override
@@ -206,13 +256,13 @@ public:
 	uint32 PLUGIN_API release () override { return 1000; }
 
 private:
-	PluginInstance* instance_;
+	LocalPluginInstance* instance_;
 };
 
 } // namespace
 
 //------------------------------------------------------------------------
-struct PluginInstance::Impl
+struct LocalPluginInstance::Impl
 {
 	std::shared_ptr<Module> module;
 	IPtr<PlugProvider> provider;
@@ -226,6 +276,7 @@ struct PluginInstance::Impl
 
 	bool active {false};
 	bool processing {false};
+	bool offlineMode {false};
 	bool editorOpen {false};
 	double sampleRate {48000.0};
 	int blockSize {256};
@@ -243,6 +294,17 @@ struct PluginInstance::Impl
 	ProcessContext context {};
 	uint32_t sequence {0};
 
+	// Effect input: `effect` gates the whole block, `inputChannels` is the live input bus width.
+	bool effect {false};
+	int inputChannels {0};
+	std::vector<float> inData;
+	std::vector<float*> inPtrs;
+	AudioBusBuffers inBus {};
+	std::mutex inputMutex;
+	std::deque<std::vector<float>> inputQueue; // whole blockSize blocks, planar
+	std::vector<float> inputPartial;           // planar scratch for the tail of a partially filled block
+	size_t inputPartialFrames {0};
+
 	EditorWindow window;
 	Clock::time_point lastSizePoll {};
 };
@@ -253,29 +315,34 @@ void initHostApplication ()
 	PluginContextFactory::instance ().setPluginContext (&hostApp ());
 }
 
-PluginInstance::PluginInstance (std::string id)
+LocalPluginInstance::LocalPluginInstance (std::string id)
 : id_ (std::move (id))
 , hash_ (fnv1a32 (id_))
 , impl_ (std::make_unique<Impl> ())
 {
 }
 
-PluginInstance::~PluginInstance ()
+LocalPluginInstance::~LocalPluginInstance ()
 {
-	if (!stopped_.load ())
-		stop (2000);
+	if (!stopped_.load () && !stop (2000))
+	{
+		// stop() detached a wedged plug-in thread; that thread still touches impl_, so
+		// destroying it here would be a use-after-free. Leak the state instead.
+		impl_.release ();
+		return;
+	}
 	if (thread_.joinable ())
 		thread_.join ();
 }
 
-bool PluginInstance::start (std::string& error)
+bool LocalPluginInstance::start (std::string& error)
 {
 	if (!finished_.valid ())
 		finished_ = finishedPromise_.get_future ();
 	running_.store (true);
 	try
 	{
-		thread_ = std::thread (&PluginInstance::run, this);
+		thread_ = std::thread (&LocalPluginInstance::run, this);
 	}
 	catch (const std::exception& e)
 	{
@@ -286,7 +353,15 @@ bool PluginInstance::start (std::string& error)
 	return true;
 }
 
-bool PluginInstance::stop (int timeoutMs)
+void LocalPluginInstance::runOnCurrentThread ()
+{
+	if (!finished_.valid ())
+		finished_ = finishedPromise_.get_future ();
+	running_.store (true);
+	run ();
+}
+
+bool LocalPluginInstance::stop (int timeoutMs)
 {
 	if (stopped_.load ())
 		return true;
@@ -314,7 +389,7 @@ bool PluginInstance::stop (int timeoutMs)
 	return finished;
 }
 
-void PluginInstance::run ()
+void LocalPluginInstance::run ()
 {
 	OleInitialize (nullptr);
 	auto nextAudio = Clock::now ();
@@ -368,8 +443,8 @@ void PluginInstance::run ()
 }
 
 //------------------------------------------------------------------------
-LoadResult PluginInstance::doLoad (const std::string& modulePath, const std::string& classUid,
-                                   double sampleRate, int blockSize, int channels)
+LoadResult LocalPluginInstance::doLoad (const std::string& modulePath, const std::string& classUid,
+                                   double sampleRate, int blockSize, int channels, bool effect)
 {
 	if (!impl_)
 		return {false, "instance not initialized"};
@@ -401,8 +476,10 @@ LoadResult PluginInstance::doLoad (const std::string& modulePath, const std::str
 			continue;
 		}
 		const auto& sub = info.subCategories ();
-		bool instrument = std::find (sub.begin (), sub.end (), "Instrument") != sub.end ();
-		if (instrument)
+		const bool wanted =
+		    effect ? std::find (sub.begin (), sub.end (), "Fx") != sub.end ()
+		           : std::find (sub.begin (), sub.end (), "Instrument") != sub.end ();
+		if (wanted)
 		{
 			chosen = &info;
 			break;
@@ -411,7 +488,14 @@ LoadResult PluginInstance::doLoad (const std::string& modulePath, const std::str
 			chosen = &info;
 	}
 	if (!chosen)
-		return {false, "no Audio Module Class found"};
+		return {false, effect ? "no effect (Fx) Audio Module Class found in this module" : "no Audio Module Class found",
+		        effect ? "no_effect_class" : ""};
+	if (effect)
+	{
+		const auto& sub = chosen->subCategories ();
+		if (std::find (sub.begin (), sub.end (), "Fx") == sub.end ())
+			return {false, "selected Audio Module Class is not an effect (Fx)", "no_effect_class"};
+	}
 
 	IPtr<PlugProvider> provider = owned (new PlugProvider (factory, *chosen, true));
 	if (!provider->initialize ())
@@ -443,11 +527,16 @@ LoadResult PluginInstance::doLoad (const std::string& modulePath, const std::str
 	for (int32 i = 0; i < outputBuses; ++i)
 		component->activateBus (kAudio, kOutput, i, i == 0);
 	int32 inputBuses = component->getBusCount (kAudio, kInput);
+	if (effect && inputBuses <= 0)
+		return {false, "effect plug-in has no audio input bus"};
 	for (int32 i = 0; i < inputBuses; ++i)
-		component->activateBus (kAudio, kInput, i, false);
+		component->activateBus (kAudio, kInput, i, effect && i == 0);
 
 	SpeakerArrangement arrangement = (channels == 1) ? SpeakerArr::kMono : SpeakerArr::kStereo;
-	processor->setBusArrangements (nullptr, 0, &arrangement, 1);
+	if (effect)
+		processor->setBusArrangements (&arrangement, 1, &arrangement, 1);
+	else
+		processor->setBusArrangements (nullptr, 0, &arrangement, 1);
 
 	int outputChannels = channels;
 	if (outputBuses > 0)
@@ -457,6 +546,17 @@ LoadResult PluginInstance::doLoad (const std::string& modulePath, const std::str
 			outputChannels = busInfo.channelCount;
 	}
 	outputChannels = std::max (1, std::min (2, outputChannels));
+
+	int inputChannels = 0;
+	if (effect)
+	{
+		BusInfo busInfo {};
+		if (component->getBusInfo (kAudio, kInput, 0, busInfo) == kResultOk && busInfo.channelCount > 0)
+			inputChannels = busInfo.channelCount;
+		if (inputChannels <= 0)
+			return {false, "effect plug-in reports no input channels"};
+		inputChannels = std::max (1, std::min (outputChannels, std::min (2, inputChannels)));
+	}
 
 	ProcessSetup setup {};
 	setup.processMode = kRealtime;
@@ -478,6 +578,8 @@ LoadResult PluginInstance::doLoad (const std::string& modulePath, const std::str
 	impl_->sampleRate = sampleRate;
 	impl_->blockSize = blockSize;
 	impl_->channels = outputChannels;
+	impl_->effect = effect;
+	impl_->inputChannels = inputChannels;
 	impl_->latency = processor->getLatencySamples ();
 	impl_->active = true;
 	impl_->period = std::chrono::microseconds (int64_t ((double (blockSize) / sampleRate) * 1e6));
@@ -492,6 +594,21 @@ LoadResult PluginInstance::doLoad (const std::string& modulePath, const std::str
 	impl_->outBus.silenceFlags = 0;
 	impl_->outBus.channelBuffers32 = impl_->outPtrs.data ();
 
+	if (effect)
+	{
+		size_t inSampleCount = size_t (inputChannels) * size_t (blockSize);
+		impl_->inData.assign (inSampleCount, 0.f);
+		impl_->inPtrs.assign (size_t (inputChannels), nullptr);
+		for (int c = 0; c < inputChannels; ++c)
+			impl_->inPtrs[size_t (c)] = impl_->inData.data () + size_t (c) * size_t (blockSize);
+		impl_->inBus = AudioBusBuffers {};
+		impl_->inBus.numChannels = inputChannels;
+		impl_->inBus.silenceFlags = 0;
+		impl_->inBus.channelBuffers32 = impl_->inPtrs.data ();
+		impl_->inputPartial.assign (inSampleCount, 0.f);
+		impl_->inputPartialFrames = 0;
+	}
+
 	impl_->context = ProcessContext {};
 	impl_->context.state = ProcessContext::kPlaying | ProcessContext::kTempoValid |
 	                       ProcessContext::kTimeSigValid | ProcessContext::kProjectTimeMusicValid |
@@ -505,7 +622,7 @@ LoadResult PluginInstance::doLoad (const std::string& modulePath, const std::str
 	return {true, {}};
 }
 
-void PluginInstance::teardownPlugin ()
+void LocalPluginInstance::teardownPlugin ()
 {
 	destroyEditorOnThread ();
 	if (impl_ && impl_->processor && impl_->processing)
@@ -525,6 +642,16 @@ void PluginInstance::teardownPlugin ()
 		impl_->handler.reset ();
 		impl_->outPtrs.clear ();
 		impl_->outData.clear ();
+		{
+			std::lock_guard<std::mutex> lock (impl_->inputMutex);
+			impl_->inputQueue.clear ();
+			impl_->inputPartial.clear ();
+			impl_->inputPartialFrames = 0;
+		}
+		impl_->inPtrs.clear ();
+		impl_->inData.clear ();
+		impl_->effect = false;
+		impl_->inputChannels = 0;
 		impl_->processor = nullptr;
 		impl_->component = nullptr;
 		impl_->controller = nullptr;
@@ -535,7 +662,7 @@ void PluginInstance::teardownPlugin ()
 }
 
 //------------------------------------------------------------------------
-void PluginInstance::processOneBlock (bool emitFrame)
+void LocalPluginInstance::processOneBlock (bool emitFrame, OfflineRenderState* renderTarget)
 {
 	if (!impl_ || !impl_->processor || !impl_->component)
 		return;
@@ -546,6 +673,25 @@ void PluginInstance::processOneBlock (bool emitFrame)
 	impl_->pendingEvents.clear ();
 
 	std::fill (impl_->outData.begin (), impl_->outData.end (), 0.f);
+
+	// Effect instances take one queued input block per rendered block; an empty queue renders silence.
+	bool haveInput = false;
+	if (impl_->effect)
+	{
+		{
+			std::lock_guard<std::mutex> lock (impl_->inputMutex);
+			if (!impl_->inputQueue.empty ())
+			{
+				const std::vector<float>& block = impl_->inputQueue.front ();
+				std::copy (block.begin (), block.end (), impl_->inData.begin ());
+				impl_->inputQueue.pop_front ();
+				haveInput = true;
+			}
+		}
+		if (!haveInput)
+			std::fill (impl_->inData.begin (), impl_->inData.end (), 0.f);
+		impl_->inBus.silenceFlags = haveInput ? 0 : ((1ull << impl_->inBus.numChannels) - 1ull);
+	}
 
 	impl_->parameterChanges.clearQueue ();
 	for (const auto& change : impl_->pendingParams)
@@ -560,11 +706,11 @@ void PluginInstance::processOneBlock (bool emitFrame)
 	impl_->pendingParams.clear ();
 
 	ProcessData data {};
-	data.processMode = kRealtime;
+	data.processMode = impl_->offlineMode ? kOffline : kRealtime;
 	data.symbolicSampleSize = kSample32;
 	data.numSamples = impl_->blockSize;
-	data.numInputs = 0;
-	data.inputs = nullptr;
+	data.numInputs = impl_->effect ? 1 : 0;
+	data.inputs = impl_->effect ? &impl_->inBus : nullptr;
 	data.numOutputs = impl_->outBus.numChannels > 0 ? 1 : 0;
 	data.outputs = &impl_->outBus;
 	data.inputEvents = impl_->eventList.getEventCount () > 0 ? &impl_->eventList : nullptr;
@@ -596,6 +742,15 @@ void PluginInstance::processOneBlock (bool emitFrame)
 		std::memcpy (frame.data () + 16, impl_->outData.data (), sampleCount * sizeof (float));
 
 	auto shared = std::make_shared<const std::vector<uint8_t>> (std::move (frame));
+	if (renderTarget)
+	{
+		std::lock_guard<std::mutex> lock (renderTarget->mutex);
+		if (renderTarget->cancelled)
+			return;
+		renderTarget->frames.push_back (std::move (shared));
+		renderTarget->condition.notify_all ();
+		return;
+	}
 	{
 		std::lock_guard<std::mutex> lock (queueMutex_);
 		if (frameQueue_.size () >= kMaxQueuedFrames)
@@ -605,13 +760,13 @@ void PluginInstance::processOneBlock (bool emitFrame)
 	queueCondition_.notify_one ();
 }
 
-void PluginInstance::setPump (bool on)
+void LocalPluginInstance::setPump (bool on)
 {
 	pump_.store (on);
 	condition_.notify_all ();
 }
 
-std::shared_ptr<const std::vector<uint8_t>> PluginInstance::popFrame (int waitMs)
+std::shared_ptr<const std::vector<uint8_t>> LocalPluginInstance::popFrame (int waitMs)
 {
 	std::unique_lock<std::mutex> lock (queueMutex_);
 	queueCondition_.wait_for (lock, std::chrono::milliseconds (waitMs),
@@ -624,7 +779,67 @@ std::shared_ptr<const std::vector<uint8_t>> PluginInstance::popFrame (int waitMs
 }
 
 //------------------------------------------------------------------------
-bool PluginInstance::doSetProcessing (bool on)
+// `POST /audio-in` lands here on an HTTP thread: the body is validated as a run of `/audio` frames,
+// then re-blocked to the instance block size and queued for the render thread. Nothing is appended
+// when the body is malformed, so a bad request never leaves partial audio in the queue.
+//------------------------------------------------------------------------
+size_t countAudioInFrames (const uint8_t* data, size_t size, std::string& error)
+{
+	error.clear ();
+	std::vector<AudioInFrame> frames;
+	if (!walkAudioInFrames (data, size, frames, error))
+		return 0;
+	return frames.size ();
+}
+
+bool LocalPluginInstance::queueInput (const uint8_t* data, size_t size, size_t& acceptedFrames, std::string& error)
+{
+	acceptedFrames = 0;
+	if (!impl_ || !impl_->effect || impl_->inputChannels <= 0)
+	{
+		error = "instance is not an effect (it has no input bus)";
+		return false;
+	}
+
+	std::vector<AudioInFrame> framesList;
+	if (!walkAudioInFrames (data, size, framesList, error))
+		return false;
+
+	const int channels = impl_->inputChannels;
+	const int blockSize = impl_->blockSize;
+	std::lock_guard<std::mutex> lock (impl_->inputMutex);
+	for (const AudioInFrame& frame : framesList)
+	{
+		const uint8_t* pcm = data + frame.offset + 16;
+		size_t cursor = 0;
+		while (cursor < frame.frames)
+		{
+			const size_t take = std::min (size_t (frame.frames) - cursor,
+			                              size_t (blockSize) - impl_->inputPartialFrames);
+			for (int c = 0; c < channels; ++c)
+			{
+				const int source = frame.channels == 1 ? 0 : std::min<int> (c, int (frame.channels) - 1);
+				const uint8_t* src = pcm + (size_t (source) * size_t (frame.frames) + cursor) * 4;
+				float* dst = impl_->inputPartial.data () + size_t (c) * size_t (blockSize) + impl_->inputPartialFrames;
+				std::memcpy (dst, src, take * 4);
+			}
+			impl_->inputPartialFrames += take;
+			cursor += take;
+			if (impl_->inputPartialFrames == size_t (blockSize))
+			{
+				if (impl_->inputQueue.size () >= kMaxQueuedInputBlocks)
+					impl_->inputQueue.pop_front ();
+				impl_->inputQueue.push_back (impl_->inputPartial);
+				impl_->inputPartialFrames = 0;
+			}
+		}
+	}
+	acceptedFrames = framesList.size ();
+	return true;
+}
+
+//------------------------------------------------------------------------
+bool LocalPluginInstance::doSetProcessing (bool on)
 {
 	if (!impl_ || !impl_->processor)
 		return false;
@@ -634,7 +849,7 @@ bool PluginInstance::doSetProcessing (bool on)
 	return result == kResultOk;
 }
 
-RenderStats PluginInstance::doRenderBlocks (int blocks)
+RenderStats LocalPluginInstance::doRenderBlocks (int blocks)
 {
 	if (!impl_ || !impl_->processor)
 		return {};
@@ -665,7 +880,225 @@ RenderStats PluginInstance::doRenderBlocks (int blocks)
 	return stats;
 }
 
-bool PluginInstance::doNoteOn (int pitch, int velocity, int channel)
+//------------------------------------------------------------------------
+// Offline render (`POST /render`): the request runs on the instance thread while an HTTP thread
+// drains the frames it produces. `seconds` of timeline are rendered plus the plug-in's reported
+// latency, which the client trims off the front (the `x-vst-latency-samples` header carries it).
+// With no active pump the plug-in moves to its offline process mode (higher quality, faster than
+// real time where supported); while a stream is live the real-time mode is kept so re-activation
+// cannot reset the plugin mid-stream.
+//------------------------------------------------------------------------
+bool LocalPluginInstance::applyProcessMode (bool offline)
+{
+	if (!impl_ || !impl_->component || !impl_->processor || !impl_->active)
+		return false;
+	if (impl_->offlineMode == offline)
+		return true;
+
+	const bool wasProcessing = impl_->processing;
+	if (wasProcessing)
+	{
+		impl_->processor->setProcessing (false);
+		impl_->processing = false;
+	}
+	impl_->component->setActive (false);
+
+	auto setup = [this] (ProcessModes mode) {
+		ProcessSetup config {};
+		config.processMode = mode;
+		config.symbolicSampleSize = kSample32;
+		config.maxSamplesPerBlock = impl_->blockSize;
+		config.sampleRate = impl_->sampleRate;
+		if (impl_->processor->setupProcessing (config) != kResultOk)
+			return false;
+		SpeakerArrangement arrangement = impl_->channels == 1 ? SpeakerArr::kMono : SpeakerArr::kStereo;
+		impl_->processor->setBusArrangements (nullptr, 0, &arrangement, 1);
+		return true;
+	};
+
+	if (setup (offline ? kOffline : kRealtime))
+		impl_->offlineMode = offline;
+	else if (offline && setup (kRealtime))
+		impl_->offlineMode = false; // plug-in does not support offline processing; stay real-time
+	impl_->component->setActive (true);
+	if (wasProcessing)
+	{
+		impl_->processor->setProcessing (true);
+		impl_->processing = true;
+	}
+	return impl_->offlineMode == offline;
+}
+
+void LocalPluginInstance::doRenderOffline (const std::shared_ptr<OfflineRenderState>& state, double seconds,
+                                      std::vector<OfflineNote> notes)
+{
+	auto finish = [&state] (const std::string& error) {
+		std::lock_guard<std::mutex> lock (state->mutex);
+		if (!error.empty ())
+			state->error = error;
+		state->finished = true;
+		state->condition.notify_all ();
+	};
+
+	if (!impl_ || !impl_->processor || !impl_->component)
+	{
+		finish ("instance has no loaded plug-in");
+		return;
+	}
+
+	const double sampleRate = impl_->sampleRate;
+	const int blockSize = impl_->blockSize;
+	const int channels = impl_->channels;
+	const double latency = std::max (0.0, impl_->latency);
+	const int64_t renderSamples = int64_t (std::llround (seconds * sampleRate + latency));
+	const int64_t totalBlocks = (renderSamples + blockSize - 1) / blockSize;
+
+	{
+		std::lock_guard<std::mutex> lock (state->mutex);
+		state->latencySamples = latency;
+		state->channels = uint32_t (channels);
+		state->framesPerBlock = uint32_t (blockSize);
+	}
+
+	struct Scheduled
+	{
+		int64_t sample;
+		bool off;
+		int pitch;
+		int velocity;
+	};
+	std::vector<Scheduled> schedule;
+	for (const OfflineNote& note : notes)
+	{
+		int64_t start = int64_t (std::llround (note.start * sampleRate));
+		int64_t end = start + std::max<int64_t> (1, int64_t (std::llround (note.length * sampleRate)));
+		if (end <= 0 || start >= renderSamples)
+			continue;
+		start = std::max<int64_t> (start, 0);
+		end = std::min<int64_t> (end, renderSamples);
+		int pitch = std::max (0, std::min (127, note.pitch));
+		int velocity = std::max (0, std::min (127, note.velocity));
+		schedule.push_back ({start, false, pitch, velocity});
+		schedule.push_back ({end, true, pitch, velocity});
+	}
+	// Note-offs sort before note-ons at the same sample, so a re-trigger never swallows the release.
+	std::sort (schedule.begin (), schedule.end (), [] (const Scheduled& a, const Scheduled& b) {
+		if (a.sample != b.sample)
+			return a.sample < b.sample;
+		return a.off != b.off ? a.off : a.velocity < b.velocity;
+	});
+
+	const bool wasProcessing = impl_->processing;
+	if (!wasProcessing)
+	{
+		if (impl_->processor->setProcessing (true) != kResultOk)
+		{
+			finish ("plug-in refused to start processing");
+			return;
+		}
+		impl_->processing = true;
+	}
+	const bool offlineMode = !pump_.load () && applyProcessMode (true);
+
+	size_t next = 0;
+	for (int64_t block = 0; block < totalBlocks; ++block)
+	{
+		{
+			std::unique_lock<std::mutex> lock (state->mutex);
+			state->condition.wait (lock, [&state] {
+				return state->cancelled || state->frames.size () < kMaxOfflineQueuedFrames;
+			});
+			if (state->cancelled)
+				break;
+		}
+
+		const int64_t blockStart = block * blockSize;
+		while (next < schedule.size () && schedule[next].sample < blockStart + blockSize)
+		{
+			const Scheduled& entry = schedule[next++];
+			Event event {};
+			event.sampleOffset = int32 (std::max<int64_t> (0, entry.sample - blockStart));
+			if (entry.off)
+			{
+				event.type = Event::kNoteOffEvent;
+				event.noteOff.channel = 0;
+				event.noteOff.pitch = int16 (entry.pitch);
+				event.noteOff.velocity = 0.5f;
+				event.noteOff.noteId = -1;
+				event.noteOff.tuning = 0.0f;
+			}
+			else
+			{
+				event.type = Event::kNoteOnEvent;
+				event.noteOn.channel = 0;
+				event.noteOn.pitch = int16 (entry.pitch);
+				event.noteOn.velocity = float (entry.velocity) / 127.0f;
+				event.noteOn.noteId = -1;
+				event.noteOn.tuning = 0.0f;
+				event.noteOn.length = 0;
+			}
+			impl_->pendingEvents.push_back (event);
+		}
+		processOneBlock (true, state.get ());
+	}
+
+	if (offlineMode)
+		applyProcessMode (false);
+	if (!wasProcessing)
+	{
+		impl_->processor->setProcessing (false);
+		impl_->processing = false;
+	}
+	finish ({});
+}
+
+std::shared_ptr<OfflineRenderState> LocalPluginInstance::renderOffline (double seconds, const std::vector<OfflineNote>& notes)
+{
+	auto state = std::make_shared<OfflineRenderState> ();
+	if (stuck ())
+	{
+		std::lock_guard<std::mutex> lock (state->mutex);
+		state->error = "plugin_hang";
+		state->finished = true;
+		return state;
+	}
+	post ([this, state, seconds, notes] { doRenderOffline (state, seconds, notes); });
+	return state;
+}
+
+bool waitRenderStart (const std::shared_ptr<OfflineRenderState>& state, std::string& error, int timeoutMs)
+{
+	std::unique_lock<std::mutex> lock (state->mutex);
+	state->condition.wait_for (lock, std::chrono::milliseconds (timeoutMs),
+	                           [&state] { return state->finished || !state->frames.empty (); });
+	if (!state->frames.empty ())
+		return true;
+	error = state->error.empty () ? "render did not produce audio" : state->error;
+	return false;
+}
+
+bool popRenderFrame (const std::shared_ptr<OfflineRenderState>& state,
+                     std::shared_ptr<const std::vector<uint8_t>>& frame, int waitMs)
+{
+	std::unique_lock<std::mutex> lock (state->mutex);
+	state->condition.wait_for (lock, std::chrono::milliseconds (waitMs),
+	                           [&state] { return state->cancelled || !state->frames.empty () || state->finished; });
+	if (state->cancelled || state->frames.empty ())
+		return false;
+	frame = std::move (state->frames.front ());
+	state->frames.pop_front ();
+	state->condition.notify_all (); // wake the renderer when it waited for queue space
+	return true;
+}
+
+void cancelRender (const std::shared_ptr<OfflineRenderState>& state)
+{
+	std::lock_guard<std::mutex> lock (state->mutex);
+	state->cancelled = true;
+	state->condition.notify_all ();
+}
+
+bool LocalPluginInstance::doNoteOn (int pitch, int velocity, int channel)
 {
 	if (!impl_)
 		return false;
@@ -685,7 +1118,7 @@ bool PluginInstance::doNoteOn (int pitch, int velocity, int channel)
 	return true;
 }
 
-bool PluginInstance::doNoteOff (int pitch, int channel)
+bool LocalPluginInstance::doNoteOff (int pitch, int channel)
 {
 	if (!impl_)
 		return false;
@@ -704,7 +1137,7 @@ bool PluginInstance::doNoteOff (int pitch, int channel)
 	return true;
 }
 
-std::vector<ParamInfo> PluginInstance::doParamList ()
+std::vector<ParamInfo> LocalPluginInstance::doParamList ()
 {
 	std::vector<ParamInfo> params;
 	if (!impl_ || !impl_->controller)
@@ -730,7 +1163,7 @@ std::vector<ParamInfo> PluginInstance::doParamList ()
 	return params;
 }
 
-bool PluginInstance::doParamSet (uint32_t paramId, double value)
+bool LocalPluginInstance::doParamSet (uint32_t paramId, double value)
 {
 	if (!impl_ || !impl_->controller)
 		return false;
@@ -741,7 +1174,7 @@ bool PluginInstance::doParamSet (uint32_t paramId, double value)
 	return true;
 }
 
-std::string PluginInstance::doGetState ()
+std::string LocalPluginInstance::doGetState ()
 {
 	if (!impl_ || !impl_->component)
 		return {};
@@ -781,7 +1214,7 @@ std::string PluginInstance::doGetState ()
 	return base64Encode (blob);
 }
 
-bool PluginInstance::doSetState (const std::string& base64)
+bool LocalPluginInstance::doSetState (const std::string& base64)
 {
 	if (!impl_ || !impl_->component || !impl_->controller)
 		return false;
@@ -819,7 +1252,7 @@ bool PluginInstance::doSetState (const std::string& base64)
 }
 
 //------------------------------------------------------------------------
-bool PluginInstance::doEditorOpen ()
+bool LocalPluginInstance::doEditorOpen ()
 {
 	if (!impl_ || !impl_->controller)
 		return false;
@@ -875,7 +1308,7 @@ bool PluginInstance::doEditorOpen ()
 	return true;
 }
 
-bool PluginInstance::doEditorClose ()
+bool LocalPluginInstance::doEditorClose ()
 {
 	if (!impl_)
 		return false;
@@ -900,13 +1333,13 @@ bool PluginInstance::doEditorClose ()
 	return true;
 }
 
-void PluginInstance::destroyEditorOnThread ()
+void LocalPluginInstance::destroyEditorOnThread ()
 {
 	if (impl_ && impl_->editorOpen)
 		doEditorClose ();
 }
 
-void PluginInstance::pumpWin32 ()
+void LocalPluginInstance::pumpWin32 ()
 {
 	MSG message;
 	while (PeekMessageW (&message, nullptr, 0, 0, PM_REMOVE))
@@ -942,22 +1375,24 @@ void PluginInstance::pumpWin32 ()
 	}
 }
 
-void PluginInstance::onGuiParamEdit (uint32_t paramId, double value)
+void LocalPluginInstance::onGuiParamEdit (uint32_t paramId, double value)
 {
 	if (impl_ && impl_->pendingParams.size () < kMaxPendingParams)
 		impl_->pendingParams.emplace_back (paramId, value);
 }
 
-void PluginInstance::resizeEditorWindow (int width, int height)
+void LocalPluginInstance::resizeEditorWindow (int width, int height)
 {
 	if (impl_ && impl_->window.hwnd)
 		resizeHostWindow (impl_->window.hwnd, width, height);
 }
 
 //------------------------------------------------------------------------
-double PluginInstance::latencySamples () const { return impl_ ? impl_->latency : 0.0; }
-int PluginInstance::channels () const { return impl_ ? impl_->channels : 0; }
-int PluginInstance::blockSize () const { return impl_ ? impl_->blockSize : 0; }
-double PluginInstance::sampleRate () const { return impl_ ? impl_->sampleRate : 0.0; }
+bool LocalPluginInstance::isEffect () const { return impl_ && impl_->effect; }
+int LocalPluginInstance::inputChannels () const { return impl_ ? impl_->inputChannels : 0; }
+double LocalPluginInstance::latencySamples () const { return impl_ ? impl_->latency : 0.0; }
+int LocalPluginInstance::channels () const { return impl_ ? impl_->channels : 0; }
+int LocalPluginInstance::blockSize () const { return impl_ ? impl_->blockSize : 0; }
+double LocalPluginInstance::sampleRate () const { return impl_ ? impl_->sampleRate : 0.0; }
 
 } // namespace vhost

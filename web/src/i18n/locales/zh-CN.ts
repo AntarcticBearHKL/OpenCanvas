@@ -334,6 +334,8 @@ export default {
             vstScanning: "正在扫描 VST3 插件…",
             vstEditorOpen: "打开插件界面",
             vstEditorOpening: "正在打开插件界面…",
+            vstEditorClose: "关闭插件界面",
+            vstEditorClosing: "正在关闭插件界面…",
             vstEditorOpenFailed: "打开插件界面失败",
             vstEditorPending: "插件加载中…",
             vstEditorFailed: "插件加载失败",
@@ -376,6 +378,7 @@ export default {
             nodeTitle: "{{name}} 混音",
             noContent: "没有可导出的音频片段或 MIDI 片段",
             mixdownFailed: "混音导出失败，请重试",
+            mixdownVstSkipped: "VST3 音源轨未包含在导出中：{{tracks}}（宿主未运行或渲染失败）",
         },
         workspace: {
             canvas: "画布",

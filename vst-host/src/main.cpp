@@ -4,12 +4,14 @@
 //   vst-host --stop          -> stop the server recorded in the PID file
 //   vst-host --scan          -> print the discovered plug-ins as JSON and exit
 //   vst-host --scan-worker   -> internal: the isolated scanning child
+//   vst-host --plugin-worker -> internal: the per-instance plugin child
 //   vst-host --selftest PATH -> load one plug-in, render ~2 s, attach its editor
 //
-// `--scan` deliberately re-executes this binary as `--scan-worker`: loading a
-// commercial plug-in can hang or crash during factory init, and a child process
-// keeps that away from the server. The worker terminates without running
-// plug-in teardown, which several Steinberg plug-ins are not safe to do.
+// Runtime plug-in loading never happens in the server process: the server spawns
+// one `--plugin-worker` child per loaded instance (worker.h), so a crashed or
+// hung plug-in cannot take it down. Scanning is isolated the same way. Both
+// workers terminate without running unsafe teardown paths when the parent kills
+// them. `--selftest` is a diagnostic and still runs the plug-in in-process.
 
 #include "config.h"
 #include "instance.h"
@@ -17,6 +19,7 @@
 #include "scan.h"
 #include "server.h"
 #include "util.h"
+#include "worker.h"
 
 #include <chrono>
 #include <cstdio>
@@ -39,6 +42,7 @@ void printUsage ()
 	std::printf ("  vst-host --scan               print the plug-in list as JSON and exit\n");
 	std::printf ("  vst-host --selftest <path>    load a plug-in, render ~2 s, attach its editor\n");
 	std::printf ("  vst-host --scan-worker        internal scan child (do not call directly)\n");
+	std::printf ("  vst-host --plugin-worker <id> internal plugin child (do not call directly)\n");
 	std::printf ("environment:\n");
 	std::printf ("  VST_HOST_TOKEN        bearer token (generated and printed when unset)\n");
 	std::printf ("  VST_HOST_ORIGINS      comma-separated Origin allowlist\n");
@@ -85,7 +89,7 @@ int runScanMode ()
 
 int runSelfTest (const std::string& path)
 {
-	auto instance = std::make_shared<PluginInstance> ("selftest");
+	auto instance = std::make_shared<LocalPluginInstance> ("selftest");
 	std::string startError;
 	if (!instance->start (startError))
 	{
@@ -157,6 +161,8 @@ int main (int argc, char** argv)
 	}
 	if (command == "--scan-worker")
 		return runScanWorkerMode ();
+	if (command == "--plugin-worker")
+		return runPluginWorkerMode (args);
 	if (command == "--scan")
 		return runScanMode ();
 	if (command == "--stop")

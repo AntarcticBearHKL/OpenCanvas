@@ -334,6 +334,8 @@ export default {
             vstScanning: "Scanning VST3 plugins…",
             vstEditorOpen: "Open plugin editor",
             vstEditorOpening: "Opening plugin editor…",
+            vstEditorClose: "Close plugin editor",
+            vstEditorClosing: "Closing plugin editor…",
             vstEditorOpenFailed: "Could not open the plugin editor",
             vstEditorPending: "Loading plugin…",
             vstEditorFailed: "Plugin failed to load",
@@ -376,6 +378,7 @@ export default {
             nodeTitle: "{{name}} mix",
             noContent: "No clips or MIDI regions to mix down",
             mixdownFailed: "Mixdown failed, please retry",
+            mixdownVstSkipped: "VST3 instrument tracks were left out of the export: {{tracks}} (host unreachable or render failed)",
         },
         workspace: {
             canvas: "Canvas",

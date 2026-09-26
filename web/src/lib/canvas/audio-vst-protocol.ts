@@ -15,13 +15,23 @@ export const VST_SAMPLE_RATE = 48000;
 export const VST_FRAMES_PER_BLOCK = 256;
 export const VST_CHANNELS = 2;
 export const VST_FRAME_HEADER_BYTES = 16;
+/** Response header of `POST /render` carrying the plug-in's reported latency in samples. */
+export const VST_LATENCY_HEADER = "x-vst-latency-samples";
 /** Pre-allocated block buffers owned by the streaming worker (8 x 256 x 2 floats). */
 export const VST_BUFFER_POOL_SIZE = 8;
 /** Jitter-buffer prefill before playback starts (~10.7 ms at 256/48000). */
 export const VST_LOOKAHEAD_BLOCKS = 2;
 /** Hard ceiling on buffered blocks; anything above is dropped by the worklet. */
 export const VST_MAX_BUFFERED_BLOCKS = 4;
+/** Input blocks the worklet captures before it ships one upload batch to the worker (effect role only).
+ *  Must exceed VST_INPUT_BATCH_BLOCKS, or a full batch keeps every pooled buffer in flight and capture starves. */
+export const VST_INPUT_POOL_SIZE = 8;
+/** Input blocks a single `POST /audio-in` carries; the host re-blocks them to its own block size. */
+export const VST_INPUT_BATCH_BLOCKS = 4;
 export const VST_WORKLET_PROCESSOR = "canvas-vst-source";
+
+/** Role of a loaded instance: `instrument` keeps the zero-input instrument path, `effect` opens the input bus. */
+export type VstPluginRole = "instrument" | "effect";
 
 /** RPC commands of the frozen v1 surface. */
 export type VstCommand =
@@ -99,12 +109,18 @@ export type VstPlugin = {
 };
 
 export type VstHelloResult = { protocol: number; host: string; version: string };
-export type VstLoadParams = { pluginId: string; sampleRate?: number; blockSize?: number; channels?: number };
+export type VstLoadParams = { pluginId: string; role?: VstPluginRole; sampleRate?: number; blockSize?: number; channels?: number };
 export type VstNoteOnParams = { instanceId: string; pitch: number; velocity: number; channel?: number };
 export type VstNoteOffParams = { instanceId: string; pitch: number; channel?: number };
 export type VstParam = { id: string | number; name: string; value: number; min?: number; max?: number; unit?: string };
 export type VstParamSetParams = { instanceId: string; paramId: string | number; value: number };
 export type VstEditorResult = { opened: boolean };
+
+/** One note of an offline render; times are seconds from the render start, matching the graph's note schedule. */
+export type VstOfflineNote = { pitch: number; velocity: number; start: number; length: number };
+export type VstRenderParams = { instanceId: string; seconds: number; notes: VstOfflineNote[]; sampleRate?: number; blockSize?: number; channels?: number };
+/** Planar PCM returned by `renderOffline`, already aligned by the plug-in's reported latency. */
+export type VstRenderedAudio = { channels: Float32Array[]; frames: number; latencySamples: number };
 
 // ---------------------------------------------------------------------------
 // Frame helpers
@@ -167,6 +183,17 @@ export function writeFrame(view: DataView, offset: number, header: VstFrameHeade
         }
     }
     return cursor + header.channels * frames * 4;
+}
+
+/** Allocate the exact body of one `POST /audio-in` (or `/render`-style file) for one or more planar blocks. */
+export function encodeFrames(frames: readonly { header: VstFrameHeader; planes: readonly Float32Array[] }[]): Uint8Array<ArrayBuffer> {
+    let total = 0;
+    for (const frame of frames) total += frameByteLength(frame.header.channels, frame.header.framesPerChannel);
+    const bytes = new Uint8Array(total);
+    const view = new DataView(bytes.buffer);
+    let offset = 0;
+    for (const frame of frames) offset = writeFrame(view, offset, frame.header, frame.planes);
+    return bytes;
 }
 
 /** Stable u32 fingerprint of an instance id, mirrored by host, worker and tests. */
