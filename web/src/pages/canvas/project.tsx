@@ -213,9 +213,24 @@ function InfiniteCanvasPage() {
     const navigate = useNavigate();
     const projectId = params.id || "";
     const workspace: CanvasWorkspace = CANVAS_WORKSPACES.find((item) => item === params.workspace) || "canvas";
+
+    useEffect(() => {
+        if (params.workspace === "image") {
+            navigate(`/image?canvasId=${projectId}`, { replace: true });
+        } else if (params.workspace === "audio") {
+            navigate(`/audio?canvasId=${projectId}`, { replace: true });
+        }
+    }, [params.workspace, projectId, navigate]);
+
     const handleWorkspaceChange = useCallback(
         (next: CanvasWorkspace) => {
-            navigate(`/canvas/${projectId}/${next}`, { replace: false });
+            if (next === "image") {
+                navigate(`/image?canvasId=${projectId}`);
+            } else if (next === "audio") {
+                navigate(`/audio?canvasId=${projectId}`);
+            } else {
+                navigate(`/canvas/${projectId}`);
+            }
         },
         [navigate, projectId],
     );
@@ -2270,57 +2285,6 @@ function InfiniteCanvasPage() {
     const ghostNode = dragGhost ? nodeById.get(dragGhost.nodeId) : undefined;
     const GhostIcon = ghostNode?.type === CanvasNodeType.Video ? Video : ghostNode?.type === CanvasNodeType.Audio ? Music2 : ImageIcon;
 
-    if (workspace !== "canvas") {
-        return (
-            <main className="relative flex h-full min-h-0 overflow-hidden" style={{ background: theme.canvas.background, color: theme.node.text }}>
-                <CanvasTopBar
-                    title={currentProject?.title || t("canvas.projectPage.untitledCanvas")}
-                    titleDraft={titleDraft}
-                    isTitleEditing={titleEditing}
-                    onTitleDraftChange={setTitleDraft}
-                    onStartTitleEditing={startTitleEditing}
-                    onFinishTitleEditing={finishTitleEditing}
-                    onCancelTitleEditing={() => setTitleEditing(false)}
-                    onProjects={() => navigate("/canvas")}
-                    workspace={workspace}
-                    onWorkspaceChange={handleWorkspaceChange}
-                />
-                <Suspense
-                    fallback={
-                        <div className="flex min-h-0 flex-1 items-center justify-center pt-14 text-xs" style={{ color: theme.node.muted }}>
-                            {t("canvas.workspace.loading")}
-                        </div>
-                    }
-                >
-                    {workspace === "image" ? (
-                        <ImageStudio
-                            board={workspaceBoard}
-                            boards={workspaceBoards}
-                            nodes={nodes}
-                            setNodes={setNodes}
-                            onSelectBoard={selectWorkspaceBoard}
-                            onBoardChange={handleSmartCanvasChange}
-                            onOutput={(target) => void handleSaveBoardAsNode(target)}
-                            onBack={() => navigate("/canvas")}
-                        />
-                    ) : (
-                        <AudioStudio
-                            project={workspaceAudioProject}
-                            projects={workspaceAudioProjects}
-                            nodes={nodes}
-                            setNodes={setNodes}
-                            onSelectProject={selectWorkspaceAudioProject}
-                            onOutput={handleMixdownAudioProject}
-                            onExportStems={handleExportAudioStems}
-                            onRecorded={handleAudioRecorded}
-                            onBack={() => navigate("/canvas")}
-                        />
-                    )}
-                </Suspense>
-            </main>
-        );
-    }
-
     return (
         <main className="relative flex h-full min-h-0 overflow-hidden" style={{ background: theme.canvas.background, color: theme.node.text }}>
             <CanvasTopBar
@@ -2439,6 +2403,8 @@ function InfiniteCanvasPage() {
                     onKeep={keepNodeToolbar}
                     onLeave={hideNodeToolbar}
                     onInfo={(node) => setInfoNodeId(node.id)}
+                    onOpenInImageStudio={(node) => navigate(`/image?canvasId=${projectId}&nodeId=${node.id}`)}
+                    onOpenInAudioStudio={(node) => navigate(`/audio?canvasId=${projectId}&nodeId=${node.id}`)}
                     onDecreaseFont={(node) => handleFontSizeChange(node.id, Math.max(10, (node.metadata?.fontSize || 14) - 2))}
                     onIncreaseFont={(node) => handleFontSizeChange(node.id, Math.min(32, (node.metadata?.fontSize || 14) + 2))}
                     onTextStyleChange={handleConfigNodeChange}

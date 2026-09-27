@@ -1,7 +1,7 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Modal } from "antd";
-import { AlignLeft, AudioLines, Clapperboard, Compass, Download, Focus, FolderDown, FolderInput, Hand, HelpCircle, LayoutDashboard, ListTree, Loader2, MessageSquareText, Mic, MousePointer2, Music2, Puzzle, Redo2, SlidersHorizontal, SlidersVertical, Sparkles, Trash2, Undo2, Video, ZoomIn } from "lucide-react";
+import { AlignLeft, AudioLines, Clapperboard, Compass, Download, Focus, FolderDown, FolderInput, Hand, HelpCircle, ListTree, Loader2, MessageSquareText, Mic, MousePointer2, Music2, Puzzle, Redo2, SlidersHorizontal, Sparkles, Trash2, Undo2, Video, ZoomIn } from "lucide-react";
 
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
@@ -224,13 +224,6 @@ export function CanvasToolbar({
                     }}
                 >
                     <Sparkles className="size-4.5" />
-                </ToolbarButton>
-                <Divider theme={theme} />
-                <ToolbarButton id="tool-audio-project" label={t("canvas.nodeTypes.audioProject")} hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={() => onAddNode(CanvasNodeType.AudioProject)}>
-                    <SlidersVertical className="size-4.5" />
-                </ToolbarButton>
-                <ToolbarButton id="tool-smart-canvas" label={t("canvas.nodeTypes.smartCanvas")} hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={() => onAddNode(CanvasNodeType.SmartCanvas)}>
-                    <LayoutDashboard className="size-4.5" />
                 </ToolbarButton>
                 {extensionDefs.length ? (
                     <ToolbarButton

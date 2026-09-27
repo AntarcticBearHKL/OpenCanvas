@@ -5,7 +5,7 @@ import type { CanvasNodeData } from "@/types/canvas";
 import i18n from "@/i18n";
 
 type ImageNodeActionToolId = "resize" | "maskEdit" | "crop" | "removeBackground" | "split" | "resolution" | "analyze" | "ocr" | "segment" | "angle" | "duplicate";
-export type ImageQuickToolId = "info" | "delete" | "download" | "copy" | ImageNodeActionToolId;
+export type ImageQuickToolId = "info" | "delete" | "download" | "copy" | "openInImageStudio" | ImageNodeActionToolId;
 
 type ImageToolHandlers = {
     onUpload: (node: CanvasNodeData) => void;
@@ -37,9 +37,9 @@ type ImageQuickToolsConfig = {
     showLabels: boolean;
 };
 
-export const IMAGE_QUICK_TOOLS_STORAGE_KEY = "canvas-image-quick-tools-v15";
+export const IMAGE_QUICK_TOOLS_STORAGE_KEY = "canvas-image-quick-tools-v16";
 
-const defaultBaseToolIds: ImageQuickToolId[] = ["info", "delete", "download", "copy"];
+const defaultBaseToolIds: ImageQuickToolId[] = ["info", "delete", "download", "copy", "openInImageStudio"];
 
 const imageToolDefinitions: ImageToolDefinition[] = [
     {

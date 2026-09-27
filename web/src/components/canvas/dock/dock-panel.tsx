@@ -1,9 +1,44 @@
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
+import { Component, Fragment, useEffect, useRef, useState, type CSSProperties, type ErrorInfo, type HTMLAttributes, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 
 import { DockTabs } from "@/components/canvas/dock/dock-tabs";
 import { DOCK_MIN_GROUP_SIZE, DOCK_SPLIT_MIN, dockClampSize, dockDefaultLayout, dockLoadLayout, dockMovePanel, dockRevealPanel, dockSaveLayout, dockSetActive, dockSetSize, dockSetSplit, dockTogglePanel, type DockEdge, type DockGroup, type DockLayout, type DockPanelDef, type DockSide } from "@/components/canvas/dock/dock-layout";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
+
+type PanelErrorState = { hasError: boolean; error: Error | null };
+
+class PanelErrorBoundary extends Component<{ children: ReactNode; panelId: string }, PanelErrorState> {
+    override state: PanelErrorState = { hasError: false, error: null };
+    static getDerivedStateFromError(error: Error) {
+        return { hasError: true, error };
+    }
+    componentDidCatch(error: Error, info: ErrorInfo) {
+        console.error(`[DockPanel Error] in panel ${this.props.panelId}:`, error, info);
+    }
+    componentDidUpdate(prevProps: { panelId: string }) {
+        if (prevProps.panelId !== this.props.panelId && this.state.hasError) {
+            this.setState({ hasError: false, error: null });
+        }
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="flex flex-1 flex-col items-center justify-center p-4 text-center text-xs text-muted-foreground">
+                    <p className="font-semibold text-danger">Panel error</p>
+                    <p className="mt-1 max-w-[200px] truncate text-[11px] opacity-75">{this.state.error?.message || "Failed to load panel"}</p>
+                    <button
+                        type="button"
+                        onClick={() => this.setState({ hasError: false, error: null })}
+                        className="mt-2 rounded bg-hover px-2 py-1 text-xs hover:text-foreground cursor-pointer"
+                    >
+                        Retry
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
 
 export type DockEdgeProps = { ref?: Ref<HTMLElement> } & HTMLAttributes<HTMLElement>;
 
@@ -169,7 +204,9 @@ export function DockArea({ defs, layout, renderPanel, onActivate, onMove, onResi
                     value={active}
                     onChange={(id) => onActivate(edge, groupIndex, id)}
                 />
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{renderPanel(active)}</div>
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                    <PanelErrorBoundary panelId={active}>{renderPanel(active)}</PanelErrorBoundary>
+                </div>
             </div>
         );
     };

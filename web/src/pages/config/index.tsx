@@ -46,7 +46,7 @@ export default function ConfigPage() {
                     }
                     case "select_model": {
                         const field = CONFIG_MODEL_FIELDS[op.capability];
-                        if (!field) throw new Error(`不支持的模型能力：${String(op.capability)}`);
+                        if (!field) throw new Error(`Unsupported model capability: ${String(op.capability)}`);
                         updateConfig(field, op.value);
                         return;
                     }

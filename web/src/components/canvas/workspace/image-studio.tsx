@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import { Segmented, Select, Slider, Switch } from "antd";
-import { ArrowLeft, Blend, Brush, CircleDashed, Contrast, Eraser, Grid3x3, Hand, History, ImagePlus, Lasso, LassoSelect, Layers, Layers2, Magnet, Maximize, Move, MousePointer2, PaintBucket, Palette, PenTool, Pipette, Rows3, Settings2, Sparkles, SquareDashed, Wand2, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, Blend, Brush, CircleDashed, Contrast, Eraser, FolderKanban, Grid3x3, Hand, History, ImagePlus, Lasso, LassoSelect, Layers, Layers2, Magnet, Maximize, Move, MousePointer2, PaintBucket, Palette, PenTool, Pipette, Rows3, Settings2, Share2, Sparkles, SquareDashed, Wand2, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useTranslation } from "react-i18next";
 
@@ -18,6 +18,7 @@ import PsColorPicker from "@/components/canvas/workspace/ps-color-picker";
 import PsFilterDialog from "@/components/canvas/workspace/ps-filter-dialog";
 import { PsHistoryPanel, usePsHistory } from "@/components/canvas/workspace/ps-history-panel";
 import PsLayersPanel from "@/components/canvas/workspace/ps-layers-panel";
+import PsResourcePoolPanel, { IMAGE_NODE_DRAG_MIME } from "@/components/canvas/workspace/ps-resource-pool-panel";
 import { PsMenus, type PsViewFlags } from "@/components/canvas/workspace/ps-menus";
 import { PsDraftOverlay, PsGrid, PsGuides, PsMarchingAnts, PsPathOverlay, PsRulers, PsSnapLines, PsTransformHandles, type PsDraft, type PsGuideAxis, type PsGuides as PsGuidesState, type PsSnapLines as PsSnapLinesState } from "@/components/canvas/workspace/ps-overlays";
 import { PsPathsPanel } from "@/components/canvas/workspace/ps-paths-panel";
@@ -38,7 +39,7 @@ import { CANVAS_BLEND_MODES } from "@/lib/canvas/blend-modes";
 import { IMAGE_AGENT_ASYNC_TYPES, IMAGE_AGENT_OP_TYPES, IMAGE_AGENT_SCHEMA, applyImageAgentOps, type ImageAgentOp } from "@/lib/canvas/image-agent-ops";
 import { createPsPath, psPathAnchor } from "@/lib/canvas/ps-path";
 import { PS_TRANSFORM_MODES, psApplyNumericTransform, psClearTransform, psMoveTransformHandle, psTransformHandlesDoc, type PsNumericTransform, type PsTransformMode } from "@/lib/canvas/ps-transform";
-import { composeSmartCanvas, createPsAdjustmentLayer, createPsPixelLayer, createPsShapeLayer, psBoxUnion, psLayerBox, psTextRenderStyle, psTopLayers, renderPsLayerBitmap, smartCanvasBackground, smartCanvasBackgroundOpacity, smartCanvasFill, smartCanvasLayers, smartCanvasRatio, smartCanvasResolution, smartCanvasSizeForRatio } from "@/lib/canvas/smart-canvas";
+import { composeSmartCanvas, createPsAdjustmentLayer, createPsImageLayer, createPsPixelLayer, createPsShapeLayer, psBoxUnion, psLayerBox, psTextRenderStyle, psTopLayers, renderPsLayerBitmap, smartCanvasBackground, smartCanvasBackgroundOpacity, smartCanvasFill, smartCanvasLayers, smartCanvasRatio, smartCanvasResolution, smartCanvasSizeForRatio } from "@/lib/canvas/smart-canvas";
 import { PS_ADJUSTMENT_NAME_KEYS } from "@/lib/canvas/ps-adjustments";
 import { inferMediaRatio } from "@/lib/media-size";
 import { useAgentStore } from "@/stores/use-agent-store";
@@ -132,6 +133,7 @@ const PS_DOCK_PANELS: DockPanelDef[] = [
     { id: "actions", labelKey: "canvas.ps.actions", icon: Rows3, dock: "right" },
     { id: "properties", labelKey: "canvas.ps.properties", icon: Settings2, dock: "left" },
     { id: "adjustments", labelKey: "canvas.ps.adjustments", icon: Contrast, dock: "left" },
+    { id: "assets", labelKey: "canvas.ps.resourcePool", icon: FolderKanban, dock: "left" },
     { id: "color", labelKey: "canvas.ps.color", icon: Palette, dock: "bottom" },
     { id: "gradients", labelKey: "canvas.ps.gradients", icon: Blend, dock: "bottom" },
     { id: "patterns", labelKey: "canvas.ps.patterns", icon: Grid3x3, dock: "bottom" },
@@ -1460,6 +1462,17 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
         if (panelId === "history") return <PsHistoryPanel history={history.state} onRestore={history.restore} onSnapshot={history.snapshot} />;
         if (panelId === "actions") return <PsActionsPanel recorder={recorder} />;
         if (panelId === "adjustments") return <PsAdjustmentsPanel board={board} setNodes={setNodes} selected={selected || null} onSelect={setSelectedLayerId} />;
+        if (panelId === "assets")
+            return (
+                <PsResourcePoolPanel
+                    imageNodes={imageNodes}
+                    onAddImageLayer={(node) => {
+                        const layer = createPsImageLayer(board, node);
+                        commit(addPsLayerAbove(layers, layer, selectedLayerId));
+                        setSelectedLayerId(layer.id);
+                    }}
+                />
+            );
         if (panelId === "properties")
             return (
                 <>
@@ -1490,23 +1503,29 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     };
 
     return (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col pt-14">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div className={`${STUDIO_BAR_CLASS} h-11 glass-surface`}>
                 <button type="button" className={FLAT_ACTION_CLASS} aria-label={t("canvas.workspace.back")} title={t("canvas.workspace.back")} onClick={onBack} style={{ color: theme.node.text }}>
                     <ArrowLeft className="size-3.5" />
                 </button>
-                <Select
-                    size="small"
-                    variant="borderless"
-                    className="min-w-[120px] max-w-[220px]"
-                    value={board.id}
-                    placeholder={t("canvas.workspace.pickBoard")}
-                    options={boards.map((item) => ({ value: item.id, label: item.title || t("canvas.node.untitled") }))}
-                    popupMatchSelectWidth={false}
-                    styles={{ popup: { root: { zIndex: 1300 } } }}
-                    aria-label={t("canvas.workspace.pickBoard")}
-                    onChange={onSelectBoard}
-                />
+                {boards.length > 1 ? (
+                    <Select
+                        size="small"
+                        variant="borderless"
+                        className="min-w-[120px] max-w-[220px]"
+                        value={board.id}
+                        placeholder={t("canvas.workspace.pickBoard")}
+                        options={boards.map((item) => ({ value: item.id, label: item.title || t("canvas.node.untitled") }))}
+                        popupMatchSelectWidth={false}
+                        styles={{ popup: { root: { zIndex: 1300 } } }}
+                        aria-label={t("canvas.workspace.pickBoard")}
+                        onChange={onSelectBoard}
+                    />
+                ) : (
+                    <span className="font-semibold text-sm px-2 truncate max-w-[220px]" style={{ color: theme.node.text }}>
+                        {board.title || t("canvas.node.untitled")}
+                    </span>
+                )}
                 <SmartCanvasSettingsPopover
                     ratio={smartCanvasRatio(board)}
                     resolution={smartCanvasResolution(board)}
@@ -1528,8 +1547,8 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                 </span>
                 <span className="min-w-0 flex-1" />
                 <button type="button" className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => onOutput(board)}>
-                    <ImagePlus className="size-3.5" />
-                    {t("canvas.smartCanvas.saveAsNode")}
+                    <Share2 className="size-3.5" />
+                    {t("studio.output.title", { defaultValue: "Export" })}
                 </button>
             </div>
 
@@ -1684,6 +1703,30 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                     }}
                     onPointerUp={endPan}
                     onPointerCancel={endPan}
+                    onDragOver={(event) => {
+                        if (event.dataTransfer.types.includes(IMAGE_NODE_DRAG_MIME)) {
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "copy";
+                        }
+                    }}
+                    onDrop={(event) => {
+                        const raw = event.dataTransfer.getData(IMAGE_NODE_DRAG_MIME);
+                        if (!raw) return;
+                        event.preventDefault();
+                        const foundNode = nodes.find((n) => n.id === raw);
+                        if (foundNode) {
+                            const layer = createPsImageLayer(board, foundNode);
+                            const rect = event.currentTarget.getBoundingClientRect();
+                            const dropClientX = event.clientX - rect.left;
+                            const dropClientY = event.clientY - rect.top;
+                            const docX = (dropClientX - view.x) / view.k;
+                            const docY = (dropClientY - view.y) / view.k;
+                            layer.x = Math.round(docX - layer.width / 2);
+                            layer.y = Math.round(docY - layer.height / 2);
+                            commit(addPsLayerAbove(layers, layer, selectedLayerId));
+                            setSelectedLayerId(layer.id);
+                        }
+                    }}
                 >
                     {ringTool && (cursorInside || Boolean(strokeLayer)) ? (
                         <div ref={cursorRef} className="pointer-events-none absolute left-0 top-0 rounded-full" style={{ width: paint.size * view.k, height: paint.size * view.k, border: `1px solid ${theme.node.text}`, opacity: 0 }} />

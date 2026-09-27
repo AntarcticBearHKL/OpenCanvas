@@ -219,17 +219,32 @@ export const useWritingStore = create<WritingStore>()(
                     }),
                 createGroup: (name) => {
                     const id = nanoid();
-                    const group: WriteGroup = { id, name: name?.trim() || i18n.t("writing.group.defaultName", { count: get().groups.length + 1 }), createdAt: stamp() };
+                    const group: WriteGroup = {
+                        id,
+                        name: name?.trim() || (get().groups.length === 0 ? "Default Group" : `Group ${get().groups.length + 1}`),
+                        createdAt: stamp(),
+                    };
                     set((state) => ({ groups: [...state.groups, group] }));
                     return id;
                 },
                 renameGroup: (id, name) =>
                     set((state) => ({ groups: state.groups.map((group) => (group.id === id ? { ...group, name: name.trim() || group.name } : group)) })),
                 deleteGroup: (id) =>
-                    set((state) => ({
-                        groups: state.groups.filter((group) => group.id !== id),
-                        projects: state.projects.filter((project) => project.groupId !== id),
-                    })),
+                    set((state) => {
+                        const remainingGroups = state.groups.filter((group) => group.id !== id);
+                        const remainingProjects = state.projects.filter((project) => project.groupId !== id);
+                        if (remainingGroups.length === 0) {
+                            const defaultGroup: WriteGroup = { id: nanoid(), name: "Default Group", createdAt: stamp() };
+                            return {
+                                groups: [defaultGroup],
+                                projects: [],
+                            };
+                        }
+                        return {
+                            groups: remainingGroups,
+                            projects: remainingProjects,
+                        };
+                    }),
                 setProjectGroup: (projectId, groupId) => patchProject(projectId, (project) => ({ ...project, groupId })),
             };
         },
@@ -237,18 +252,23 @@ export const useWritingStore = create<WritingStore>()(
             name: WRITING_STORE_KEY,
             storage: writingStorage,
             partialize: (state) => ({ projects: state.projects, groups: state.groups }) as unknown as WritingStore,
-            onRehydrateStorage: () => (state) => {
-                if (state) state.hydrated = true;
+            onRehydrateStorage: () => () => {
+                useWritingStore.setState({ hydrated: true });
                 const { projects, groups } = useWritingStore.getState();
                 const hasGroup = (project: WriteProject) => Boolean(project.groupId && groups.some((group) => group.id === project.groupId));
-                if (!projects.some((project) => !hasGroup(project))) return;
-                if (groups.length) {
-                    const groupId = groups[0].id;
-                    useWritingStore.setState({ projects: projects.map((project) => (hasGroup(project) ? project : { ...project, groupId })) });
+                if (groups.length === 0) {
+                    const defaultGroup: WriteGroup = { id: nanoid(), name: "Default Group", createdAt: stamp() };
+                    useWritingStore.setState({ groups: [defaultGroup], projects: projects.map((p) => ({ ...p, groupId: defaultGroup.id })) });
                     return;
                 }
-                const group: WriteGroup = { id: nanoid(), name: i18n.t("writing.group.defaultName", { count: 1 }), createdAt: stamp() };
-                useWritingStore.setState({ groups: [group], projects: projects.map((project) => ({ ...project, groupId: group.id })) });
+                const migratedGroups = groups.map((g) => (g.name === "Library 1" || g.name === "库 1" ? { ...g, name: "Default Group" } : g));
+                if (migratedGroups.some((g, i) => g.name !== groups[i].name)) {
+                    useWritingStore.setState({ groups: migratedGroups });
+                }
+                if (projects.some((project) => !hasGroup(project))) {
+                    const groupId = migratedGroups[0].id;
+                    useWritingStore.setState({ projects: projects.map((project) => (hasGroup(project) ? project : { ...project, groupId })) });
+                }
             },
         },
     ),

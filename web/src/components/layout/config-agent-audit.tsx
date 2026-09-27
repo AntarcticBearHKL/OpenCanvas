@@ -96,32 +96,32 @@ function AgentBridgeSettings() {
         const nextToken = draftToken.trim();
         setAgentBridgeUrl(nextUrl);
         setAgentToken(nextToken);
-        setAgentState({ url: nextUrl, token: nextToken, enabled: true, connected: false, connectError: "", activity: "正在连接…" });
+        setAgentState({ url: nextUrl, token: nextToken, enabled: true, connected: false, connectError: "", activity: "Connecting..." });
         setSaved(true);
     };
 
     return (
         <section className="overflow-hidden rounded-xl border border-border dark:border-border glass-card">
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 dark:border-border">
-                <div className="text-sm font-semibold">本地 Agent 连接</div>
+                <div className="text-sm font-semibold">Local Agent Connection</div>
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span className={`size-1.5 rounded-full ${connected ? "bg-success" : "bg-warning"}`} />
-                    {connected ? "已连接" : activity}
+                    {connected ? "Connected" : activity}
                 </span>
             </div>
             <div className="space-y-3 px-4 py-3">
                 <label className="block">
-                    <span className="mb-1 block text-sm text-muted-foreground">服务地址</span>
+                    <span className="mb-1 block text-sm text-muted-foreground">Service URL</span>
                     <Input value={draftUrl} onChange={(event) => { setDraftUrl(event.target.value); setSaved(false); }} placeholder={AGENT_BRIDGE_URL_DEFAULT} />
                 </label>
                 <label className="block">
-                    <span className="mb-1 block text-sm text-muted-foreground">访问令牌</span>
-                    <Input.Password value={draftToken} onChange={(event) => { setDraftToken(event.target.value); setSaved(false); }} placeholder="未设置可留空" />
+                    <span className="mb-1 block text-sm text-muted-foreground">Access Token</span>
+                    <Input.Password value={draftToken} onChange={(event) => { setDraftToken(event.target.value); setSaved(false); }} placeholder="Optional if unset" />
                 </label>
                 <div className="flex items-center justify-between gap-3">
-                    <span className={`min-w-0 truncate text-xs ${connectError ? "text-danger" : "text-muted-foreground"}`}>{connectError || (saved ? "已保存，正在重新连接" : "地址与令牌保存在本地浏览器，无需重新构建")}</span>
+                    <span className={`min-w-0 truncate text-xs ${connectError ? "text-danger" : "text-muted-foreground"}`}>{connectError || (saved ? "Saved, reconnecting..." : "URL and token are stored locally in your browser")}</span>
                     <Button size="small" type="primary" onClick={save}>
-                        保存并重连
+                        Save & Reconnect
                     </Button>
                 </div>
             </div>

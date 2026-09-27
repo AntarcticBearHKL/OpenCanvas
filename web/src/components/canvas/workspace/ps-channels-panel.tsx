@@ -14,15 +14,30 @@ export type PsChannelView = "rgb" | "r" | "g" | "b";
 
 const ROW_CLASS = "flex w-full items-center gap-1 border-b px-1 py-0.5 text-sm transition hover:bg-hover";
 const FLAT_BUTTON_CLASS = STUDIO_FLAT_BUTTON_CLASS;
+const EMPTY_CHANNELS: CanvasPsAlphaChannel[] = [];
+const DEFAULT_VISIBILITY = { r: true, g: true, b: true };
 
 /** Channel view is a viewing mode, not a document effect: the composite comes from the shared renderer and only the shown channel changes. */
-export function PsChannelPreview({ board, nodes, channel }: { board: CanvasNodeData; nodes: CanvasNodeData[]; channel: PsChannelView }) {
+export function PsChannelPreview({
+    board,
+    nodes,
+    channel,
+}: {
+    board?: CanvasNodeData | null;
+    nodes: CanvasNodeData[];
+    channel: PsChannelView;
+}) {
     const [url, setUrl] = useState("");
+
     useEffect(() => {
+        if (!board || channel === "rgb") {
+            setUrl("");
+            return;
+        }
         let active = true;
         void renderPsDocument(board, nodes, { width: board.width, height: board.height }).then(({ canvas }) => {
             const context = canvas?.getContext("2d");
-            if (!active || !canvas || !context || channel === "rgb") return;
+            if (!active || !canvas || !context) return;
             const index = channel === "r" ? 0 : channel === "g" ? 1 : 2;
             const image = context.getImageData(0, 0, canvas.width, canvas.height);
             for (let offset = 0; offset < image.data.length; offset += 4) {
@@ -32,12 +47,15 @@ export function PsChannelPreview({ board, nodes, channel }: { board: CanvasNodeD
                 image.data[offset + 2] = value;
             }
             context.putImageData(image, 0, 0);
-            setUrl(canvas.toDataURL("image/png"));
+            if (active) {
+                setUrl(canvas.toDataURL("image/png"));
+            }
         });
         return () => {
             active = false;
         };
     }, [board, nodes, channel]);
+
     if (channel === "rgb" || !url) return null;
     return <img src={url} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill" />;
 }
@@ -50,7 +68,7 @@ export function PsChannelsPanel({
     view,
     onView,
 }: {
-    board: CanvasNodeData;
+    board?: CanvasNodeData | null;
     onBoardChange: (boardId: string, patch: Partial<CanvasNodeMetadata>) => void;
     selection: HTMLCanvasElement | null;
     onLoadSelection: (selection: PsSelection) => void;
@@ -59,21 +77,41 @@ export function PsChannelsPanel({
 }) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
-    const channels = board.metadata?.boardAlphaChannels ?? [];
-    const visibility = board.metadata?.boardChannelVisibility ?? { r: true, g: true, b: true };
+
+    if (!board) return null;
+
+    const channels = board.metadata?.boardAlphaChannels ?? EMPTY_CHANNELS;
+    const visibility = board.metadata?.boardChannelVisibility ?? DEFAULT_VISIBILITY;
     const [urls, setUrls] = useState<Record<string, string>>({});
     const [renamingId, setRenamingId] = useState("");
     const [nameDraft, setNameDraft] = useState("");
 
+    const channelKeys = channels.map((c) => `${c.id}:${c.storageKey}`).join("|");
+
     useEffect(() => {
+        if (!channels.length) {
+            setUrls((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+            return;
+        }
         let active = true;
-        void Promise.all(channels.map(async (channel) => [channel.id, await resolveImageUrl(channel.storageKey)] as const)).then((entries) => {
-            if (active) setUrls(Object.fromEntries(entries));
+        void Promise.all(
+            channels.map(async (channel) => [channel.id, await resolveImageUrl(channel.storageKey)] as const),
+        ).then((entries) => {
+            if (!active) return;
+            const next = Object.fromEntries(entries);
+            setUrls((prev) => {
+                const prevKeys = Object.keys(prev);
+                const nextKeys = Object.keys(next);
+                if (prevKeys.length === nextKeys.length && prevKeys.every((k) => prev[k] === next[k])) {
+                    return prev;
+                }
+                return next;
+            });
         });
         return () => {
             active = false;
         };
-    }, [channels]);
+    }, [channelKeys]);
 
     const setChannels = (next: CanvasPsAlphaChannel[]) => onBoardChange(board.id, { boardAlphaChannels: next });
     const saveSelection = async () => {
@@ -121,12 +159,43 @@ export function PsChannelsPanel({
                     const channelKey = row.key === "rgb" ? null : row.key;
                     const shown = view === row.key;
                     return (
-                        <div key={row.key} className={ROW_CLASS} style={shown ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText, borderColor: theme.toolbar.border, boxShadow: `inset 2px 0 0 0 ${theme.node.accent}` } : { borderColor: theme.toolbar.border }}>
-                            <button type="button" className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover" aria-label={t("canvas.ps.channelVisibility")} title={t("canvas.ps.channelVisibility")} onClick={() => channelKey && toggle(channelKey)}>
+                        <div
+                            key={row.key}
+                            className={ROW_CLASS}
+                            style={
+                                shown
+                                    ? {
+                                          background: theme.node.accentSoft,
+                                          color: theme.node.accentText,
+                                          borderColor: theme.toolbar.border,
+                                      }
+                                    : { borderColor: theme.toolbar.border }
+                            }
+                        >
+                            <button
+                                type="button"
+                                className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover"
+                                aria-label={t("canvas.ps.channelVisibility")}
+                                title={t("canvas.ps.channelVisibility")}
+                                onClick={() => channelKey && toggle(channelKey)}
+                            >
                                 {channelKey ? (visibility[channelKey] ? <Eye className="size-3" /> : <EyeOff className="size-3" />) : <span className="size-3" />}
                             </button>
                             <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left" onClick={() => onView(row.key)}>
-                                <span className="size-4 shrink-0 rounded-md border" style={{ borderColor: theme.toolbar.border, background: row.key === "rgb" ? "linear-gradient(135deg, #ff0000, #00ff00, #0000ff)" : row.key === "r" ? "#ff0000" : row.key === "g" ? "#00ff00" : "#0000ff" }} />
+                                <span
+                                    className="size-4 shrink-0 rounded-md border"
+                                    style={{
+                                        borderColor: theme.toolbar.border,
+                                        background:
+                                            row.key === "rgb"
+                                                ? "linear-gradient(135deg, #ff0000, #00ff00, #0000ff)"
+                                                : row.key === "r"
+                                                  ? "#ff0000"
+                                                  : row.key === "g"
+                                                    ? "#00ff00"
+                                                    : "#0000ff",
+                                    }}
+                                />
                                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
                                 {shown ? <Check className="size-3 shrink-0" /> : null}
                             </button>
@@ -172,7 +241,7 @@ export function PsChannelsPanel({
                         </div>
                     ))
                 ) : (
-                    <p className="pt-1 text-sm glass-card" style={{ color: theme.node.muted }}>
+                    <p className="pt-1 text-sm" style={{ color: theme.node.muted }}>
                         {t("canvas.ps.channelEmpty")}
                     </p>
                 )}

@@ -403,6 +403,7 @@ export type CanvasNodeMetadata = {
     audioPpqn?: number; // Ticks per quarter note for MIDI regions; defaults to 960.
     audioCapture?: CanvasAudioCapture; // Recording input settings; defaults to normal mode, stereo, 0 dB, no latency.
     audioCountIn?: number; // Record count-in in bars (0 = off); defaults to 0.
+    canvasTitle?: string; // Optional parent canvas title when nodes are projected into studio resource pools.
 };
 
 export type CanvasNodeData = {

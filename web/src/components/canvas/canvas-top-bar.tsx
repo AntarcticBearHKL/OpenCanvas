@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { Frame, House, LayoutGrid, Music2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { Frame, House, LayoutGrid, Music2, PanelLeftClose, PanelLeftOpen, PenLine } from "lucide-react";
 import { Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 
@@ -7,9 +8,7 @@ import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { canvasThemes, frostedSurfaceClass } from "@/lib/canvas-theme";
 import { useCanvasSidePanelStore } from "@/stores/use-canvas-side-panel-store";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { CANVAS_WORKSPACES, type CanvasWorkspace } from "@/types/canvas";
-
-const WORKSPACE_ICONS = { canvas: LayoutGrid, image: Frame, audio: Music2 };
+import { type CanvasWorkspace } from "@/types/canvas";
 
 export function CanvasTopBar({
     title,
@@ -20,7 +19,7 @@ export function CanvasTopBar({
     onFinishTitleEditing,
     onCancelTitleEditing,
     onProjects,
-    workspace,
+    workspace = "canvas",
     onWorkspaceChange,
 }: {
     title: string;
@@ -31,9 +30,10 @@ export function CanvasTopBar({
     onFinishTitleEditing: () => void;
     onCancelTitleEditing: () => void;
     onProjects: () => void;
-    workspace: CanvasWorkspace;
-    onWorkspaceChange: (workspace: CanvasWorkspace) => void;
+    workspace?: CanvasWorkspace;
+    onWorkspaceChange?: (workspace: CanvasWorkspace) => void;
 }) {
+    const { id } = useParams<{ id: string }>();
     const colorTheme = useThemeStore((state) => state.theme);
     const { t } = useTranslation();
     const theme = canvasThemes[colorTheme];
@@ -98,26 +98,39 @@ export function CanvasTopBar({
                     </div>
                 </div>
 
-                <div className="pointer-events-auto flex min-w-0 flex-1 items-center justify-center gap-0.5 px-1">
-                    {CANVAS_WORKSPACES.map((item) => {
-                        const Icon = WORKSPACE_ICONS[item];
-                        const active = workspace === item;
-                        return (
-                            <button
-                                key={item}
-                                type="button"
-                                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-1 text-sm transition hover:bg-hover sm:px-2.5"
-                                style={active ? { background: theme.node.accentSoft, color: theme.node.accent, boxShadow: `inset 0 0 0 1px ${theme.node.accent}` } : { color: theme.node.muted }}
-                                aria-current={active ? "page" : undefined}
-                                aria-label={t(`canvas.workspace.${item}`)}
-                                title={t(`canvas.workspace.${item}`)}
-                                onClick={() => onWorkspaceChange(item)}
-                            >
-                                <Icon className="size-3.5 shrink-0" />
-                                <span className="hidden sm:inline">{t(`canvas.workspace.${item}`)}</span>
-                            </button>
-                        );
-                    })}
+                <div className="pointer-events-auto flex min-w-0 flex-1 items-center justify-center gap-1 px-1">
+                    <Link
+                        to={id ? `/canvas/${id}` : "/canvas"}
+                        className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-sm transition hover:bg-hover"
+                        style={{ background: theme.node.accentSoft, color: theme.node.accent, boxShadow: `inset 0 0 0 1px ${theme.node.accent}` }}
+                    >
+                        <LayoutGrid className="size-3.5 shrink-0" />
+                        <span className="hidden sm:inline">{t("canvas.workspace.canvas")}</span>
+                    </Link>
+                    <Link
+                        to="/image"
+                        className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-sm transition hover:bg-hover"
+                        style={{ color: theme.node.muted }}
+                    >
+                        <Frame className="size-3.5 shrink-0" />
+                        <span className="hidden sm:inline">{t("navigation.image")}</span>
+                    </Link>
+                    <Link
+                        to="/audio"
+                        className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-sm transition hover:bg-hover"
+                        style={{ color: theme.node.muted }}
+                    >
+                        <Music2 className="size-3.5 shrink-0" />
+                        <span className="hidden sm:inline">{t("navigation.audio")}</span>
+                    </Link>
+                    <Link
+                        to="/write"
+                        className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-sm transition hover:bg-hover"
+                        style={{ color: theme.node.muted }}
+                    >
+                        <PenLine className="size-3.5 shrink-0" />
+                        <span className="hidden sm:inline">{t("navigation.write")}</span>
+                    </Link>
                 </div>
 
                 <div className="pointer-events-auto flex shrink-0 items-center gap-1.5 pr-1">

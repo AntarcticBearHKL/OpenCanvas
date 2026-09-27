@@ -6,15 +6,18 @@ import { navigationTools, type NavigationToolSlug } from "@/constant/navigation-
 import { AppConfigModal } from "@/components/layout/app-config-modal";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
-import { frostedSurfaceClass } from "@/lib/canvas-theme";
+import { canvasThemes, frostedSurfaceClass } from "@/lib/canvas-theme";
+import { useThemeStore } from "@/stores/use-theme-store";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 export function AppTopNav() {
     const { t } = useTranslation();
     const { pathname } = useLocation();
+    const colorTheme = useThemeStore((state) => state.theme);
+    const theme = canvasThemes[colorTheme];
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
-    const hideHeader = /^\/(canvas|write)\/[^/]+/.test(pathname);
+    const hideHeader = /^\/(canvas|write|image|audio)\/[^/]+/.test(pathname);
     const slug = pathname.split("/").filter(Boolean)[0];
     const activeToolSlug = navigationTools.some((tool) => tool.slug === slug) ? (slug as NavigationToolSlug) : undefined;
 
@@ -22,8 +25,8 @@ export function AppTopNav() {
         <>
             {!hideHeader ? (
                 <header className={cn("sticky top-0 z-20 h-14 shrink-0 border-b border-border glass-surface", frostedSurfaceClass)}>
-                    <div className="flex h-full items-stretch justify-between gap-3 px-4 sm:gap-5">
-                        <div className="flex min-w-0 items-center">
+                    <div className="relative flex h-full items-center justify-between gap-3 px-4 sm:gap-5">
+                        <div className="flex shrink-0 items-center">
                             <Link to="/" className="flex h-full min-w-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight !text-foreground transition hover:!text-muted-foreground">
                                 <span
                                     className="size-5 shrink-0 !bg-brand"
@@ -44,31 +47,37 @@ export function AppTopNav() {
                             >
                                 <Menu className="size-5" />
                             </button>
-
-                            <nav className="hide-scrollbar ml-8 hidden h-full min-w-0 items-center gap-7 overflow-x-auto md:flex">
-                                {navigationTools.map((tool) => {
-                                    const Icon = tool.icon;
-                                    const active = tool.slug === activeToolSlug;
-                                    return (
-                                        <Link
-                                            key={tool.slug}
-                                            to={`/${tool.slug}`}
-                                            className={cn(
-                                                "relative flex h-full shrink-0 items-center gap-2 text-sm leading-6 transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5",
-                                                active
-                                                    ? "font-semibold !text-foreground after:bg-brand"
-                                                    : "!text-muted-foreground after:bg-transparent hover:!text-foreground",
-                                            )}
-                                        >
-                                            <Icon className="size-4" />
-                                            <span className="truncate">{t(`navigation.${tool.slug}`)}</span>
-                                        </Link>
-                                    );
-                                })}
-                            </nav>
                         </div>
 
-                        <div className="my-auto flex h-9 min-w-0 items-center justify-end gap-2 justify-self-end whitespace-nowrap">
+                        {/* Directly centered tabs switcher */}
+                        <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-1 md:flex">
+                            {navigationTools.map((tool) => {
+                                const Icon = tool.icon;
+                                const active = tool.slug === activeToolSlug;
+                                return (
+                                    <Link
+                                        key={tool.slug}
+                                        to={`/${tool.slug}`}
+                                        className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-sm font-medium transition hover:bg-hover"
+                                        style={
+                                            active
+                                                ? {
+                                                      background: theme.node.accentSoft,
+                                                      color: theme.node.accent,
+                                                      boxShadow: `inset 0 0 0 1px ${theme.node.accent}`,
+                                                  }
+                                                : { color: theme.node.muted }
+                                        }
+                                        aria-current={active ? "page" : undefined}
+                                    >
+                                        <Icon className="size-3.5 shrink-0" />
+                                        <span className="truncate">{t(`navigation.${tool.slug}`)}</span>
+                                    </Link>
+                                );
+                            })}
+                        </nav>
+
+                        <div className="my-auto flex h-9 shrink-0 items-center justify-end gap-2 justify-self-end whitespace-nowrap">
                             <UserStatusActions />
                         </div>
                     </div>

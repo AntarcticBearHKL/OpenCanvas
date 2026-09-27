@@ -9,12 +9,13 @@ function getTagColor(type: string) {
     if (type === "新增" || type === "Added") return "green";
     if (type === "修复" || type === "Fixed") return "red";
     if (type === "调整" || type === "Changed") return "blue";
+    if (type === "优化" || type === "Optimized") return "cyan";
     if (type === "文档" || type === "Docs") return "purple";
     return "default";
 }
 
 function releaseTypeLabel(type: string, t: TFunction) {
-    const key = ({ 新增: "added", 修复: "fixed", 调整: "changed", 优化: "optimized", 文档: "docs" } as Record<string, string>)[type];
+    const key = ({ 新增: "added", 修复: "fixed", 调整: "changed", 优化: "optimized", 文档: "docs", Added: "added", Fixed: "fixed", Changed: "changed", Optimized: "optimized", Docs: "docs" } as Record<string, string>)[type];
     return key ? t(`version.types.${key}`) : type;
 }
 

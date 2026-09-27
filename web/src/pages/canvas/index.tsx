@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { App, Button, Empty, Input, Spin, Table } from "antd";
-import { Check, Download, FileUp, FolderPlus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Download, FileUp, FolderKanban, FolderPlus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
@@ -35,6 +35,7 @@ export default function CanvasPage() {
     const deleteGroup = useCanvasStore((state) => state.deleteGroup);
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const { armedId, confirmDelete, cancel } = useCanvasProjectDelete();
+    const [armedGroupId, setArmedGroupId] = useState<string | null>(null);
     const selectedGroupId = useCanvasUiStore((state) => state.selectedGroupId);
     const setSelectedGroupId = useCanvasUiStore((state) => state.setSelectedGroupId);
 
@@ -72,18 +73,14 @@ export default function CanvasPage() {
         setEditingGroupId(null);
     };
     const removeGroup = (id: string) => {
+        if (armedGroupId !== id) {
+            setArmedGroupId(id);
+            return;
+        }
+        setArmedGroupId(null);
         setEditingGroupId(null);
-        modal.confirm({
-            title: t("canvas.group.deleteTitle"),
-            content: t("canvas.group.deleteDescription"),
-            okText: t("common.delete"),
-            okButtonProps: { danger: true },
-            cancelText: t("common.cancel"),
-            onOk: () => {
-                deleteGroup(id);
-                cleanupUnusedCanvasImages();
-            },
-        });
+        deleteGroup(id);
+        cleanupUnusedCanvasImages();
     };
 
     useEffect(() => {
@@ -128,14 +125,27 @@ export default function CanvasPage() {
                                     <Button type="text" size="small" shape="circle" icon={<X className="size-3.5" />} onClick={() => setEditingGroupId(null)} aria-label={t("common.cancel")} title={t("common.cancel")} />
                                 </div>
                             ) : (
-                                <div className={`group flex h-9 items-center rounded-xl border-b border-border px-2 transition ${selectedGroupId === group.id ? "bg-brand-soft shadow-[inset_2px_0_0_0_var(--brand)]" : "hover:bg-hover"}`}>
+                                <div
+                                    className={`group flex h-9 items-center rounded-lg px-2.5 transition ${
+                                        selectedGroupId === group.id
+                                            ? "bg-brand-soft text-brand font-medium"
+                                            : "text-muted-foreground hover:bg-hover hover:text-foreground"
+                                    }`}
+                                >
                                     <button
                                         type="button"
                                         onClick={() => setSelectedGroupId(group.id)}
-                                        className={`flex h-full min-w-0 flex-1 items-center gap-2 text-left text-sm ${selectedGroupId === group.id ? "font-medium text-foreground" : "text-muted-foreground"}`}
+                                        className="flex h-full min-w-0 flex-1 items-center gap-2 text-left text-sm"
                                     >
+                                        <FolderKanban className="size-4 shrink-0 opacity-70" />
                                         <span className="min-w-0 flex-1 truncate">{group.name}</span>
-                                        <span className="shrink-0 text-xs text-muted-foreground group-hover:hidden dark:text-muted-foreground">{projects.filter((project) => project.groupId === group.id).length}</span>
+                                        <span
+                                            className={`shrink-0 text-xs ${
+                                                selectedGroupId === group.id ? "text-brand/70" : "text-muted-foreground"
+                                            } group-hover:hidden`}
+                                        >
+                                            {projects.filter((project) => project.groupId === group.id).length}
+                                        </span>
                                     </button>
                                     <div className="hidden shrink-0 items-center group-hover:flex">
                                         <Button
@@ -150,7 +160,20 @@ export default function CanvasPage() {
                                             aria-label={t("canvas.group.rename")}
                                             title={t("canvas.group.rename")}
                                         />
-                                        <Button type="text" size="small" shape="circle" icon={<Trash2 className="size-3.5" />} onClick={() => removeGroup(group.id)} aria-label={t("canvas.group.delete")} title={t("canvas.group.delete")} />
+                                        <Button
+                                            type="text"
+                                            size="small"
+                                            shape={armedGroupId === group.id ? "default" : "circle"}
+                                            danger={armedGroupId === group.id}
+                                            className={armedGroupId === group.id ? "!px-2 !text-xs font-medium" : undefined}
+                                            icon={armedGroupId === group.id ? <Check className="size-3.5" /> : <Trash2 className="size-3.5" />}
+                                            onClick={() => removeGroup(group.id)}
+                                            onPointerLeave={() => setArmedGroupId(null)}
+                                            aria-label={armedGroupId === group.id ? t("canvas.project.confirmDelete") : t("canvas.group.delete")}
+                                            title={armedGroupId === group.id ? t("canvas.project.confirmDelete") : t("canvas.group.delete")}
+                                        >
+                                            {armedGroupId === group.id ? t("canvas.project.confirmDelete") : null}
+                                        </Button>
                                     </div>
                                 </div>
                             )}

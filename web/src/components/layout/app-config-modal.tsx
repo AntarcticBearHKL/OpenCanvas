@@ -58,7 +58,6 @@ export function AppConfigPanel() {
                                         value={locale}
                                         onChange={(value) => void changeAppLocale(value)}
                                         options={[
-                                            { value: "zh-CN", label: t("locale.zhCN") },
                                             { value: "en-US", label: t("locale.enUS") },
                                         ]}
                                     />

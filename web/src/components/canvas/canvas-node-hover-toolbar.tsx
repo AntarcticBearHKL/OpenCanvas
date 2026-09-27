@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Modal, Segmented } from "antd";
-import { BetweenHorizontalStart, ClipboardCopy, Copy, Download, GalleryHorizontal, GalleryHorizontalEnd, Image as ImageIcon, ImagePlus, Info, Layers, MessageSquare, Minus, Music2, Plus, RefreshCw, Settings2, Tags, Trash2, Upload, Video } from "lucide-react";
+import { BetweenHorizontalStart, ClipboardCopy, Copy, Download, Frame, GalleryHorizontal, GalleryHorizontalEnd, Image as ImageIcon, ImagePlus, Info, Layers, MessageSquare, Minus, Music2, Plus, RefreshCw, Settings2, SlidersHorizontal, Tags, Trash2, Upload, Video } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
@@ -47,6 +47,8 @@ type CanvasNodeHoverToolbarProps = {
     onCaptureVideoFrame: (node: CanvasNodeData, position: VideoFramePosition) => void;
     onTextStyleChange?: (nodeId: string, patch: Partial<CanvasNodeMetadata>) => void;
     onSaveBoardAsNode?: (node: CanvasNodeData) => void;
+    onOpenInImageStudio?: (node: CanvasNodeData) => void;
+    onOpenInAudioStudio?: (node: CanvasNodeData) => void;
     extraTools?: CanvasNodeToolbarItem[];
 };
 
@@ -93,6 +95,8 @@ export function CanvasNodeHoverToolbar({
     onCaptureVideoFrame,
     onTextStyleChange,
     onSaveBoardAsNode,
+    onOpenInImageStudio,
+    onOpenInAudioStudio,
     extraTools = [],
 }: CanvasNodeHoverToolbarProps) {
     const [quickImageToolIds, setQuickImageToolIds] = useState<ImageQuickToolId[]>(defaultImageQuickToolIds);
@@ -160,6 +164,8 @@ export function CanvasNodeHoverToolbar({
         ...(hasVideo || hasAudio ? [{ id: "download", title: t(hasAudio ? "canvas.nodeToolbar.downloadAudio" : "canvas.nodeToolbar.downloadVideo"), label: t("common.download"), icon: <Download className="size-4" />, onClick: () => onDownload(node) }] : []),
         ...(hasImage ? [{ id: "download", title: t("common.download"), label: t("common.download"), icon: <Download className="size-4" />, onClick: () => onDownload(node) }] : []),
         ...(hasImage ? [{ id: "copy", title: t("canvas.imageTools.copyTitle"), label: t("canvas.imageTools.copy"), icon: <ClipboardCopy className="size-4" />, onClick: () => onCopy(node) }] : []),
+        ...(hasImage && onOpenInImageStudio ? [{ id: "openInImageStudio", title: "Process in Image Studio", label: "Studio", icon: <Frame className="size-4" />, onClick: () => onOpenInImageStudio(node) }] : []),
+        ...(hasAudio && onOpenInAudioStudio ? [{ id: "openInAudioStudio", title: "Process in Audio Studio", label: "Studio", icon: <SlidersHorizontal className="size-4" />, onClick: () => onOpenInAudioStudio(node) }] : []),
         ...(isVideo ? [{ id: "edit", title: t("common.edit"), label: t("common.edit"), icon: <MessageSquare className="size-4" />, onClick: () => onToggleDialog(node) }] : []),
         ...(isText ? [{ id: "generateImage", title: t("canvas.node.generateImage"), label: t("canvas.node.generate"), icon: <ImageIcon className="size-4" />, onClick: () => onGenerateImage(node) }] : []),
         ...(isConfig ? [{ id: "config", title: t("canvas.configNode.title"), label: t("canvas.configNode.title"), icon: <Settings2 className="size-4" />, onClick: () => onToggleDialog(node) }] : []),

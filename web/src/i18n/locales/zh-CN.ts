@@ -399,6 +399,7 @@ export default {
         ps: {
             layers: "图层",
             properties: "属性",
+            resourcePool: "资源池",
             addImage: "添加图片图层",
             addText: "添加文字图层",
             addGroup: "编组",
@@ -897,7 +898,8 @@ export default {
     navigation: {
         write: "文本创作器",
         canvas: "我的画布",
-        image: "生图工作台",
+        image: "图像工作台",
+        audio: "音频工作室",
         video: "视频创作台",
         config: "配置",
     },
@@ -1102,8 +1104,8 @@ export default {
         menu: { edit: "编辑", insert: "插入", format: "格式", view: "视图", undo: "撤销", redo: "重做", bold: "加粗", italic: "斜体", strike: "删除线", h2: "标题 2", h3: "标题 3", bulletList: "无序列表", orderedList: "有序列表", quote: "引用", divider: "分割线", insertCodex: "插入设定条目", noCodex: "资源库还没有条目", collapseAll: "折叠全部大纲", expandAll: "展开全部大纲" },
         common: { add: "添加", confirm: "确定", cancel: "取消", delete: "删除", rename: "重命名", none: "无", all: "全部" },
         studio: { title: "文本创作器", titleLabel: "作品标题", wordCount: "{{count}} 字", missing: "作品不存在，返回列表", back: "返回作品库" },
-        library: { title: "文本创作器", count: "{{count}} 部作品", create: "新建作品", rename: "重命名", delete: "删除", deleteConfirm: "删除这部作品？正文与设定会一并删除。", empty: "还没有作品，先新建一部。", nodes: "{{count}} 个节点", titlePlaceholder: "作品标题", projects: "我的作品", open: "打开作品", select: "选择作品 {{name}}", updated: "更新于 {{date}}", exportSelected: "导出选中", deleteSelected: "删除选中", deleteAll: "删除全部", confirmDelete: "确认删除" },
-        group: { create: "新建库", defaultName: "库 {{count}}", none: "未选择库", createFirst: "请先新建库", count: "{{count}} 部作品", rename: "重命名库", delete: "删除库", confirmDelete: "删除库及其作品", move: "移动到库", empty: "该库暂无作品" },
+        library: { title: "文本创作器", count: "{{count}} 个工程", create: "新建工程", rename: "重命名", delete: "删除", deleteConfirm: "删除该工程？正文与设定会一并删除。", empty: "还没有工程，先新建一个。", nodes: "{{count}} 个节点", titlePlaceholder: "工程标题", projects: "文本工程", open: "打开工程", select: "选择工程 {{name}}", updated: "更新于 {{date}}", exportSelected: "导出选中", deleteSelected: "删除选中", deleteAll: "删除全部", confirmDelete: "确认删除" },
+        group: { create: "新建分组", defaultName: "分组 {{count}}", none: "未选择分组", createFirst: "请先新建分组", count: "{{count}} 个工程", rename: "重命名分组", delete: "删除分组", confirmDelete: "删除分组及其工程", move: "移动到分组", empty: "该分组暂无工程" },
         panel: { outline: "章节管理器", codex: "资源库", inspector: "检视器", board: "场景看板", history: "版本历史" },
         outline: { addChild: "加下级", addSibling: "加同级", deleteNode: "删除节点", deleteConfirm: "删除该节点及其全部下级？", searchPlaceholder: "搜索标题或摘要", empty: "还没有大纲节点", newChild: "新节点", expand: "展开下级", expandFailed: "展开失败，请重试", words: "{{count}} 字", noDoc: "未写作", dragHint: "拖拽调整顺序与层级" },
         editor: { placeholder: "在左侧选择章节开始写作", empty: "这部作品还没有可写的章节。", words: "{{count}} 字", saved: "已保存", saving: "保存中…", focus: "专注模式", exitFocus: "退出专注", snapshot: "存快照", slash: { heading: "标题", bullet: "列表", quote: "引用", divider: "分割线", codex: "插入设定", ai: "AI 写作" }, codexPlaceholder: "选择要插入的设定", aiMenu: { label: "AI 写作", continue: "续写", rewrite: "改写", expand: "扩写", condense: "精简", polish: "润色", dialogue: "写对话", stop: "停止", accept: "采用", reject: "丢弃", error: "生成失败，请重试", noModel: "请先在设置里配置文本模型", instruction: "补充要求（可选）", generating: "生成中…" } },

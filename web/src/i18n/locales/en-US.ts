@@ -399,6 +399,7 @@ export default {
         ps: {
             layers: "Layers",
             properties: "Properties",
+            resourcePool: "Resource Pool",
             addImage: "Add image layer",
             addText: "Add text layer",
             addGroup: "Group layer",
@@ -898,6 +899,7 @@ export default {
         write: "Writing Studio",
         canvas: "My Canvases",
         image: "Image Studio",
+        audio: "Audio Studio",
         video: "Video Studio",
         config: "Settings",
     },
@@ -1088,7 +1090,7 @@ export default {
         },
     },
     locale: {
-        zhCN: "简体中文",
+        zhCN: "Simplified Chinese",
         enUS: "English",
     },
     writing: {
@@ -1102,9 +1104,9 @@ export default {
         field: { pov: "POV", tense: "Tense" },
         menu: { edit: "Edit", insert: "Insert", format: "Format", view: "View", undo: "Undo", redo: "Redo", bold: "Bold", italic: "Italic", strike: "Strikethrough", h2: "Heading 2", h3: "Heading 3", bulletList: "Bulleted list", orderedList: "Numbered list", quote: "Quote", divider: "Divider", insertCodex: "Insert codex entry", noCodex: "The codex is empty", collapseAll: "Collapse all", expandAll: "Expand all" },
         common: { add: "Add", confirm: "Confirm", cancel: "Cancel", delete: "Delete", rename: "Rename", none: "None", all: "All" },
-        studio: { title: "Writing Studio", titleLabel: "Work title", wordCount: "{{count}} words", missing: "This work no longer exists", back: "Back to library" },
-        library: { title: "Writing Studio", count: "{{count}} works", create: "New work", rename: "Rename", delete: "Delete", deleteConfirm: "Delete this work? Its prose and codex will be removed.", empty: "No works yet. Create one to start writing.", nodes: "{{count}} nodes", titlePlaceholder: "Work title", projects: "My Works", open: "Open work", select: "Select {{name}}", updated: "Updated {{date}}", exportSelected: "Export selected", deleteSelected: "Delete selected", deleteAll: "Delete all", confirmDelete: "Confirm delete" },
-        group: { create: "New library", defaultName: "Library {{count}}", none: "No library selected", createFirst: "Create a library first", count: "{{count}} works", rename: "Rename library", delete: "Delete library", confirmDelete: "Delete library and its works", move: "Move to library", empty: "No works in this library" },
+        studio: { title: "Writing Studio", titleLabel: "Project title", wordCount: "{{count}} words", missing: "This project no longer exists", back: "Back to library" },
+        library: { title: "Writing Studio", count: "{{count}} projects", create: "New Project", rename: "Rename", delete: "Delete", deleteConfirm: "Delete this project? Its prose and codex will be removed.", empty: "No projects yet. Create one to start writing.", nodes: "{{count}} nodes", titlePlaceholder: "Project title", projects: "Writing Projects", open: "Open project", select: "Select {{name}}", updated: "Updated {{date}}", exportSelected: "Export selected", deleteSelected: "Delete selected", deleteAll: "Delete all", confirmDelete: "Confirm delete" },
+        group: { create: "New group", defaultName: "Group {{count}}", none: "No group selected", createFirst: "Create a group first", count: "{{count}} projects", rename: "Rename group", delete: "Delete group", confirmDelete: "Delete group and its projects", move: "Move to group", empty: "No projects in this group" },
         panel: { outline: "Outline", codex: "Codex", inspector: "Inspector", board: "Board", history: "History" },
         outline: { addChild: "Add child", addSibling: "Add sibling", deleteNode: "Delete node", deleteConfirm: "Delete this node and everything under it?", searchPlaceholder: "Search title or summary", empty: "No outline nodes yet", newChild: "New node", expand: "Expand", expandFailed: "Expansion failed. Try again.", words: "{{count}} words", noDoc: "No prose", dragHint: "Drag to reorder and re-parent" },
         editor: { placeholder: "Pick a chapter on the left to start writing", empty: "This work has no writable unit yet.", words: "{{count}} words", saved: "Saved", saving: "Saving…", focus: "Focus mode", exitFocus: "Exit focus", snapshot: "Snapshot", slash: { heading: "Heading", bullet: "List", quote: "Quote", divider: "Divider", codex: "Insert codex entry", ai: "AI writing" }, codexPlaceholder: "Pick a codex entry", aiMenu: { label: "AI writing", continue: "Continue", rewrite: "Rewrite", expand: "Expand", condense: "Condense", polish: "Polish", dialogue: "Dialogue", stop: "Stop", accept: "Accept", reject: "Discard", error: "Generation failed. Try again.", noModel: "Configure a text model in Settings first.", instruction: "Extra instructions (optional)", generating: "Generating…" } },

@@ -58,6 +58,7 @@ export function DockTabs<T extends string>({ tabs, value, onChange }: { tabs: Do
                             onClick={() => onChange(tab.id)}
                             className="min-w-0 shrink-0 cursor-pointer rounded-md px-2 py-1 text-xs font-medium transition"
                             style={active ? { background: theme.toolbar.accentBg, color: theme.toolbar.accentText, boxShadow: `inset 0 0 0 1px ${theme.node.accent}` } : { color: theme.toolbar.item }}
+                            title={tab.label}
                             onMouseEnter={(event) => {
                                 if (!active) event.currentTarget.style.background = theme.toolbar.itemHover;
                             }}
@@ -65,7 +66,7 @@ export function DockTabs<T extends string>({ tabs, value, onChange }: { tabs: Do
                                 if (!active) event.currentTarget.style.background = "transparent";
                             }}
                         >
-                            <span className="block max-w-[104px] truncate">{tab.label}</span>
+                            <span className="block max-w-[120px] truncate">{tab.label}</span>
                         </button>
                     );
                 })}

@@ -8,8 +8,16 @@ import { matildaProxy } from "./matilda-proxy";
 import { parseChangelog } from "./src/lib/release";
 
 const webDir = dirname(fileURLToPath(import.meta.url));
-const localVersion = readFileSync(resolve(webDir, "../VERSION"), "utf8").trim() || "dev";
-const localChangelog = readFileSync(resolve(webDir, "../CHANGELOG.md"), "utf8");
+function safeReadFile(filePath: string, fallback = ""): string {
+    try {
+        return readFileSync(filePath, "utf8");
+    } catch {
+        return fallback;
+    }
+}
+
+const localVersion = safeReadFile(resolve(webDir, "../VERSION")).trim() || "dev";
+const localChangelog = safeReadFile(resolve(webDir, "../CHANGELOG.md"), "");
 
 // Expose /plugins/index.json with local plugin files from public/plugins.
 // The frontend can discover and list them when enabled; development reads the directory live, while builds emit a static registry.

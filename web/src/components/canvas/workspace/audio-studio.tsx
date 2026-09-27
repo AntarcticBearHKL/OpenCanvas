@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
 import { App, ConfigProvider, Dropdown, InputNumber, Modal, Popover, Segmented, Select, Switch } from "antd";
-import { ArrowLeft, AudioLines, AudioWaveform, ChevronDown, ChevronRight, Circle, CircleStop, Ellipsis, Eraser, Flag, Hand, History, Library, Link, Link2, Lock, Magnet, MoreHorizontal, MousePointer2, Music2, PanelRight, Pause, Pencil, Play, Plus, Repeat, Scissors, Search, Settings2, SkipBack, SlidersHorizontal, SlidersVertical, SquareDashed, Timer, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, AudioLines, AudioWaveform, ChevronDown, ChevronRight, Circle, CircleStop, Ellipsis, Eraser, Flag, Hand, History, Library, Link, Link2, Lock, Magnet, MoreHorizontal, MousePointer2, Music2, PanelRight, Pause, Pencil, Play, Plus, Repeat, Scissors, Search, Settings2, Share2, SkipBack, SlidersHorizontal, SlidersVertical, SquareDashed, Timer, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useTranslation } from "react-i18next";
 import * as Tone from "tone";
@@ -1871,23 +1871,29 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     };
 
     return (
-        <div className={`flex min-h-0 min-w-0 flex-1 flex-col pt-14 ${FOCUS_RING_CLASS}`} style={{ "--audio-focus": theme.node.activeStroke } as React.CSSProperties}>
+        <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${FOCUS_RING_CLASS}`} style={{ "--audio-focus": theme.node.activeStroke } as React.CSSProperties}>
             <div className={`${STUDIO_BAR_CLASS} glass-surface h-11`}>
                 <IconAction label={t("canvas.workspace.back")} onClick={onBack}>
                     <ArrowLeft className="size-3.5" />
                 </IconAction>
-                <Select
-                    size="small"
-                    variant="borderless"
-                    className={`${CONTROL_CLASS} min-w-[120px] max-w-[220px]`}
-                    value={project.id}
-                    placeholder={t("canvas.audioStudio.pickProject")}
-                    options={projects.map((item) => ({ value: item.id, label: item.title || t("canvas.node.untitled") }))}
-                    popupMatchSelectWidth={false}
-                    styles={{ popup: { root: { zIndex: 1300 } } }}
-                    aria-label={t("canvas.audioStudio.pickProject")}
-                    onChange={onSelectProject}
-                />
+                {projects.length > 1 ? (
+                    <Select
+                        size="small"
+                        variant="borderless"
+                        className={`${CONTROL_CLASS} min-w-[120px] max-w-[220px]`}
+                        value={project.id}
+                        placeholder={t("canvas.audioStudio.pickProject")}
+                        options={projects.map((item) => ({ value: item.id, label: item.title || t("canvas.node.untitled") }))}
+                        popupMatchSelectWidth={false}
+                        styles={{ popup: { root: { zIndex: 1300 } } }}
+                        aria-label={t("canvas.audioStudio.pickProject")}
+                        onChange={onSelectProject}
+                    />
+                ) : (
+                    <span className="font-semibold text-sm px-2 truncate max-w-[220px]" style={{ color: theme.node.text }}>
+                        {project.title || t("canvas.node.untitled")}
+                    </span>
+                )}
                 <span className={STUDIO_DIVIDER_CLASS} style={{ background: theme.toolbar.border }} />
                 <IconAction label={t("canvas.audioStudio.toStart")} className="hidden lg:grid" onClick={() => seek(0)}>
                     <SkipBack className="size-3.5" />
@@ -1961,8 +1967,8 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                     {Math.round((pxPerSecond / AUDIO_DEFAULT_PX_PER_SECOND) * 100)}%
                 </span>
                 <button type="button" className="hidden h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent lg:flex hover:bg-hover dark:disabled:hover:bg-transparent" style={{ color: theme.node.text }} disabled={exporting} onClick={() => void runExport(() => onOutput(project))}>
-                    <AudioWaveform className="size-3.5" />
-                    {t(exporting ? "canvas.audioStudio.exporting" : "canvas.audioStudio.saveAsNode")}
+                    <Share2 className="size-3.5" />
+                    {t(exporting ? "canvas.audioStudio.exporting" : "studio.output.title", { defaultValue: exporting ? "Exporting..." : "Export" })}
                 </button>
                 <button
                     ref={dockToggleRef}
@@ -2060,8 +2066,8 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                 </button>
                             </div>
                             <button type="button" className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-left transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent" style={{ color: theme.node.text }} disabled={exporting} onClick={() => void runExport(() => onOutput(project))}>
-                                <AudioWaveform className="size-3.5" />
-                                {t(exporting ? "canvas.audioStudio.exporting" : "canvas.audioStudio.saveAsNode")}
+                                <Share2 className="size-3.5" />
+                                {t(exporting ? "canvas.audioStudio.exporting" : "studio.output.title", { defaultValue: exporting ? "Exporting..." : "Export" })}
                             </button>
                         </div>
                     }

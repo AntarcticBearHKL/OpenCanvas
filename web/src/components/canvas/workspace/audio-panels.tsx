@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from "react";
-import { InputNumber, Select, Slider, Switch } from "antd";
-import { Circle, Link2, Music2, Plus, SlidersVertical, Trash2 } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Input, InputNumber, Select, Slider, Switch } from "antd";
+import { Circle, FolderKanban, Link2, Music2, Plus, Search, SlidersVertical, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import PsColorPicker from "@/components/canvas/workspace/ps-color-picker";
@@ -424,45 +424,87 @@ export function AudioInspectorPanel({ tracks, selectedTrackId, clips, selectedCl
     );
 }
 
-export function AudioMediaPoolPanel({ audioNodes, onGoCanvas }: { audioNodes: CanvasNodeData[]; onGoCanvas: () => void }) {
+export function AudioMediaPoolPanel({ audioNodes }: { audioNodes: CanvasNodeData[]; onGoCanvas?: () => void }) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
+    const [search, setSearch] = useState("");
+
+    const filtered = useMemo(() => {
+        if (!search.trim()) return audioNodes;
+        const q = search.toLowerCase();
+        return audioNodes.filter((node) => {
+            const canvasName = (node.metadata?.canvasTitle as string) || "";
+            const title = node.title || "";
+            return canvasName.toLowerCase().includes(q) || title.toLowerCase().includes(q);
+        });
+    }, [audioNodes, search]);
+
     if (!audioNodes.length) {
         return (
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 text-center glass-card">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center glass-card">
                 <Music2 className="size-5" style={{ color: theme.node.muted }} />
-                <span className="text-sm" style={{ color: theme.node.placeholder }}>
-                    {t("canvas.audioStudio.mediaEmpty")}
+                <span className="text-sm font-medium" style={{ color: theme.node.text }}>
+                    {t("canvas.audioStudio.mediaEmpty", { defaultValue: "No canvas audio available" })}
                 </span>
-                <button type="button" className={FLAT_BUTTON_CLASS} style={{ color: theme.node.text }} onClick={onGoCanvas}>
-                    <Plus className="size-3" />
-                    {t("canvas.audioStudio.mediaGoCanvas")}
-                </button>
+                <span className="text-xs" style={{ color: theme.node.muted }}>
+                    Audio added or recorded in any canvas will appear here automatically.
+                </span>
             </div>
         );
     }
     return (
-        <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto p-1.5 glass-card">
-            {audioNodes.map((node) => (
-                <div
-                    key={node.id}
-                    draggable
-                    className="flex w-full cursor-grab items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-hover"
-                    style={{ color: theme.node.text }}
-                    title={t("canvas.audioStudio.mediaDragHint")}
-                    onDragStart={(event) => {
-                        event.dataTransfer.effectAllowed = "copy";
-                        event.dataTransfer.setData(AUDIO_NODE_DRAG_MIME, node.id);
-                        event.dataTransfer.setData("text/plain", node.id);
-                    }}
-                >
-                    <Music2 className="size-3.5 shrink-0" style={{ color: theme.node.muted }} />
-                    <span className="min-w-0 flex-1 truncate">{node.title || t("canvas.node.untitled")}</span>
-                    <span className="shrink-0 tabular-nums" style={{ color: theme.node.muted }}>
-                        {formatAudioTime((node.metadata?.durationMs || 0) / 1000)}
-                    </span>
-                </div>
-            ))}
+        <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden glass-card">
+            <div className="p-2 border-b" style={{ borderColor: theme.toolbar.border }}>
+                <Input
+                    size="small"
+                    prefix={<Search className="size-3.5 text-muted-foreground mr-1" />}
+                    placeholder="Search canvas or audio name..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    allowClear
+                />
+            </div>
+            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto p-1.5 space-y-1">
+                {filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-6 text-center text-xs text-muted-foreground">
+                        No matching audio found
+                    </div>
+                ) : (
+                    filtered.map((node) => {
+                        const canvasTitle = (node.metadata?.canvasTitle as string) || "Untitled Canvas";
+                        return (
+                            <div
+                                key={node.id}
+                                draggable
+                                className="group flex w-full cursor-grab items-center gap-2 rounded-lg p-1.5 text-left text-sm transition hover:bg-hover border"
+                                style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
+                                title={t("canvas.audioStudio.mediaDragHint", { defaultValue: "Drag into track to create clip" })}
+                                onDragStart={(event) => {
+                                    event.dataTransfer.effectAllowed = "copy";
+                                    event.dataTransfer.setData(AUDIO_NODE_DRAG_MIME, node.id);
+                                    event.dataTransfer.setData("text/plain", node.id);
+                                }}
+                            >
+                                <div className="relative flex size-8 shrink-0 items-center justify-center rounded bg-black/10 dark:bg-white/10">
+                                    <Music2 className="size-4 shrink-0" style={{ color: theme.node.muted }} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="truncate text-xs font-medium">
+                                        {node.title || t("canvas.node.untitled")}
+                                    </div>
+                                    <div className="flex items-center gap-1 text-[11px]" style={{ color: theme.node.muted }}>
+                                        <FolderKanban className="size-3 shrink-0" />
+                                        <span className="truncate">{canvasTitle}</span>
+                                    </div>
+                                </div>
+                                <span className="shrink-0 text-xs tabular-nums" style={{ color: theme.node.muted }}>
+                                    {formatAudioTime((node.metadata?.durationMs || 0) / 1000)}
+                                </span>
+                            </div>
+                        );
+                    })
+                )}
+            </div>
         </div>
     );
 }

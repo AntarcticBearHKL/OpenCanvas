@@ -68,11 +68,11 @@ function applyOpsInternal(ops: AgentOp[], replayedFrom?: string): AgentApplyResu
     const known: { op: AgentOp; index: number }[] = [];
     ops.forEach((op, index) => {
         if (!op || typeof op.ns !== "string" || !op.ns) {
-            errors.push({ index, error: "操作缺少命名空间 ns" });
+            errors.push({ index, error: "Operation is missing namespace ns" });
             return;
         }
         if (!resolveNamespace(op.ns)) {
-            errors.push({ index, error: `未知的命名空间：${op.ns}` });
+            errors.push({ index, error: `Unknown namespace: ${op.ns}` });
             return;
         }
         known.push({ op, index });

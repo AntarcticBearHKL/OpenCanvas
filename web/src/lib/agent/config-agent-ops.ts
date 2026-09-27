@@ -86,10 +86,10 @@ export function isConfigScalarKey(key: unknown): key is ConfigScalarKey {
 
 /** Whitelisted scalar write; throws on an unknown key, a non-string value or an out-of-enum value. */
 export function normalizeConfigScalar(key: unknown, value: unknown): { key: ConfigScalarKey; value: string } {
-    if (!isConfigScalarKey(key)) throw new Error(`不支持的配置项：${String(key)}`);
-    if (typeof value !== "string") throw new Error(`配置项 ${key} 需要字符串值`);
+    if (!isConfigScalarKey(key)) throw new Error(`Unsupported config item: ${String(key)}`);
+    if (typeof value !== "string") throw new Error(`Config item ${key} requires a string value`);
     const allowed = SCALAR_ENUMS[key];
-    if (allowed && !allowed.includes(value)) throw new Error(`配置项 ${key} 不支持取值：${value}`);
+    if (allowed && !allowed.includes(value)) throw new Error(`Config item ${key} does not support value: ${value}`);
     return { key, value };
 }
 
@@ -133,7 +133,7 @@ function patchChannel(channel: ModelChannel, patch?: ConfigChannelPatch): ModelC
 
 function updateChannel(config: AiConfig, channelId: string, update: (channel: ModelChannel) => ModelChannel): ModelChannel[] {
     const index = config.channels.findIndex((channel) => channel.id === channelId);
-    if (index < 0) throw new Error(`未找到渠道：${channelId}`);
+    if (index < 0) throw new Error(`Channel not found: ${channelId}`);
     const channels = config.channels.slice();
     channels[index] = update(channels[index]);
     return channels;
@@ -153,7 +153,7 @@ export function applyConfigChannelOp(config: AiConfig, op: ConfigChannelOp): Mod
         case "channel.add_model":
             return updateChannel(config, op.channelId, (channel) => {
                 const name = op.name.trim();
-                if (!name) throw new Error("模型名称不能为空");
+                if (!name) throw new Error("Model name cannot be empty");
                 const capability = isModelCapability(op.capability) ? op.capability : "text";
                 const exists = channel.models.some((model) => model.name === name);
                 const models = exists
@@ -165,8 +165,8 @@ export function applyConfigChannelOp(config: AiConfig, op: ConfigChannelOp): Mod
             return updateChannel(config, op.channelId, (channel) => ({ ...channel, models: channel.models.filter((model) => model.name !== op.name) }));
         case "channel.set_model_capability":
             return updateChannel(config, op.channelId, (channel) => {
-                if (!isModelCapability(op.capability)) throw new Error(`不支持的模型能力：${String(op.capability)}`);
-                if (!channel.models.some((model) => model.name === op.name)) throw new Error(`未找到模型：${op.name}`);
+                if (!isModelCapability(op.capability)) throw new Error(`Unsupported model capability: ${String(op.capability)}`);
+                if (!channel.models.some((model) => model.name === op.name)) throw new Error(`Model not found: ${op.name}`);
                 return { ...channel, models: channel.models.map((model) => (model.name === op.name ? { ...model, capability: op.capability } : model)) };
             });
     }
@@ -179,7 +179,7 @@ export function revealConfigKeys(config: AiConfig, channelId?: string): ConfigRe
     const channels = config.channels.map((channel) => ({ id: channel.id, name: channel.name, apiKey: channel.apiKey }));
     if (!channelId) return { channels };
     const channel = channels.find((item) => item.id === channelId);
-    if (!channel) throw new Error(`未找到渠道：${channelId}`);
+    if (!channel) throw new Error(`Channel not found: ${channelId}`);
     return { channels: [channel] };
 }
 
@@ -242,7 +242,7 @@ const CONFIG_OP_SPECS: { type: ConfigAgentOpType; required?: string[]; propertie
         type: "set_provider_key",
         required: ["channelId", "apiKey"],
         properties: { channelId: { type: "string" }, apiKey: { type: "string" } },
-        description: "危险操作：写入渠道 API Key，默认权限拒绝。",
+        description: "Dangerous operation: Writes channel API Key, denied by default.",
     },
     { type: "channel.add_model", required: ["channelId", "name"], properties: { channelId: { type: "string" }, name: { type: "string" }, capability: MODEL_CAPABILITY_ENUM } },
     { type: "channel.remove_model", required: ["channelId", "name"], properties: { channelId: { type: "string" }, name: { type: "string" } } },
@@ -252,7 +252,7 @@ const CONFIG_OP_SPECS: { type: ConfigAgentOpType; required?: string[]; propertie
         properties: { channelId: { type: "string" }, name: { type: "string" }, capability: MODEL_CAPABILITY_ENUM },
     },
     { type: "select_model", required: ["capability", "value"], properties: { capability: MODEL_CAPABILITY_ENUM, value: { type: "string" } } },
-    { type: "reveal_key", properties: { channelId: { type: "string" } }, description: "危险操作：返回原始 API Key（省略 channelId 返回全部），默认权限拒绝，仅应在用户显式授权后调用。" },
+    { type: "reveal_key", properties: { channelId: { type: "string" } }, description: "Dangerous operation: Returns raw API Key (omit channelId for all), denied by default, should only be called upon explicit user authorization." },
     { type: "import_credentials", properties: { baseUrl: { type: "string" }, apiKey: { type: "string" } } },
 ];
 

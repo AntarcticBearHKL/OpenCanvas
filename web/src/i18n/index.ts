@@ -8,14 +8,17 @@ export type AppLocale = "zh-CN" | "en-US";
 
 const LOCALE_STORAGE_KEY = "infinite-canvas:locale";
 
+// English-only mode per requirement
+localStorage.setItem(LOCALE_STORAGE_KEY, "en-US");
+
 i18n.use(initReactI18next).init({
     resources: {
         "zh-CN": { translation: zhCN },
         "en-US": { translation: enUS },
     },
-    lng: (localStorage.getItem(LOCALE_STORAGE_KEY) as AppLocale) || "en-US",
+    lng: "en-US",
     fallbackLng: "en-US",
-    supportedLngs: ["zh-CN", "en-US"],
+    supportedLngs: ["en-US", "zh-CN"],
     initAsync: false,
     interpolation: { escapeValue: false },
     react: { useSuspense: false },
