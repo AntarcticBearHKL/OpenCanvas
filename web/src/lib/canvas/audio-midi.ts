@@ -10,19 +10,17 @@ export const AUDIO_MIN_NOTE_TICKS = 10;
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const BLACK_KEY_NOTES = new Set([1, 3, 6, 8, 10]);
 
+/** A built-in sampled instrument: `release` is the Sampler's release (s) and `volume` its level in dB. */
 type AudioInstrumentPreset = {
     id: string;
     labelKey: string;
-    oscillator: "sawtooth" | "square" | "triangle" | "sine";
-    envelope: { attack: number; decay: number; sustain: number; release: number };
+    release: number;
     volume: number; // dB
 };
 
 export const AUDIO_INSTRUMENT_PRESETS: AudioInstrumentPreset[] = [
-    { id: "saw-lead", labelKey: "canvas.audioStudio.instrumentSawLead", oscillator: "sawtooth", envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.4 }, volume: -12 },
-    { id: "square-bass", labelKey: "canvas.audioStudio.instrumentSquareBass", oscillator: "square", envelope: { attack: 0.005, decay: 0.15, sustain: 0.35, release: 0.25 }, volume: -14 },
-    { id: "triangle-pad", labelKey: "canvas.audioStudio.instrumentTrianglePad", oscillator: "triangle", envelope: { attack: 0.4, decay: 0.6, sustain: 0.7, release: 1.2 }, volume: -8 },
-    { id: "sine-bell", labelKey: "canvas.audioStudio.instrumentSineBell", oscillator: "sine", envelope: { attack: 0.005, decay: 0.9, sustain: 0.05, release: 0.9 }, volume: -8 },
+    { id: "piano", labelKey: "canvas.audioStudio.instrumentPiano", release: 1.2, volume: -6 },
+    { id: "guitar", labelKey: "canvas.audioStudio.instrumentGuitar", release: 0.6, volume: -6 },
 ];
 
 export const AUDIO_DEFAULT_INSTRUMENT_PRESET = AUDIO_INSTRUMENT_PRESETS[0].id;

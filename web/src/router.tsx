@@ -8,6 +8,7 @@ import CanvasProjectPage from "@/pages/canvas/project";
 import ConfigPage from "@/pages/config";
 import ImagePage from "@/pages/image";
 import NotFound from "@/pages/not-found";
+import PixelPage from "@/pages/pixel";
 import WritePage from "@/pages/write";
 
 export const router = createBrowserRouter([
@@ -24,6 +25,8 @@ export const router = createBrowserRouter([
             { path: "/canvas/:id/:workspace?", element: <CanvasProjectPage /> },
             { path: "/image", element: <ImagePage /> },
             { path: "/image/:id", element: <ImagePage /> },
+            { path: "/pixel", element: <PixelPage /> },
+            { path: "/pixel/:id", element: <PixelPage /> },
             { path: "/audio", element: <AudioPage /> },
             { path: "/audio/:id", element: <AudioPage /> },
             { path: "/config", element: <ConfigPage /> },

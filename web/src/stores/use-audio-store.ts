@@ -7,6 +7,7 @@ import { localForageStorage } from "@/lib/localforage-storage";
 import { createAudioTrack } from "@/lib/canvas/audio-project";
 import type {
     CanvasAudioAutomationLane,
+    CanvasAudioCapture,
     CanvasAudioClip,
     CanvasAudioMarker,
     CanvasAudioMidiRegion,
@@ -33,6 +34,8 @@ export type AudioProject = {
     midiRegions: CanvasAudioMidiRegion[];
     ppqn: number;
     masterGain: number;
+    capture?: CanvasAudioCapture;
+    countIn?: number;
 };
 
 export type AudioGroup = {

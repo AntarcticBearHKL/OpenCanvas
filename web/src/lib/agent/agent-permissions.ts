@@ -45,8 +45,6 @@ export function describeAgentOp(op: AgentOp): string {
     if (op.type === "connect_nodes") return `${head} ${text(op.fromNodeId)}->${text(op.toNodeId)}`;
     if (op.type === "select_nodes") return `${head} ${list(op.ids)}`;
     if (op.type === "run_generation") return `${head} ${text(op.nodeId)} ${text(op.mode) || "image"}`;
-    if (op.type === "arrange_board") return `${head} ${text(op.id)}`;
-    if (op.type === "place_on_board") return `${head} ${text(op.nodeId)}`;
     return head;
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Segmented, Select, Slider, Switch } from "antd";
 import { ArrowLeft, Blend, Brush, CircleDashed, Contrast, Eraser, FolderKanban, Grid3x3, Hand, History, ImagePlus, Lasso, LassoSelect, Layers, Layers2, Magnet, Maximize, Move, MousePointer2, PaintBucket, Palette, PenTool, Pipette, Rows3, Settings2, Share2, Sparkles, SquareDashed, Wand2, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
 import { nanoid } from "nanoid";
@@ -8,7 +8,7 @@ import { ImageSettingsTheme } from "@/components/image-settings-panel";
 import { type DockPanelDef } from "@/components/canvas/dock/dock-layout";
 import { DockArea, useDockLayout } from "@/components/canvas/dock/dock-panel";
 import { DockWindowMenu } from "@/components/canvas/dock/dock-window-menu";
-import { BoardLayersView, layerBlendStyle, psLayerFrame } from "@/components/canvas/smart-canvas-node";
+import { BoardLayersView, layerBlendStyle, psLayerFrame } from "@/components/canvas/workspace/ps-board-view";
 import { SmartCanvasSettingsPopover } from "@/components/canvas/smart-canvas-settings-popover";
 import { PsActionsPanel, usePsActionRecorder, type PsLayerCommand, type PsMenuCommand } from "@/components/canvas/workspace/ps-actions-panel";
 import PsAdjustmentsPanel from "@/components/canvas/workspace/ps-adjustments-panel";
@@ -25,36 +25,34 @@ import { PsPathsPanel } from "@/components/canvas/workspace/ps-paths-panel";
 import PsPropertiesPanel from "@/components/canvas/workspace/ps-properties-panel";
 import PsTextPanel from "@/components/canvas/workspace/ps-text-panel";
 import { psFilterLayerBitmap, type PsFilterParams, type PsFilterType } from "@/components/canvas/workspace/ps-filters";
-import { addPsLayer, addPsLayerAbove, commitBoardLayers, duplicatePsLayer, findPsLayer, groupPsLayers, movePsLayerStep, patchPsLayer, psLayerCentre, rasterizePsLayer, removePsLayer, resizePsLayer, rotatePsLayer, translatePsLayer, ungroupPsLayer, type PsResizeCorner } from "@/components/canvas/workspace/ps-layer-ops";
+import { addPsLayer, addPsLayerAbove, commitBoardLayers, duplicatePsLayer, findPsLayer, groupPsLayers, movePsLayerStep, patchPsLayer, psLayerCentre, rasterizePsLayer, removePsLayer, resizePsLayer, rotatePsLayer, translatePsLayer, ungroupPsLayer, type PsBoardCommit, type PsResizeCorner } from "@/components/canvas/workspace/ps-layer-ops";
 import { psBucketFill, psBucketPattern, psCanvasToBlob, psPatternFillLayer, psBeginStroke, psBitmapSize, psColorLuminance, psCommitStroke, psDocToLayer, psDrawStroke, psGradientFill, psLoadBoardPixels, psLoadBoardSampler, psLoadLayerPixels, psSampleBoardPixel, psStrokeTo, type PsBoardSampler, type PsBrushOptions, type PsGradientStop, type PsPaintPoint, type PsStroke } from "@/components/canvas/workspace/ps-paint";
 import { psAnchorOffset, psOffsetLayers, psResampleLayerBitmaps, psRotateLayers, psScaleLayers, psTrimBox, type PsCanvasAnchor } from "@/components/canvas/workspace/ps-image-ops";
 import { psPaintPath, psPathPaintSource, psPathToSelection } from "@/components/canvas/workspace/ps-path-ops";
-import { STUDIO_BAR_CLASS, STUDIO_DIVIDER_CLASS, STUDIO_ICON_BUTTON_CLASS, STUDIO_LABEL_CLASS, STUDIO_LIST_ROW_CLASS, STUDIO_OPTIONS_CLASS, STUDIO_TOOL_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
+import { STUDIO_BAR_CLASS, STUDIO_DIVIDER_CLASS, STUDIO_ICON_BUTTON_CLASS, STUDIO_LABEL_CLASS, STUDIO_TOOL_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import { psImageColorAt, psSelectionAll, psSelectionBlob, psSelectionBounds, psSelectionClear, psSelectionCombine, psSelectionCreate, psSelectionFeather, psSelectionInvert, psSelectionPolygon, psSelectionQuick, psSelectionRect, psSelectionToLayerSpace, psSelectionWand, type PsSelectionMode } from "@/components/canvas/workspace/ps-selection";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import i18n from "@/i18n";
 import { registerAgentNamespace } from "@/lib/agent/action-registry";
+import { registerScreenshotProvider } from "@/lib/agent/screenshot-registry";
 import type { AgentOp } from "@/lib/agent/agent-ops";
 import { CANVAS_BLEND_MODES } from "@/lib/canvas/blend-modes";
 import { IMAGE_AGENT_ASYNC_TYPES, IMAGE_AGENT_OP_TYPES, IMAGE_AGENT_SCHEMA, applyImageAgentOps, type ImageAgentOp } from "@/lib/canvas/image-agent-ops";
 import { createPsPath, psPathAnchor } from "@/lib/canvas/ps-path";
 import { PS_TRANSFORM_MODES, psApplyNumericTransform, psClearTransform, psMoveTransformHandle, psTransformHandlesDoc, type PsNumericTransform, type PsTransformMode } from "@/lib/canvas/ps-transform";
-import { composeSmartCanvas, createPsAdjustmentLayer, createPsImageLayer, createPsPixelLayer, createPsShapeLayer, psBoxUnion, psLayerBox, psTextRenderStyle, psTopLayers, renderPsLayerBitmap, smartCanvasBackground, smartCanvasBackgroundOpacity, smartCanvasFill, smartCanvasLayers, smartCanvasRatio, smartCanvasResolution, smartCanvasSizeForRatio } from "@/lib/canvas/smart-canvas";
+import { composeSmartCanvas, createPsAdjustmentLayer, createPsImageLayer, createPsPixelLayer, createPsShapeLayer, psBoxUnion, psLayerBox, psTextRenderStyle, psTopLayers, renderPsLayerBitmap, smartCanvasBackground, smartCanvasBackgroundOpacity, smartCanvasFill, smartCanvasLayers, smartCanvasRatio, smartCanvasResolution, smartCanvasSizeForRatio, type PsImageSource, type SmartCanvasBoard } from "@/lib/canvas/smart-canvas";
 import { PS_ADJUSTMENT_NAME_KEYS } from "@/lib/canvas/ps-adjustments";
 import { inferMediaRatio } from "@/lib/media-size";
 import { useAgentStore } from "@/stores/use-agent-store";
 import { PS_BRUSH_DEFAULT, type PsActionStep, type PsBrushPreset, type PsPatternPreset } from "@/stores/use-ps-asset-store";
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
-import { CanvasNodeType, type CanvasNodeData, type CanvasNodeMetadata, type CanvasPsAdjustmentType, type CanvasPsLayer, type CanvasPsPath, type CanvasPsShapeKind } from "@/types/canvas";
+import { CanvasNodeType, type CanvasNodeData, type CanvasPsAdjustmentType, type CanvasPsLayer, type CanvasPsPath, type CanvasPsShapeKind } from "@/types/canvas";
 
 type ImageStudioProps = {
-    board: CanvasNodeData | null;
-    boards: CanvasNodeData[];
+    board: SmartCanvasBoard | null;
     nodes: CanvasNodeData[];
-    setNodes: Dispatch<SetStateAction<CanvasNodeData[]>>;
-    onSelectBoard: (boardId: string) => void;
-    onBoardChange: (boardId: string, patch: Partial<CanvasNodeMetadata>) => void;
-    onOutput: (board: CanvasNodeData) => void;
+    onBoardChange: (patch: Partial<SmartCanvasBoard>) => void;
+    onOutput: () => void;
     onBack: () => void;
 };
 
@@ -87,7 +85,6 @@ type PsSnapAxis = { diff: number; line: number } | null;
 
 const FLAT_ACTION_CLASS = STUDIO_ICON_BUTTON_CLASS;
 const TOOL_CLASS = STUDIO_TOOL_BUTTON_CLASS;
-const LIST_ACTION_CLASS = STUDIO_LIST_ROW_CLASS;
 const HANDLE_SCREEN_SIZE = 8;
 const ROTATE_SCREEN_OFFSET = 26;
 const SNAP_SCREEN_DISTANCE = 6;
@@ -155,7 +152,7 @@ const layerFrame = (layers: CanvasPsLayer[], layer: CanvasPsLayer) => {
     return { left: box.x, top: box.y, width: box.width, height: box.height };
 };
 
-export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBoard, onBoardChange, onOutput, onBack }: ImageStudioProps) {
+export default function ImageStudio({ board, nodes, onBoardChange, onOutput, onBack }: ImageStudioProps) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -219,17 +216,24 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
 
     const boardLayers = useMemo(() => (board ? smartCanvasLayers(board) : []), [board]);
     const layers = draftLayers ?? boardLayers;
-    const paths = useMemo(() => board?.metadata?.boardPaths ?? [], [board]);
+    const paths = useMemo(() => board?.boardPaths ?? [], [board]);
     const activePath = paths.find((path) => path.id === activePathId);
-    const history = usePsHistory(board, boardLayers, setNodes);
+    const commitBoard = useCallback<PsBoardCommit>(
+        (boardId, patch) => {
+            if (!board || boardId !== board.id) return;
+            onBoardChange(patch);
+        },
+        [board, onBoardChange],
+    );
+    const history = usePsHistory(board, boardLayers, commitBoard);
     const recorder = usePsActionRecorder((step) => runActionStep(step));
     const commit = useCallback(
         (next: CanvasPsLayer[], name?: string) => {
             if (!board) return;
             if (name) history.label(name);
-            commitBoardLayers(setNodes, board.id, next);
+            commitBoardLayers(commitBoard, board.id, next);
         },
-        [board, history, setNodes],
+        [board, history, commitBoard],
     );
     const selected = findPsLayer(layers, selectedLayerId);
     const maskLayer = maskTargetId && maskTargetId === selected?.id && selected?.maskStorageKey ? selected : undefined;
@@ -241,7 +245,10 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     const ringTool = RING_TOOLS.includes(tool);
     const brushOptions = maskLayer ? { ...paint, color: "#ffffff" } : paint;
     const imageNodes = useMemo(() => nodes.filter((node) => node.type === CanvasNodeType.Image && Boolean(node.metadata?.content || node.metadata?.storageKey)), [nodes]);
-    const visited = useMemo(() => new Set(board ? [board.id] : []), [board]);
+    const imageSources = useMemo<(PsImageSource & { id: string })[]>(
+        () => imageNodes.map((node) => ({ id: node.id, title: node.title, width: node.width, height: node.height, naturalWidth: node.metadata?.naturalWidth, naturalHeight: node.metadata?.naturalHeight, storageKey: node.metadata?.storageKey, content: node.metadata?.content })),
+        [imageNodes],
+    );
     const maskViewLayer = maskView && selected?.maskStorageKey && selected.kind !== "group" ? selected : undefined;
     const viewBoard = useMemo(() => {
         if (!board) return board;
@@ -252,17 +259,13 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
         }
         if (maskViewLayer) {
             const base = rendered ?? boardLayers;
-            rendered = base.map((layer) => (layer.id === maskViewLayer.id ? { ...layer, kind: "pixel", storageKey: layer.maskStorageKey, maskStorageKey: undefined, sourceNodeId: undefined } : layer));
+            rendered = base.map((layer) => (layer.id === maskViewLayer.id ? { ...layer, kind: "pixel", storageKey: layer.maskStorageKey, maskStorageKey: undefined, content: undefined } : layer));
         }
-        return rendered ? { ...board, metadata: { ...board.metadata, boardLayers: rendered } } : board;
+        return rendered ? { ...board, boardLayers: rendered } : board;
     }, [board, boardLayers, draftLayers, strokeLayer, maskViewLayer]);
     const backgroundFill = board ? smartCanvasFill(smartCanvasBackground(board) === "transparent" ? theme.toolbar.panel : smartCanvasBackground(board), smartCanvasBackgroundOpacity(board)) : "transparent";
     const handMode = tool === "hand" || spaceHeld;
     const guides = guidesByBoard[board?.id || ""] ?? EMPTY_GUIDES;
-
-    useEffect(() => {
-        if (!board && boards.length) onSelectBoard(boards[0].id);
-    }, [board, boards, onSelectBoard]);
 
     useEffect(() => {
         if (!board) return;
@@ -274,8 +277,8 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
         if (content.x + content.width <= board.width + 0.5 && content.y + content.height <= board.height + 0.5) return;
         const size = smartCanvasSizeForRatio(smartCanvasRatio(board));
         if (size.width + 0.5 < content.x + content.width || size.height + 0.5 < content.y + content.height) return;
-        setNodes((prev) => prev.map((node) => (node.id === board.id ? { ...node, ...size, position: { x: node.position.x + node.width / 2 - size.width / 2, y: node.position.y + node.height / 2 - size.height / 2 } } : node)));
-    }, [board, setNodes]);
+        onBoardChange({ width: size.width, height: size.height });
+    }, [board, onBoardChange]);
 
     useEffect(() => {
         const element = containerRef.current;
@@ -622,11 +625,9 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     const activeLayerPixels = async () => {
         if (!board || !selected) return null;
         const sourceUrl =
-            selected.kind === "pixel"
-                ? await resolveImageUrl(selected.storageKey)
-                : selected.kind === "image" && selected.sourceNodeId
-                  ? await resolveImageUrl(nodes.find((node) => node.id === selected.sourceNodeId)?.metadata?.storageKey, nodes.find((node) => node.id === selected.sourceNodeId)?.metadata?.content || "")
-                  : "";
+            selected.kind === "pixel" || selected.kind === "image"
+                ? await resolveImageUrl(selected.storageKey, selected.content || "")
+                : "";
         if (!sourceUrl) return null;
         return psLoadLayerPixels(selected, board.width, board.height, sourceUrl);
     };
@@ -661,7 +662,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
             event.currentTarget.setPointerCapture(event.pointerId);
             const pick = { pointerId: event.pointerId, sampler: null as PsBoardSampler | null };
             pickRef.current = pick;
-            void psLoadBoardSampler(board, nodes).then((sampler) => {
+            void psLoadBoardSampler(board).then((sampler) => {
                 if (pickRef.current !== pick) return;
                 pick.sampler = sampler;
                 sampleAt(point);
@@ -709,7 +710,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     const wandSelect = async (point: PsPaintPoint, mode: PsSelectionMode) => {
         if (!board) return;
         const activePixels = selectOptions.sampleAll ? null : await activeLayerPixels();
-        const image = activePixels ?? (await psLoadBoardPixels(board, nodes, board.width, board.height));
+        const image = activePixels ?? (await psLoadBoardPixels(board, board.width, board.height));
         if (!image) return;
         const shape = psSelectionWand(image, point, paint.tolerance, selectOptions.contiguous);
         if (!shape) return;
@@ -747,7 +748,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
         const gesture: PsQuickGesture = { pointerId: event.pointerId, target, image: null, sample: null, radius: Math.max(1, paint.size / 2), erase: event.altKey };
         quickRef.current = gesture;
         setGestureActive(true);
-        const image = await psLoadBoardPixels(board, nodes, board.width, board.height);
+        const image = await psLoadBoardPixels(board, board.width, board.height);
         if (quickRef.current !== gesture) return;
         gesture.image = image;
         gesture.sample = image ? psImageColorAt(image, Math.floor(point.x), Math.floor(point.y)) : null;
@@ -950,7 +951,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     const repeatFilter = async () => {
         if (!board || !selected || !lastFilter || selected.kind === "adjustment") return;
         const maskUrl = selected.maskStorageKey ? await resolveImageUrl(selected.maskStorageKey) : "";
-        const blob = await psFilterLayerBitmap(selected, boardLayers, nodes, lastFilter.type, lastFilter.params, { selection: selection ? { canvas: selection } : null, maskUrl: maskUrl || undefined });
+        const blob = await psFilterLayerBitmap(selected, boardLayers, lastFilter.type, lastFilter.params, { selection: selection ? { canvas: selection } : null, maskUrl: maskUrl || undefined });
         if (!blob) return;
         const uploaded = await uploadImage(blob);
         if (!uploaded.storageKey) return;
@@ -960,7 +961,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     const resizeDocument = (width: number, height: number) => {
         if (!board) return;
         const rounded = { width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height)) };
-        setNodes((prev) => prev.map((node) => (node.id === board.id ? { ...node, ...rounded, metadata: { ...node.metadata, boardRatio: inferMediaRatio(`${rounded.width}x${rounded.height}`) } } : node)));
+        onBoardChange({ ...rounded, boardRatio: inferMediaRatio(`${rounded.width}x${rounded.height}`) });
     };
 
     const imageSize = async (width: number, height: number) => {
@@ -1007,7 +1008,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
 
     const setPaths = (next: CanvasPsPath[]) => {
         if (!board) return;
-        onBoardChange(board.id, { boardPaths: next });
+        onBoardChange({ boardPaths: next });
     };
 
     const setDraftPath = (next: CanvasPsPath | null) => {
@@ -1185,7 +1186,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
         const latest = latestRef.current;
         if (!latest.board || !latest.selected || latest.selected.kind === "adjustment") return;
         const maskUrl = latest.selected.maskStorageKey ? await resolveImageUrl(latest.selected.maskStorageKey) : "";
-        const blob = await psFilterLayerBitmap(latest.selected, latest.layers, nodes, type, params, { selection: latest.selection ? { canvas: latest.selection } : null, maskUrl: maskUrl || undefined });
+        const blob = await psFilterLayerBitmap(latest.selected, latest.layers, type, params, { selection: latest.selection ? { canvas: latest.selection } : null, maskUrl: maskUrl || undefined });
         if (!blob) return;
         const uploaded = await uploadImage(blob);
         if (!uploaded.storageKey) return;
@@ -1196,22 +1197,22 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
     imageAgentApplyRef.current = (agentOps) => {
         if (!board) return;
         const imageOps = agentOps.map(({ ns, ...op }) => op as ImageAgentOp);
-        const result = applyImageAgentOps({ board, nodes }, imageOps);
+        const result = applyImageAgentOps({ board, images: imageSources }, imageOps);
         if (result.layers !== boardLayers) commit(result.layers);
-        if (result.metadata) onBoardChange(board.id, result.metadata);
+        if (result.metadata) onBoardChange(result.metadata);
         if (result.size && !result.metadata?.boardRatio) resizeDocument(result.size.width, result.size.height);
         if (result.size || result.metadata?.boardRatio) resetSelection();
         imageOps
             .filter((op) => IMAGE_AGENT_ASYNC_TYPES.includes(op.type))
             .forEach((op) => {
                 if (op.type === "filter.apply") void applyFilterStep(op.filter, op.params || {});
-                if (op.type === "document.compose") void composeSmartCanvas(board, nodes);
-                if (op.type === "document.export") onOutput(board);
+                if (op.type === "document.compose") void composeSmartCanvas(board);
+                if (op.type === "document.export") onOutput();
             });
         return {
             ...(useAgentStore.getState().pageContext?.state ?? {}),
             workspace: "image",
-            nodes: nodes.map((node) => (node.id === board.id ? { ...node, ...(result.size || {}), metadata: { ...node.metadata, ...(result.metadata || {}), ...(result.layers !== boardLayers ? { boardLayers: result.layers } : {}) } } : node)),
+            nodes,
         };
     };
 
@@ -1225,6 +1226,18 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
             applyOps: (ops) => imageAgentApplyRef.current(ops),
         });
         return unregister;
+    }, []);
+
+    const screenshotRef = useRef({ board });
+    screenshotRef.current = { board };
+
+    useEffect(() => {
+        return registerScreenshotProvider("image", async () => {
+            const current = screenshotRef.current;
+            if (!current.board) return null;
+            const composite = await composeSmartCanvas(current.board);
+            return composite.dataUrl ? { studio: "image", dataUrl: composite.dataUrl, mimeType: "image/png", width: composite.width, height: composite.height } : null;
+        });
     }, []);
 
     const layerCommand = (command: PsLayerCommand) => {
@@ -1250,7 +1263,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
         if (command === "group") commit(groupPsLayers(layers, [id], nanoid(), t("canvas.ps.groupLayer")), labels[command]);
         if (command === "ungroup") commit(ungroupPsLayer(layers, id), labels[command]);
         if (command === "rasterize") {
-            void renderPsLayerBitmap(latest.selected, layers, nodes, latest.board.metadata?.boardPaths ?? []).then(async (canvas) => {
+            void renderPsLayerBitmap(latest.selected, layers, latest.board.boardPaths ?? []).then(async (canvas) => {
                 const blob = canvas ? await psCanvasToBlob(canvas) : null;
                 if (!blob) return;
                 const uploaded = await uploadImage(blob);
@@ -1360,25 +1373,8 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                 <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 py-8 text-center">
                     <Layers className="size-7" style={{ color: theme.node.muted }} />
                     <p className="text-sm" style={{ color: theme.node.text }}>
-                        {t("canvas.workspace.pickBoard")}
+                        {t("canvas.workspace.noBoards")}
                     </p>
-                    {boards.length ? (
-                        <div className="flex w-full max-w-xs flex-col gap-0.5">
-                            {boards.map((item) => (
-                                <button key={item.id} type="button" className={LIST_ACTION_CLASS} style={{ color: theme.node.text }} onClick={() => onSelectBoard(item.id)}>
-                                    <Layers className="size-3.5 shrink-0" style={{ color: theme.node.muted }} />
-                                    <span className="min-w-0 flex-1 truncate">{item.title || t("canvas.node.untitled")}</span>
-                                    <span className="shrink-0 tabular-nums" style={{ color: theme.node.muted }}>
-                                        {smartCanvasLayers(item).length}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-sm" style={{ color: theme.node.muted }}>
-                            {t("canvas.workspace.noBoards")}
-                        </p>
-                    )}
                 </div>
             </div>
         );
@@ -1428,7 +1424,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
             return (
                 <PsLayersPanel
                     board={board}
-                    setNodes={setNodes}
+                    commitBoard={commitBoard}
                     imageNodes={imageNodes}
                     selectedId={selectedLayerId}
                     onSelect={setSelectedLayerId}
@@ -1441,7 +1437,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                     onLayerCommand={layerCommand}
                 />
             );
-        if (panelId === "channels") return <PsChannelsPanel board={board} onBoardChange={onBoardChange} selection={selection} onLoadSelection={(next) => commitSelection(next.canvas)} view={channelView} onView={setChannelView} />;
+        if (panelId === "channels") return <PsChannelsPanel board={board} commitBoard={commitBoard} selection={selection} onLoadSelection={(next) => commitSelection(next.canvas)} view={channelView} onView={setChannelView} />;
         if (panelId === "paths")
             return (
                 <PsPathsPanel
@@ -1461,13 +1457,13 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
             );
         if (panelId === "history") return <PsHistoryPanel history={history.state} onRestore={history.restore} onSnapshot={history.snapshot} />;
         if (panelId === "actions") return <PsActionsPanel recorder={recorder} />;
-        if (panelId === "adjustments") return <PsAdjustmentsPanel board={board} setNodes={setNodes} selected={selected || null} onSelect={setSelectedLayerId} />;
+        if (panelId === "adjustments") return <PsAdjustmentsPanel board={board} commitBoard={commitBoard} selected={selected || null} onSelect={setSelectedLayerId} />;
         if (panelId === "assets")
             return (
                 <PsResourcePoolPanel
                     imageNodes={imageNodes}
                     onAddImageLayer={(node) => {
-                        const layer = createPsImageLayer(board, node);
+                        const layer = createPsImageLayer(board, { title: node.title, width: node.width, height: node.height, naturalWidth: node.metadata?.naturalWidth, naturalHeight: node.metadata?.naturalHeight, storageKey: node.metadata?.storageKey, content: node.metadata?.content });
                         commit(addPsLayerAbove(layers, layer, selectedLayerId));
                         setSelectedLayerId(layer.id);
                     }}
@@ -1476,8 +1472,8 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
         if (panelId === "properties")
             return (
                 <>
-                    <PsPropertiesPanel board={board} setNodes={setNodes} selected={selected || null} onAddMask={() => void addMask()} />
-                    {selected?.kind === "text" ? <PsTextPanel board={board} setNodes={setNodes} layer={selected} paths={paths} /> : null}
+                    <PsPropertiesPanel board={board} commitBoard={commitBoard} selected={selected || null} onAddMask={() => void addMask()} />
+                    {selected?.kind === "text" ? <PsTextPanel board={board} commitBoard={commitBoard} layer={selected} paths={paths} /> : null}
                 </>
             );
         if (panelId === "color") return <PsColorPanelBody foreground={paint.color} background={paint.background} onForeground={(hex) => setPaint((prev) => ({ ...prev, color: hex }))} onBackground={(hex) => setPaint((prev) => ({ ...prev, background: hex }))} />;
@@ -1487,7 +1483,6 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                 <PsPatternsPanel
                     board={board}
                     layers={boardLayers}
-                    nodes={nodes}
                     selection={selection}
                     selected={selected || null}
                     onPick={(preset) => {
@@ -1504,55 +1499,24 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
 
     return (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div className={`${STUDIO_BAR_CLASS} h-11 glass-surface`}>
+            <div className={`${STUDIO_BAR_CLASS} h-11 glass-surface border-b border-border`}>
                 <button type="button" className={FLAT_ACTION_CLASS} aria-label={t("canvas.workspace.back")} title={t("canvas.workspace.back")} onClick={onBack} style={{ color: theme.node.text }}>
                     <ArrowLeft className="size-3.5" />
                 </button>
-                {boards.length > 1 ? (
-                    <Select
-                        size="small"
-                        variant="borderless"
-                        className="min-w-[120px] max-w-[220px]"
-                        value={board.id}
-                        placeholder={t("canvas.workspace.pickBoard")}
-                        options={boards.map((item) => ({ value: item.id, label: item.title || t("canvas.node.untitled") }))}
-                        popupMatchSelectWidth={false}
-                        styles={{ popup: { root: { zIndex: 1300 } } }}
-                        aria-label={t("canvas.workspace.pickBoard")}
-                        onChange={onSelectBoard}
-                    />
-                ) : (
-                    <span className="font-semibold text-sm px-2 truncate max-w-[220px]" style={{ color: theme.node.text }}>
-                        {board.title || t("canvas.node.untitled")}
-                    </span>
-                )}
+                <span className="font-semibold text-sm px-2 truncate max-w-[220px]" style={{ color: theme.node.text }}>
+                    {board.title || t("canvas.node.untitled")}
+                </span>
                 <SmartCanvasSettingsPopover
                     ratio={smartCanvasRatio(board)}
                     resolution={smartCanvasResolution(board)}
                     background={smartCanvasBackground(board)}
                     backgroundOpacity={smartCanvasBackgroundOpacity(board)}
                     onChange={(patch) => {
-                        onBoardChange(board.id, patch);
+                        onBoardChange(patch);
                         resetSelection();
                     }}
                 />
                 <span className={STUDIO_DIVIDER_CLASS} style={{ background: theme.toolbar.border }} />
-                <span className="flex w-20 shrink-0 items-center gap-1">
-                    <span className="w-12 shrink-0 text-center text-sm tabular-nums" style={{ color: theme.node.text }}>
-                        {Math.round(view.k * 100)}%
-                    </span>
-                    <button type="button" className={FLAT_ACTION_CLASS} aria-label={t("canvas.ps.fit")} title={t("canvas.ps.fit")} onClick={fit} style={{ color: theme.node.text }}>
-                        <Maximize className="size-3.5" />
-                    </button>
-                </span>
-                <span className="min-w-0 flex-1" />
-                <button type="button" className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => onOutput(board)}>
-                    <Share2 className="size-3.5" />
-                    {t("studio.output.title", { defaultValue: "Export" })}
-                </button>
-            </div>
-
-            <div className={`${STUDIO_OPTIONS_CLASS} glass-surface`} style={{ color: theme.node.muted, borderColor: theme.toolbar.border }}>
                 <ImageSettingsTheme theme={theme}>
                     <PsMenus
                         disabled={false}
@@ -1583,81 +1547,98 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                         onClearTransform={clearTransform}
                     />
                     <DockWindowMenu defs={PS_DOCK_PANELS} layout={dock.layout} onToggle={dock.toggle} onReset={dock.reset} />
-                    <span className={STUDIO_DIVIDER_CLASS} style={{ background: theme.toolbar.border }} />
-                    <span className={`${STUDIO_LABEL_CLASS} w-20 truncate`} style={{ color: theme.node.text }}>
-                        {t(TOOL_LABELS[tool])}
-                    </span>
-                    {ringTool ? (
-                        <>
-                            <OptionSlider label={t("canvas.ps.brushSize")} value={paint.size} min={BRUSH_SIZE_MIN} max={BRUSH_SIZE_MAX} suffix="px" onChange={(value) => setPaint((prev) => ({ ...prev, size: value }))} />
-                            {tool === "quick-select" ? null : (
-                                <>
-                                    <OptionSlider label={t("canvas.ps.brushHardness")} value={Math.round(paint.hardness * 100)} min={0} max={100} suffix="%" onChange={(value) => setPaint((prev) => ({ ...prev, hardness: value / 100 }))} />
-                                    <OptionSlider label={t("canvas.ps.brushOpacity")} value={Math.round(paint.opacity * 100)} min={1} max={100} suffix="%" onChange={(value) => setPaint((prev) => ({ ...prev, opacity: value / 100 }))} />
-                                </>
-                            )}
-                            <span className="shrink-0">{t("canvas.ps.brushSizeHint")}</span>
-                        </>
-                    ) : null}
-                    {selecting && tool !== "wand" && tool !== "quick-select" ? <OptionSlider label={t("canvas.ps.selectFeather")} value={selectOptions.feather} min={0} max={100} suffix="px" onChange={(value) => setSelectOptions((prev) => ({ ...prev, feather: value }))} /> : null}
-                    {selecting && tool !== "wand" && tool !== "quick-select" ? <OptionToggle label={t("canvas.ps.selectAntiAlias")} checked={selectOptions.antiAlias} onChange={(value) => setSelectOptions((prev) => ({ ...prev, antiAlias: value }))} /> : null}
-                    {tool === "wand" || tool === "quick-select" ? <OptionSlider label={t("canvas.ps.bucketTolerance")} value={paint.tolerance} min={0} max={255} onChange={(value) => setPaint((prev) => ({ ...prev, tolerance: value }))} /> : null}
-                    {tool === "wand" ? (
-                        <>
-                            <OptionToggle label={t("canvas.ps.selectContiguous")} checked={selectOptions.contiguous} onChange={(value) => setSelectOptions((prev) => ({ ...prev, contiguous: value }))} />
-                            <OptionToggle label={t("canvas.ps.selectSampleAll")} checked={selectOptions.sampleAll} onChange={(value) => setSelectOptions((prev) => ({ ...prev, sampleAll: value }))} />
-                        </>
-                    ) : null}
-                    {tool === "bucket" ? <OptionSlider label={t("canvas.ps.bucketTolerance")} value={paint.tolerance} min={0} max={255} onChange={(value) => setPaint((prev) => ({ ...prev, tolerance: value }))} /> : null}
-                    {tool === "gradient" ? (
-                        <>
-                            <Segmented size="small" value={gradient.type} options={[{ label: t("canvas.ps.gradientLinear"), value: "linear" }, { label: t("canvas.ps.gradientRadial"), value: "radial" }]} onChange={(value) => setGradient((prev) => ({ ...prev, type: value as "linear" | "radial" }))} />
-                            <Select size="small" className="w-28" value={gradient.mode} options={blendOptions} popupMatchSelectWidth={false} styles={{ popup: { root: { zIndex: 1300 } } }} aria-label={t("canvas.ps.gradientMode")} onChange={(value) => setGradient((prev) => ({ ...prev, mode: value }))} />
-                            <OptionSlider label={t("canvas.ps.brushOpacity")} value={Math.round(gradient.opacity * 100)} min={1} max={100} suffix="%" onChange={(value) => setGradient((prev) => ({ ...prev, opacity: value / 100 }))} />
-                            <OptionSlider label={t("canvas.ps.gradientStop")} value={Math.round(paint.stop * 100)} min={0} max={100} suffix="%" onChange={(value) => setPaint((prev) => ({ ...prev, stop: value / 100 }))} />
-                            <OptionToggle label={t("canvas.ps.gradientReverse")} checked={gradient.reverse} onChange={(value) => setGradient((prev) => ({ ...prev, reverse: value }))} />
-                        </>
-                    ) : null}
-                    {tool === "shape" ? (
-                        <>
-                            <Select size="small" className="w-28" value={shapeOptions.type} options={shapeTypeOptions} popupMatchSelectWidth={false} styles={{ popup: { root: { zIndex: 1300 } } }} aria-label={t("canvas.ps.shapeType")} onChange={(value) => setShapeOptions((prev) => ({ ...prev, type: value }))} />
-                            <PsColorPicker value={shapeOptions.fill} ariaLabel={t("canvas.ps.shapeFill")} onChange={(hex) => setShapeOptions((prev) => ({ ...prev, fill: hex }))} />
-                            <PsColorPicker value={shapeOptions.stroke} ariaLabel={t("canvas.ps.shapeStroke")} onChange={(hex) => setShapeOptions((prev) => ({ ...prev, stroke: hex }))} />
-                            <OptionSlider label={t("canvas.ps.shapeStrokeWidth")} value={shapeOptions.strokeWidth} min={0} max={64} onChange={(value) => setShapeOptions((prev) => ({ ...prev, strokeWidth: value }))} />
-                        </>
-                    ) : null}
-                    {COLOR_TOOLS.includes(tool) ? <PsColorPicker value={paint.color} ariaLabel={t("canvas.ps.color")} onChange={(hex) => setPaint((prev) => ({ ...prev, color: hex }))} /> : null}
-                    {tool === "pen" || tool === "direct-select" || tool === "bucket" ? (
-                        <span className="flex shrink-0 items-center gap-1.5">
-                            <span>{t("canvas.ps.pathActive", { name: activePath?.name || t("canvas.ps.none") })}</span>
-                            {pattern ? <span>{t("canvas.ps.patternActive", { name: pattern.name })}</span> : null}
-                            <button type="button" className="rounded-md px-1.5 py-0.5 transition hover:bg-hover" onClick={() => setPattern(null)}>
-                                {t("canvas.ps.patternClear")}
-                            </button>
+                    <span className="hidden shrink-0 items-center gap-1.5 min-[1920px]:flex">
+                        <span className={STUDIO_DIVIDER_CLASS} style={{ background: theme.toolbar.border }} />
+                        <span className={`${STUDIO_LABEL_CLASS} w-20 truncate`} style={{ color: theme.node.text }}>
+                            {t(TOOL_LABELS[tool])}
                         </span>
-                    ) : null}
-                    {transformMode ? (
-                        <>
-                            <Segmented size="small" value={transformMode} options={PS_TRANSFORM_MODES.map((mode) => ({ value: mode, label: t(`canvas.ps.transform.${mode}`) }))} onChange={(value) => setTransformMode(value as PsTransformMode)} />
-                            <button type="button" className="shrink-0 rounded-md px-1.5 py-0.5 transition hover:bg-hover" onClick={() => setTransformMode(null)}>
-                                {t("canvas.ps.transformDone")}
-                            </button>
-                        </>
-                    ) : null}
-                    {tool === "gradient" ? (
-                        <>
-                            <PsColorPicker value={paint.color} ariaLabel={t("canvas.ps.color")} onChange={(hex) => setPaint((prev) => ({ ...prev, color: hex }))} />
-                            <PsColorPicker value={paint.background} ariaLabel={t("canvas.ps.gradientBackground")} onChange={(hex) => setPaint((prev) => ({ ...prev, background: hex }))} />
-                        </>
-                    ) : null}
+                        {ringTool ? (
+                            <>
+                                <OptionSlider label={t("canvas.ps.brushSize")} value={paint.size} min={BRUSH_SIZE_MIN} max={BRUSH_SIZE_MAX} suffix="px" onChange={(value) => setPaint((prev) => ({ ...prev, size: value }))} />
+                                {tool === "quick-select" ? null : (
+                                    <>
+                                        <OptionSlider label={t("canvas.ps.brushHardness")} value={Math.round(paint.hardness * 100)} min={0} max={100} suffix="%" onChange={(value) => setPaint((prev) => ({ ...prev, hardness: value / 100 }))} />
+                                        <OptionSlider label={t("canvas.ps.brushOpacity")} value={Math.round(paint.opacity * 100)} min={1} max={100} suffix="%" onChange={(value) => setPaint((prev) => ({ ...prev, opacity: value / 100 }))} />
+                                    </>
+                                )}
+                                <span className="shrink-0">{t("canvas.ps.brushSizeHint")}</span>
+                            </>
+                        ) : null}
+                        {selecting && tool !== "wand" && tool !== "quick-select" ? <OptionSlider label={t("canvas.ps.selectFeather")} value={selectOptions.feather} min={0} max={100} suffix="px" onChange={(value) => setSelectOptions((prev) => ({ ...prev, feather: value }))} /> : null}
+                        {selecting && tool !== "wand" && tool !== "quick-select" ? <OptionToggle label={t("canvas.ps.selectAntiAlias")} checked={selectOptions.antiAlias} onChange={(value) => setSelectOptions((prev) => ({ ...prev, antiAlias: value }))} /> : null}
+                        {tool === "wand" || tool === "quick-select" ? <OptionSlider label={t("canvas.ps.bucketTolerance")} value={paint.tolerance} min={0} max={255} onChange={(value) => setPaint((prev) => ({ ...prev, tolerance: value }))} /> : null}
+                        {tool === "wand" ? (
+                            <>
+                                <OptionToggle label={t("canvas.ps.selectContiguous")} checked={selectOptions.contiguous} onChange={(value) => setSelectOptions((prev) => ({ ...prev, contiguous: value }))} />
+                                <OptionToggle label={t("canvas.ps.selectSampleAll")} checked={selectOptions.sampleAll} onChange={(value) => setSelectOptions((prev) => ({ ...prev, sampleAll: value }))} />
+                            </>
+                        ) : null}
+                        {tool === "bucket" ? <OptionSlider label={t("canvas.ps.bucketTolerance")} value={paint.tolerance} min={0} max={255} onChange={(value) => setPaint((prev) => ({ ...prev, tolerance: value }))} /> : null}
+                        {tool === "gradient" ? (
+                            <>
+                                <Segmented size="small" value={gradient.type} options={[{ label: t("canvas.ps.gradientLinear"), value: "linear" }, { label: t("canvas.ps.gradientRadial"), value: "radial" }]} onChange={(value) => setGradient((prev) => ({ ...prev, type: value as "linear" | "radial" }))} />
+                                <Select size="small" className="w-28" value={gradient.mode} options={blendOptions} popupMatchSelectWidth={false} styles={{ popup: { root: { zIndex: 1300 } } }} aria-label={t("canvas.ps.gradientMode")} onChange={(value) => setGradient((prev) => ({ ...prev, mode: value }))} />
+                                <OptionSlider label={t("canvas.ps.brushOpacity")} value={Math.round(gradient.opacity * 100)} min={1} max={100} suffix="%" onChange={(value) => setGradient((prev) => ({ ...prev, opacity: value / 100 }))} />
+                                <OptionSlider label={t("canvas.ps.gradientStop")} value={Math.round(paint.stop * 100)} min={0} max={100} suffix="%" onChange={(value) => setPaint((prev) => ({ ...prev, stop: value / 100 }))} />
+                                <OptionToggle label={t("canvas.ps.gradientReverse")} checked={gradient.reverse} onChange={(value) => setGradient((prev) => ({ ...prev, reverse: value }))} />
+                            </>
+                        ) : null}
+                        {tool === "shape" ? (
+                            <>
+                                <Select size="small" className="w-28" value={shapeOptions.type} options={shapeTypeOptions} popupMatchSelectWidth={false} styles={{ popup: { root: { zIndex: 1300 } } }} aria-label={t("canvas.ps.shapeType")} onChange={(value) => setShapeOptions((prev) => ({ ...prev, type: value }))} />
+                                <PsColorPicker value={shapeOptions.fill} ariaLabel={t("canvas.ps.shapeFill")} onChange={(hex) => setShapeOptions((prev) => ({ ...prev, fill: hex }))} />
+                                <PsColorPicker value={shapeOptions.stroke} ariaLabel={t("canvas.ps.shapeStroke")} onChange={(hex) => setShapeOptions((prev) => ({ ...prev, stroke: hex }))} />
+                                <OptionSlider label={t("canvas.ps.shapeStrokeWidth")} value={shapeOptions.strokeWidth} min={0} max={64} onChange={(value) => setShapeOptions((prev) => ({ ...prev, strokeWidth: value }))} />
+                            </>
+                        ) : null}
+                        {COLOR_TOOLS.includes(tool) ? <PsColorPicker value={paint.color} ariaLabel={t("canvas.ps.color")} onChange={(hex) => setPaint((prev) => ({ ...prev, color: hex }))} /> : null}
+                        {tool === "pen" || tool === "direct-select" || tool === "bucket" ? (
+                            <span className="flex shrink-0 items-center gap-1.5">
+                                <span>{t("canvas.ps.pathActive", { name: activePath?.name || t("canvas.ps.none") })}</span>
+                                {pattern ? <span>{t("canvas.ps.patternActive", { name: pattern.name })}</span> : null}
+                                <button type="button" className="rounded-md px-1.5 py-0.5 transition hover:bg-hover" onClick={() => setPattern(null)}>
+                                    {t("canvas.ps.patternClear")}
+                                </button>
+                            </span>
+                        ) : null}
+                        {transformMode ? (
+                            <>
+                                <Segmented size="small" value={transformMode} options={PS_TRANSFORM_MODES.map((mode) => ({ value: mode, label: t(`canvas.ps.transform.${mode}`) }))} onChange={(value) => setTransformMode(value as PsTransformMode)} />
+                                <button type="button" className="shrink-0 rounded-md px-1.5 py-0.5 transition hover:bg-hover" onClick={() => setTransformMode(null)}>
+                                    {t("canvas.ps.transformDone")}
+                                </button>
+                            </>
+                        ) : null}
+                        {tool === "gradient" ? (
+                            <>
+                                <PsColorPicker value={paint.color} ariaLabel={t("canvas.ps.color")} onChange={(hex) => setPaint((prev) => ({ ...prev, color: hex }))} />
+                                <PsColorPicker value={paint.background} ariaLabel={t("canvas.ps.gradientBackground")} onChange={(hex) => setPaint((prev) => ({ ...prev, background: hex }))} />
+                            </>
+                        ) : null}
+                    </span>
                 </ImageSettingsTheme>
-                <span className="min-w-0 flex-1 truncate">{hint}</span>
+                <span className="min-w-0 flex-1" />
+                <span className="hidden min-w-0 max-w-[240px] truncate 2xl:block" style={{ color: theme.node.muted }}>
+                    {hint}
+                </span>
                 {viewFlags.snap ? (
-                    <span className="flex shrink-0 items-center gap-1">
+                    <span className="hidden shrink-0 items-center gap-1 2xl:flex" style={{ color: theme.node.muted }}>
                         <Magnet className="size-3" />
                         {t("canvas.ps.viewSnap")}
                     </span>
                 ) : null}
+                <span className="flex w-20 shrink-0 items-center gap-1">
+                    <span className="w-12 shrink-0 text-center text-sm tabular-nums" style={{ color: theme.node.text }}>
+                        {Math.round(view.k * 100)}%
+                    </span>
+                    <button type="button" className={FLAT_ACTION_CLASS} aria-label={t("canvas.ps.fit")} title={t("canvas.ps.fit")} onClick={fit} style={{ color: theme.node.text }}>
+                        <Maximize className="size-3.5" />
+                    </button>
+                </span>
+                <button type="button" className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm transition hover:bg-hover" style={{ color: theme.node.text }} onClick={() => onOutput()}>
+                    <Share2 className="size-3.5" />
+                    {t("studio.output.title", { defaultValue: "Export" })}
+                </button>
             </div>
 
             <DockArea defs={PS_DOCK_PANELS} layout={dock.layout} renderPanel={renderPsPanel} onActivate={dock.activate} onMove={dock.move} onResize={dock.resize} onSplit={dock.split}>
@@ -1713,9 +1694,9 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                         const raw = event.dataTransfer.getData(IMAGE_NODE_DRAG_MIME);
                         if (!raw) return;
                         event.preventDefault();
-                        const foundNode = nodes.find((n) => n.id === raw);
+                        const foundNode = nodes.find((node) => node.id === raw);
                         if (foundNode) {
-                            const layer = createPsImageLayer(board, foundNode);
+                            const layer = createPsImageLayer(board, { title: foundNode.title, width: foundNode.width, height: foundNode.height, naturalWidth: foundNode.metadata?.naturalWidth, naturalHeight: foundNode.metadata?.naturalHeight, storageKey: foundNode.metadata?.storageKey, content: foundNode.metadata?.content });
                             const rect = event.currentTarget.getBoundingClientRect();
                             const dropClientX = event.clientX - rect.left;
                             const dropClientY = event.clientY - rect.top;
@@ -1792,8 +1773,8 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
                         }}
                     >
                         {viewFlags.grid ? <PsGrid theme={theme} view={view} /> : null}
-                        <BoardLayersView board={viewBoard!} nodes={nodes} visited={visited} />
-                        <PsChannelPreview board={viewBoard!} nodes={nodes} channel={channelView} />
+                        <BoardLayersView board={viewBoard!} />
+                        <PsChannelPreview board={viewBoard!} channel={channelView} />
                         {strokeLayer ? (
                             <canvas
                                 ref={strokeCanvasRef}
@@ -1901,8 +1882,7 @@ export default function ImageStudio({ board, boards, nodes, setNodes, onSelectBo
             {filterType ? (
                 <PsFilterDialog
                     board={board}
-                    setNodes={setNodes}
-                    nodes={nodes}
+                    commitBoard={commitBoard}
                     layer={selected || null}
                     selection={selection ? { canvas: selection } : null}
                     type={filterType}

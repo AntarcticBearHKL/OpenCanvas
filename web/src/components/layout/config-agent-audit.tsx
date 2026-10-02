@@ -3,7 +3,7 @@ import { Button, Empty, Input, Switch } from "antd";
 import { Eraser, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { AGENT_BRIDGE_URL_DEFAULT, setAgentBridgeUrl, setAgentToken } from "@/constant/runtime-config";
+import { AGENT_BRIDGE_URL_DEFAULT, setAgentBridgeUrl } from "@/constant/runtime-config";
 import { getAgentActions, replayAgentEntry, subscribeAgentActions } from "@/lib/agent/action-registry";
 import { describeAgentOp } from "@/lib/agent/agent-permissions";
 import { useAgentAuditStore, type AgentAuditEntry } from "@/stores/use-agent-audit-store";
@@ -82,21 +82,17 @@ export function ConfigAgentAudit() {
 
 function AgentBridgeSettings() {
     const url = useAgentStore((state) => state.url);
-    const token = useAgentStore((state) => state.token);
     const connected = useAgentStore((state) => state.connected);
     const activity = useAgentStore((state) => state.activity);
     const connectError = useAgentStore((state) => state.connectError);
     const setAgentState = useAgentStore((state) => state.setAgentState);
     const [draftUrl, setDraftUrl] = useState(url);
-    const [draftToken, setDraftToken] = useState(token);
     const [saved, setSaved] = useState(false);
 
     const save = () => {
         const nextUrl = draftUrl.trim() || AGENT_BRIDGE_URL_DEFAULT;
-        const nextToken = draftToken.trim();
         setAgentBridgeUrl(nextUrl);
-        setAgentToken(nextToken);
-        setAgentState({ url: nextUrl, token: nextToken, enabled: true, connected: false, connectError: "", activity: "Connecting..." });
+        setAgentState({ url: nextUrl, connected: false, connectError: "", activity: "Connecting..." });
         setSaved(true);
     };
 
@@ -114,12 +110,8 @@ function AgentBridgeSettings() {
                     <span className="mb-1 block text-sm text-muted-foreground">Service URL</span>
                     <Input value={draftUrl} onChange={(event) => { setDraftUrl(event.target.value); setSaved(false); }} placeholder={AGENT_BRIDGE_URL_DEFAULT} />
                 </label>
-                <label className="block">
-                    <span className="mb-1 block text-sm text-muted-foreground">Access Token</span>
-                    <Input.Password value={draftToken} onChange={(event) => { setDraftToken(event.target.value); setSaved(false); }} placeholder="Optional if unset" />
-                </label>
                 <div className="flex items-center justify-between gap-3">
-                    <span className={`min-w-0 truncate text-xs ${connectError ? "text-danger" : "text-muted-foreground"}`}>{connectError || (saved ? "Saved, reconnecting..." : "URL and token are stored locally in your browser")}</span>
+                    <span className={`min-w-0 truncate text-xs ${connectError ? "text-danger" : "text-muted-foreground"}`}>{connectError || (saved ? "Saved, reconnecting..." : "The service URL is stored locally in your browser")}</span>
                     <Button size="small" type="primary" onClick={save}>
                         Save & Reconnect
                     </Button>

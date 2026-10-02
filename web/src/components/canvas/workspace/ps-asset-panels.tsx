@@ -10,10 +10,10 @@ import { psSelectionBounds } from "@/components/canvas/workspace/ps-selection";
 import { STUDIO_FLAT_BUTTON_CLASS, STUDIO_PANEL_LABEL_CLASS, STUDIO_PANEL_ROW_CLASS, STUDIO_PANEL_VALUE_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { createCanvasContext } from "@/lib/canvas/canvas-2d";
-import { renderPsDocument, renderPsLayerBitmap } from "@/lib/canvas/smart-canvas";
+import { renderPsDocument, renderPsLayerBitmap, type SmartCanvasBoard } from "@/lib/canvas/smart-canvas";
 import { psExpandGradientStops, psBrushPresetName, psGradientPresetName, usePsAssetStore, type PsBrushPreset, type PsGradientPreset, type PsGradientStopPreset, type PsPatternPreset } from "@/stores/use-ps-asset-store";
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
-import type { CanvasNodeData, CanvasPsLayer } from "@/types/canvas";
+import type { CanvasPsLayer } from "@/types/canvas";
 
 export type PsGradientPick = { color: string; position: number }[];
 
@@ -163,7 +163,7 @@ export function PsGradientsPanel({ foreground, background, onPick }: { foregroun
     );
 }
 
-export function PsPatternsPanel({ board, layers, nodes, selection, selected, onPick, onFill, onForeground }: { board: CanvasNodeData; layers: CanvasPsLayer[]; nodes: CanvasNodeData[]; selection: HTMLCanvasElement | null; selected: CanvasPsLayer | null; onPick: (preset: PsPatternPreset) => void; onFill: (preset: PsPatternPreset) => void; onForeground: (hex: string) => void }) {
+export function PsPatternsPanel({ board, layers, selection, selected, onPick, onFill, onForeground }: { board: SmartCanvasBoard; layers: CanvasPsLayer[]; selection: HTMLCanvasElement | null; selected: CanvasPsLayer | null; onPick: (preset: PsPatternPreset) => void; onFill: (preset: PsPatternPreset) => void; onForeground: (hex: string) => void }) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     const patterns = usePsAssetStore((state) => state.patterns);
@@ -187,7 +187,7 @@ export function PsPatternsPanel({ board, layers, nodes, selection, selected, onP
         let name = t("canvas.ps.patternFromLayer");
         if (selection) {
             const bounds = psSelectionBounds({ canvas: selection });
-            const { canvas } = await renderPsDocument(board, nodes, { width: board.width, height: board.height });
+            const { canvas } = await renderPsDocument(board, { width: board.width, height: board.height });
             if (canvas && bounds) {
                 const cropped = createCanvasContext(bounds.width, bounds.height);
                 if (cropped.context) {
@@ -197,7 +197,7 @@ export function PsPatternsPanel({ board, layers, nodes, selection, selected, onP
                 }
             }
         } else if (selected) {
-            const canvas = await renderPsLayerBitmap(selected, layers, nodes, board.metadata?.boardPaths ?? []);
+            const canvas = await renderPsLayerBitmap(selected, layers, board.boardPaths ?? []);
             blob = canvas ? await psCanvasToBlob(canvas) : null;
         }
         if (!blob) return;

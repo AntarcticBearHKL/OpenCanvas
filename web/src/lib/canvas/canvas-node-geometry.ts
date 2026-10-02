@@ -79,35 +79,6 @@ export function bulkRenameTitles(ids: string[], title: string) {
     return new Map(ids.map((id, index) => [id, ids.length > 1 ? `${name} ${index + 1}` : name]));
 }
 
-export function isBoardDescendant(candidateId: string, ancestorId: string, nodes: CanvasNodeData[]) {
-    const visited = new Set<string>();
-    const pending = [ancestorId];
-    while (pending.length) {
-        const boardId = pending.pop()!;
-        if (visited.has(boardId)) continue;
-        visited.add(boardId);
-        const layers = nodes.find((node) => node.id === boardId)?.metadata?.boardLayers ?? [];
-        for (const layer of layers) {
-            if (layer.sourceNodeId === candidateId) return true;
-            if (layer.sourceNodeId) pending.push(layer.sourceNodeId);
-        }
-    }
-    return false;
-}
-
-export function findBoardDropTarget(movedIds: Set<string>, nodes: CanvasNodeData[]) {
-    const movingNodes = nodes.filter((node) => movedIds.has(node.id) && (node.type === CanvasNodeType.Image || node.type === CanvasNodeType.SmartCanvas));
-    if (!movingNodes.length) return null;
-    const movedBoardIds = movingNodes.filter((node) => node.type === CanvasNodeType.SmartCanvas).map((node) => node.id);
-    return (
-        [...nodes].reverse().find((board) => {
-            if (board.type !== CanvasNodeType.SmartCanvas || movedIds.has(board.id)) return false;
-            if (movedBoardIds.some((movedId) => isBoardDescendant(board.id, movedId, nodes))) return false;
-            return movingNodes.some((node) => nodeCenterInside(node, board));
-        }) || null
-    );
-}
-
 function findDropTargetForSource(movedIds: Set<string>, nodes: CanvasNodeData[], sourceType: CanvasNodeTypeId, targetType?: CanvasNodeTypeId) {
     const movingNodes = nodes.filter((node) => movedIds.has(node.id) && node.type === sourceType);
     if (!movingNodes.length) return null;
@@ -120,10 +91,6 @@ export function findAssetsDropTarget(movedIds: Set<string>, nodes: CanvasNodeDat
 
 export function findImageModifierDropTarget(movedIds: Set<string>, nodes: CanvasNodeData[]) {
     return findDropTargetForSource(movedIds, nodes, CanvasNodeType.Image, CanvasNodeType.ImageModifier);
-}
-
-export function findAudioProjectDropTarget(movedIds: Set<string>, nodes: CanvasNodeData[]) {
-    return findDropTargetForSource(movedIds, nodes, CanvasNodeType.Audio, CanvasNodeType.AudioProject);
 }
 
 export function getConnectionTargetAnchor(node: CanvasNodeData, current: ConnectionHandle) {

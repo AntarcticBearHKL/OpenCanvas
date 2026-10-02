@@ -1,22 +1,21 @@
-import { useEffect, useRef, useState, type Dispatch, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Modal, Select, Slider, Switch } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
-import { commitBoardLayers, rasterizePsLayer } from "@/components/canvas/workspace/ps-layer-ops";
+import { commitBoardLayers, rasterizePsLayer, type PsBoardCommit } from "@/components/canvas/workspace/ps-layer-ops";
 import { psCanvasToBlob } from "@/components/canvas/workspace/ps-paint";
 import { applyPsFilter, PS_FILTER_BY_TYPE, psFilterLayerBitmap, psFilterMask, psFilterParams, psLiquifyPush, psLoadFilterSource, psMixFiltered, type PsFilterParams, type PsFilterType } from "@/components/canvas/workspace/ps-filters";
 import type { PsSelection } from "@/components/canvas/workspace/ps-selection";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { createCanvasContext } from "@/lib/canvas/canvas-2d";
-import { smartCanvasLayers } from "@/lib/canvas/smart-canvas";
+import { smartCanvasLayers, type SmartCanvasBoard } from "@/lib/canvas/smart-canvas";
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
-import type { CanvasNodeData, CanvasPsLayer } from "@/types/canvas";
+import type { CanvasPsLayer } from "@/types/canvas";
 
 type PsFilterDialogProps = {
-    board: CanvasNodeData;
-    setNodes: Dispatch<SetStateAction<CanvasNodeData[]>>;
-    nodes: CanvasNodeData[];
+    board: SmartCanvasBoard;
+    commitBoard: PsBoardCommit;
     layer: CanvasPsLayer | null;
     selection: PsSelection | null;
     type: PsFilterType;
@@ -30,7 +29,7 @@ const PREVIEW_MAX_EDGE = 320;
 const ROW_CLASS = "flex min-w-0 items-center gap-2 py-1";
 const LABEL_CLASS = "w-24 shrink-0 text-sm";
 
-export default function PsFilterDialog({ board, setNodes, nodes, layer, selection, type, onClose, onApplied }: PsFilterDialogProps) {
+export default function PsFilterDialog({ board, commitBoard, layer, selection, type, onClose, onApplied }: PsFilterDialogProps) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     const layers = smartCanvasLayers(board);
@@ -69,7 +68,7 @@ export default function PsFilterDialog({ board, setNodes, nodes, layer, selectio
         let active = true;
         setReady(false);
         previewRef.current = null;
-        void psLoadFilterSource(layer, layers, nodes).then((canvas) => {
+        void psLoadFilterSource(layer, layers).then((canvas) => {
             if (!active || !canvas) return;
             const scale = Math.min(1, PREVIEW_MAX_EDGE / Math.max(canvas.width, canvas.height));
             const width = Math.max(1, Math.round(canvas.width * scale));
@@ -86,7 +85,7 @@ export default function PsFilterDialog({ board, setNodes, nodes, layer, selectio
         return () => {
             active = false;
         };
-    }, [layer, layers, nodes, type]);
+    }, [layer, layers, type]);
 
     useEffect(() => {
         if (!ready) return;
@@ -105,7 +104,7 @@ export default function PsFilterDialog({ board, setNodes, nodes, layer, selectio
             const maskUrl = layer.maskStorageKey ? await resolveImageUrl(layer.maskStorageKey) : "";
             let blob: Blob | null = null;
             if (type === "liquify") {
-                const full = await psLoadFilterSource(layer, layers, nodes);
+                const full = await psLoadFilterSource(layer, layers);
                 const fullContext = full?.getContext("2d");
                 if (full && fullContext) {
                     const base = fullContext.getImageData(0, 0, full.width, full.height);
@@ -117,12 +116,12 @@ export default function PsFilterDialog({ board, setNodes, nodes, layer, selectio
                     blob = await psCanvasToBlob(full);
                 }
             } else {
-                blob = await psFilterLayerBitmap(layer, layers, nodes, type, params, { selection, maskUrl: maskUrl || undefined });
+                blob = await psFilterLayerBitmap(layer, layers, type, params, { selection, maskUrl: maskUrl || undefined });
             }
             if (!blob) return;
             const uploaded = await uploadImage(blob);
             if (!uploaded.storageKey) return;
-            commitBoardLayers(setNodes, board.id, rasterizePsLayer(layers, layer.id, uploaded.storageKey));
+            commitBoardLayers(commitBoard, board.id, rasterizePsLayer(layers, layer.id, uploaded.storageKey));
             onApplied(type, params);
             onClose();
         } finally {

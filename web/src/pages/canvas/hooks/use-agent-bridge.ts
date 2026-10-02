@@ -82,8 +82,6 @@ const CANVAS_OP_SPECS: { type: string; required?: string[]; properties: Record<s
         required: ["nodeId"],
         properties: { nodeId: { type: "string" }, mode: { type: "string", enum: ["text", "image", "video", "audio"] }, prompt: { type: "string" } },
     },
-    { type: "arrange_board", required: ["id"], properties: { id: { type: "string" }, template: { type: "string", enum: ["grid", "row", "column", "feature"] } } },
-    { type: "place_on_board", required: ["nodeId"], properties: { nodeId: { type: "string" }, boardId: { type: "string" } } },
     { type: "duplicate_node", required: ["id"], properties: { id: { type: "string" } } },
     { type: "move_node_layer", required: ["nodeId", "direction"], properties: { nodeId: { type: "string" }, direction: { type: "string", enum: ["up", "down"] } } },
     { type: "toggle_node_flag", required: ["nodeId", "flag"], properties: { nodeId: { type: "string" }, flag: { type: "string", enum: ["locked", "hidden"] } } },
@@ -121,12 +119,7 @@ const CANVAS_OP_SPECS: { type: string; required?: string[]; properties: Record<s
     },
     { type: "switch_video_frame_slot", required: ["nodeId", "slot"], properties: { nodeId: { type: "string" }, slot: { type: "string", enum: ["firstFrame", "lastFrame"] } } },
     { type: "set_video_mode", required: ["nodeId", "mode"], properties: { nodeId: { type: "string" }, mode: { type: "string", enum: ["frames", "reference"] } } },
-    { type: "set_asset_source", required: ["nodeId", "source"], properties: { nodeId: { type: "string" }, source: { type: "string", enum: ["folder", "cache"] } } },
-    { type: "set_board_ratio", required: ["id", "ratio"], properties: { id: { type: "string" }, ratio: { type: "string" } } },
-    { type: "set_board_resolution", required: ["id", "resolution"], properties: { id: { type: "string" }, resolution: { type: "string", enum: ["1k", "2k", "4k"] } } },
-    { type: "set_board_background", required: ["id", "background"], properties: { id: { type: "string" }, background: { type: "string" }, opacity: { type: "number" } } },
-    { type: "update_board_layers", required: ["id", "layers"], properties: { id: { type: "string" }, layers: { type: "array", items: { type: "object", additionalProperties: true } } } },
-    { type: "move_board_layer", required: ["id", "layerId", "direction"], properties: { id: { type: "string" }, layerId: { type: "string" }, direction: { type: "string", enum: ["forward", "backward"] } } },
+    { type: "set_asset_source", required: ["nodeId", "source"], properties: { nodeId: { type: "string" }, source: { type: "string", enum: ["folder", "cache", "studio"] } } },
     {
         type: "crop_image",
         required: ["nodeId", "crop"],
@@ -153,8 +146,6 @@ const CANVAS_OP_SPECS: { type: string; required?: string[]; properties: Record<s
     { type: "retry_generation", required: ["nodeId"], properties: { nodeId: { type: "string" } } },
     { type: "bake_image_modifier", required: ["nodeId"], properties: { nodeId: { type: "string" } } },
     { type: "capture_video_frame", required: ["nodeId", "position"], properties: { nodeId: { type: "string" }, position: { type: "string", enum: ["first", "last", "current"] } } },
-    { type: "compose_board", required: ["id"], properties: { id: { type: "string" } } },
-    { type: "save_board_as_node", required: ["id"], properties: { id: { type: "string" } } },
 ];
 
 const CANVAS_AGENT_OP_TYPES = CANVAS_OP_SPECS.map((spec) => spec.type);

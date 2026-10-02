@@ -9,7 +9,6 @@ type RuntimeConfig = {
     ANALYTICS_GA4_ID?: string; // GA4 measurement ID (G-XXXX)
     ANALYTICS_BAIDU_ID?: string; // Baidu Analytics site ID
     AGENT_BRIDGE_URL?: string; // Base URL of the standalone local browser bridge / MCP service
-    AGENT_TOKEN?: string; // Bearer token for the local bridge service
 };
 
 declare global {
@@ -35,7 +34,6 @@ export const ANALYTICS_BAIDU_ID = read("ANALYTICS_BAIDU_ID", import.meta.env.VIT
 // Both can be changed from Settings without a rebuild: the localStorage override wins over the build config.
 export const AGENT_BRIDGE_URL_DEFAULT = "http://127.0.0.1:3210";
 export const AGENT_BRIDGE_URL_STORAGE_KEY = "canvas-agent-url";
-export const AGENT_TOKEN_STORAGE_KEY = "canvas-agent-token";
 
 function readStorage(key: string): string {
     try {
@@ -61,13 +59,4 @@ export function setAgentBridgeUrl(url: string) {
     writeStorage(AGENT_BRIDGE_URL_STORAGE_KEY, url.trim());
 }
 
-export function readAgentToken(): string {
-    return readStorage(AGENT_TOKEN_STORAGE_KEY) || read("AGENT_TOKEN", import.meta.env.VITE_AGENT_TOKEN);
-}
-
-export function setAgentToken(token: string) {
-    writeStorage(AGENT_TOKEN_STORAGE_KEY, token.trim());
-}
-
 export const AGENT_BRIDGE_URL = readAgentBridgeUrl();
-export const AGENT_TOKEN = readAgentToken();

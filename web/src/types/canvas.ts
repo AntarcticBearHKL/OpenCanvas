@@ -3,9 +3,9 @@ export type Position = {
     y: number;
 };
 
-export type CanvasWorkspace = "canvas" | "image" | "audio";
+export type CanvasWorkspace = "canvas" | "image" | "audio" | "pixel";
 
-export const CANVAS_WORKSPACES: CanvasWorkspace[] = ["canvas", "image", "audio"];
+export const CANVAS_WORKSPACES: CanvasWorkspace[] = ["canvas", "image", "audio", "pixel"];
 
 export type ViewportTransform = {
     x: number;
@@ -27,8 +27,7 @@ export enum CanvasNodeType {
     VideoGeneration = "video-generation",
     Video = "video",
     Audio = "audio",
-    AudioProject = "audio-project",
-    SmartCanvas = "smart-canvas",
+    Midi = "midi",
     Assets = "assets",
     Recording = "recording",
     ImageModifier = "image-modifier",
@@ -106,7 +105,15 @@ export type CanvasImageModifierSource = {
     mimeType?: string;
 };
 
-export type CanvasAssetSource = "folder" | "cache";
+export type CanvasAssetSource = "folder" | "cache" | "studio";
+
+/** Studio project ids selected per studio for the assets node "studio" source. */
+export type CanvasAssetStudioProjects = {
+    image?: string[];
+    audio?: string[];
+    pixel?: string[];
+    write?: string[];
+};
 
 export type CanvasPsLayerKind = "image" | "text" | "group" | "pixel" | "shape" | "adjustment";
 
@@ -118,6 +125,39 @@ export type CanvasPsAdjustmentType = "brightness-contrast" | "levels" | "curves"
 export type CanvasPsLayerStyleType = "stroke" | "drop-shadow" | "inner-shadow" | "outer-glow" | "inner-glow" | "bevel" | "satin" | "color-overlay" | "gradient-overlay" | "pattern-overlay";
 
 export type CanvasPsParamValue = number | string | number[] | string[];
+
+export type CanvasPixelBlend = "normal" | "multiply" | "screen" | "overlay" | "add";
+
+export type CanvasPixelLayer = {
+    id: string;
+    name: string;
+    visible: boolean;
+    opacity: number; // 0..1
+    blend: CanvasPixelBlend;
+};
+
+/** One layer's bitmap on one frame; the bitmap is an `image:`-keyed PNG blob so cleanup keeps it alive. */
+export type CanvasPixelCel = { storageKey?: string };
+
+export type CanvasPixelFrame = {
+    id: string;
+    durationMs: number;
+    cels: Record<string, CanvasPixelCel>; // layerId -> cel
+};
+
+/** Self-contained pixel-art document owned by a pixel project. */
+export type CanvasPixelDoc = {
+    width: number;
+    height: number;
+    palette: string[]; // hex colors
+    layers: CanvasPixelLayer[]; // index 0 = bottom
+    frames: CanvasPixelFrame[];
+    fps: number;
+    background: string; // CSS color or "transparent"
+};
+
+/** Shared 16-color starter palette for new pixel documents. */
+export const DEFAULT_PIXEL_PALETTE: string[] = ["#000000", "#ffffff", "#7f7f7f", "#c0c0c0", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0"];
 
 /** Free-transform geometry, normalized to the layer box: (0,0) is its top-left and (1,1) its bottom-right, so move/scale/rotate keep working on a transformed layer. */
 export type CanvasPsTransform = {
@@ -161,13 +201,13 @@ export type CanvasPsLayerStyle = {
     params: Record<string, CanvasPsParamValue>;
 };
 
-/** Smart Canvas layer document entry; geometry is board-local, an image layer's bitmap comes from sourceNodeId and a pixel layer's own bitmap from storageKey. */
+/** Image layer document entry; geometry is board-local, an image layer's bitmap comes from its `image:` storageKey (or content URL) and a pixel layer's own bitmap from storageKey. */
 export type CanvasPsLayer = {
     id: string;
     name: string;
     kind: CanvasPsLayerKind;
-    sourceNodeId?: string;
-    storageKey?: string; // pixel layers: own bitmap in the image store, sized to the layer box; also kept alive by the image cleanup sweep.
+    content?: string; // image layers: plain content URL fallback used when the bitmap has no `image:` key.
+    storageKey?: string; // image layers: source bitmap in the image store; pixel layers: own bitmap, sized to the layer box; kept alive by the image cleanup sweep.
     maskStorageKey?: string; // optional per-layer mask in the image store: white shows, transparent hides; used only by the compositor, never written into images.
     adjustment?: CanvasPsAdjustmentType; // adjustment layers: which non-destructive adjustment is applied to the layers below it in the same container.
     adjustmentParams?: Record<string, CanvasPsParamValue>; // adjustment layers: parameters for the chosen adjustment type.
@@ -218,10 +258,10 @@ export type CanvasAudioSnap = "off" | "bar" | "beat" | "1/2" | "1/4" | "1/8" | "
 /** Audio timeline cue point; time is seconds. */
 export type CanvasAudioMarker = { id: string; time: number; name?: string; color?: string };
 
-/** Audio track role; `master` is the single output sink, `group` sums its inputs, `return` is fed only by sends, and `instrument`/`midi` host MIDI regions. */
-export type CanvasAudioTrackType = "audio" | "instrument" | "midi" | "group" | "return" | "master";
+/** Audio track role; `master` is the single output sink, `group` sums its inputs, `return` is fed only by sends, and `instrument` hosts MIDI regions. */
+export type CanvasAudioTrackType = "audio" | "instrument" | "group" | "return" | "master";
 
-/** Built-in instrument of an instrument/MIDI track; only `synth` is implemented, `sampler` is reserved for a later stage. */
+/** Built-in instrument of an instrument/MIDI track; it is a sampled instrument (piano / guitar), and `kind: "synth"` still labels the built-in (non-VST3) case. */
 export type CanvasAudioSynthInstrument = { kind: "synth" | "sampler"; preset?: string; soundFontKey?: string };
 
 /** Native VST3 instrument played by the local bridge; `pluginId` is a scanned plugin id, and `stateKey` is the nanoid assigned when the instrument is picked, naming the localforage blob that holds the plug-in's own state. */
@@ -260,11 +300,13 @@ export type CanvasAudioTrack = {
     vst3Effect?: CanvasAudioVst3Effect; // Optional inline VST3 effect on this track's signal; unset keeps the track untouched.
 };
 
-/** Audio compositor clip; times are seconds and sourceNodeId references an AUDIO node, never a copied payload. */
+/** Audio compositor clip; times are seconds and the source bitmap is the clip's `audio:` storageKey (or content URL), never a copied payload. */
 export type CanvasAudioClip = {
     id: string;
     trackId: string;
-    sourceNodeId: string;
+    storageKey?: string;
+    content?: string;
+    sourceDurationMs?: number; // source length in ms, kept on the clip so loop windows survive without canvas nodes.
     start: number; // timeline position (s)
     offset: number; // source in-point (s)
     duration: number; // visible length (s)
@@ -367,16 +409,10 @@ export type CanvasNodeMetadata = {
     mimeType?: string;
     bytes?: number;
     durationMs?: number;
+    /** MIDI resource summary parsed from the .mid blob. */
+    midi?: { trackCount: number; noteCount: number; tempo: number; ppqn: number };
     videoTaskId?: string;
     videoTaskProvider?: "openai" | "plugin" | "openrouter";
-    boardRatio?: string; // Smart Canvas board aspect ratio, e.g. "16:9"; defaults to "16:9".
-    boardResolution?: "1k" | "2k" | "4k"; // Smart Canvas composite resolution tier; defaults to "2k".
-    boardBackground?: string; // Smart Canvas board background colour as a CSS colour string; defaults to "transparent".
-    boardBackgroundOpacity?: number; // Smart Canvas board background opacity in 0..1; defaults to 1.
-    boardLayers?: CanvasPsLayer[]; // Self-contained board layer document; array order is z-order (index 0 = bottom) and geometry is board-local.
-    boardPaths?: CanvasPsPath[]; // Board vector paths; document data, so they save and export with the board.
-    boardAlphaChannels?: CanvasPsAlphaChannel[]; // Board alpha channels saved from selections; document data with `image:`-keyed bitmaps.
-    boardChannelVisibility?: { r: boolean; g: boolean; b: boolean }; // Per-channel visibility; hiding a channel drops it from the composite in the shared renderer.
     blendMode?: string;
     opacity?: number;
     interactive?: boolean; // Plugin node interaction/move state; see CanvasNodeDefinition.interactionToggle.
@@ -388,21 +424,7 @@ export type CanvasNodeMetadata = {
     modifierEmit?: boolean;
     modifierError?: string;
     assetSource?: CanvasAssetSource; // Assets node source mode; defaults to "folder".
-    audioTracks?: CanvasAudioTrack[]; // Audio compositor lanes; a new AUDIO PROJECT node starts with one empty track.
-    audioClips?: CanvasAudioClip[]; // Audio compositor clips; each clip references an AUDIO node instead of copying its payload.
-    audioMasterGain?: number; // Audio compositor master gain, linear 0..1; defaults to 1.
-    audioTempo?: number; // Audio timeline BPM; defaults to 120.
-    audioTimeSignature?: { numerator: number; denominator: number }; // Audio timeline meter; defaults to 4/4.
-    audioGrid?: { enabled: boolean; snap: CanvasAudioSnap }; // Audio grid + snap; defaults to on + beat.
-    audioCycle?: { enabled: boolean; start: number; end: number }; // Audio cycle region in seconds.
-    audioPunch?: { enabled: boolean; in: number; out: number }; // Punch range in seconds; recording itself is not implemented yet.
-    audioMarkers?: CanvasAudioMarker[]; // Audio timeline cue points.
-    audioMetronome?: { enabled: boolean; volumeDb: number }; // Metronome state; the click itself is not implemented yet.
-    audioAutomation?: CanvasAudioAutomationLane[]; // Audio parameter automation lanes; an enabled lane with points owns its parameter.
-    audioMidiRegions?: CanvasAudioMidiRegion[]; // MIDI regions on instrument/MIDI tracks; positions are PPQN ticks.
-    audioPpqn?: number; // Ticks per quarter note for MIDI regions; defaults to 960.
-    audioCapture?: CanvasAudioCapture; // Recording input settings; defaults to normal mode, stereo, 0 dB, no latency.
-    audioCountIn?: number; // Record count-in in bars (0 = off); defaults to 0.
+    assetStudioProjects?: CanvasAssetStudioProjects; // Assets node "studio" source: selected project ids per studio.
     canvasTitle?: string; // Optional parent canvas title when nodes are projected into studio resource pools.
 };
 

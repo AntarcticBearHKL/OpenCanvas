@@ -8,9 +8,8 @@ import { bulkRenameTitles, normalizeConnection } from "@/lib/canvas/canvas-node-
 import { fitNodeSize } from "@/lib/canvas/canvas-node-size";
 import type { VideoFramePosition } from "@/lib/canvas/canvas-video-frame";
 import { getNodeSpec, isRegisteredNodeType } from "@/lib/canvas/node-registry";
-import { arrangePsLayers, createPsImageLayer, movePsLayer, smartCanvasLayers, smartCanvasSizeForRatio, type BoardLayoutTemplate } from "@/lib/canvas/smart-canvas";
 import { VIDEO_REFERENCE_LIMITS, VIDEO_REFERENCE_TOTAL_LIMIT, openRouterVideoModels, videoFrameImageLimit, type VideoReferenceKind } from "@/lib/video-generation";
-import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasNodeMetadata, type CanvasNodeTypeId, type CanvasPsLayer, type CanvasVideoSlot, type CanvasVideoSlots, type ViewportTransform } from "@/types/canvas";
+import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasNodeMetadata, type CanvasNodeTypeId, type CanvasVideoSlot, type CanvasVideoSlots, type ViewportTransform } from "@/types/canvas";
 
 export type CanvasAgentOp =
     | { type: "add_node"; id?: string; nodeType?: CanvasNodeTypeId; title?: string; position?: { x: number; y: number }; x?: number; y?: number; width?: number; height?: number; metadata?: CanvasNodeMetadata }
@@ -21,8 +20,6 @@ export type CanvasAgentOp =
     | { type: "set_viewport"; viewport: ViewportTransform }
     | { type: "select_nodes"; ids: string[] }
     | { type: "run_generation"; nodeId: string; mode?: "text" | "image" | "video" | "audio"; prompt?: string }
-    | { type: "arrange_board"; id: string; template?: BoardLayoutTemplate }
-    | { type: "place_on_board"; nodeId: string; boardId?: string }
     | { type: "duplicate_node"; id: string }
     | { type: "move_node_layer"; nodeId: string; direction: "up" | "down" }
     | { type: "toggle_node_flag"; nodeId: string; flag: "locked" | "hidden" }
@@ -44,12 +41,7 @@ export type CanvasAgentOp =
     | { type: "clear_video_slot"; nodeId: string; slot: CanvasVideoSlot; sourceNodeId?: string }
     | { type: "switch_video_frame_slot"; nodeId: string; slot: "firstFrame" | "lastFrame" }
     | { type: "set_video_mode"; nodeId: string; mode: "frames" | "reference" }
-    | { type: "set_asset_source"; nodeId: string; source: "folder" | "cache" }
-    | { type: "set_board_ratio"; id: string; ratio: string }
-    | { type: "set_board_resolution"; id: string; resolution: "1k" | "2k" | "4k" }
-    | { type: "set_board_background"; id: string; background: string; opacity?: number }
-    | { type: "update_board_layers"; id: string; layers: CanvasPsLayer[] }
-    | { type: "move_board_layer"; id: string; layerId: string; direction: "forward" | "backward" }
+    | { type: "set_asset_source"; nodeId: string; source: "folder" | "cache" | "studio" }
     | { type: "crop_image"; nodeId: string; crop: { x: number; y: number; width: number; height: number } }
     | { type: "split_image"; nodeId: string; rows: number; columns: number; horizontalLines?: number[]; verticalLines?: number[] }
     | { type: "upscale_image"; nodeId: string; kind: "algorithm" | "ai"; targetLongEdge?: number; algorithm?: ImageUpscaleAlgorithm; prompt?: string }
@@ -59,9 +51,7 @@ export type CanvasAgentOp =
     | { type: "generate_image_from_text"; nodeId: string }
     | { type: "retry_generation"; nodeId: string }
     | { type: "bake_image_modifier"; nodeId: string }
-    | { type: "capture_video_frame"; nodeId: string; position: VideoFramePosition }
-    | { type: "compose_board"; id: string }
-    | { type: "save_board_as_node"; id: string };
+    | { type: "capture_video_frame"; nodeId: string; position: VideoFramePosition };
 
 export type CanvasAgentSnapshot = {
     projectId: string;
@@ -160,29 +150,6 @@ export function applyCanvasAgentOps(snapshot: CanvasAgentSnapshot, ops?: CanvasA
         }
         if (op.type === "set_viewport" && op.viewport) viewport = op.viewport;
         if (op.type === "select_nodes") selectedNodeIds = (op.ids || []).filter((id) => nodes.some((node) => node.id === id));
-        if (op.type === "arrange_board") {
-            const board = nodes.find((node) => node.id === op.id);
-            if (!board || board.type !== CanvasNodeType.SmartCanvas) return;
-            const layers = arrangePsLayers(board, op.template);
-            if (layers === smartCanvasLayers(board)) return;
-            nodes = nodes.map((node) => (node.id === board.id ? { ...node, metadata: { ...node.metadata, boardLayers: layers } } : node));
-        }
-        if (op.type === "place_on_board") {
-            const node = nodes.find((item) => item.id === op.nodeId);
-            if (!node || (node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.SmartCanvas)) return;
-            const board = op.boardId ? nodes.find((item) => item.id === op.boardId && item.type === CanvasNodeType.SmartCanvas) : undefined;
-            if (op.boardId && !board) return;
-            nodes = nodes.map((item) => {
-                if (item.type !== CanvasNodeType.SmartCanvas) return item;
-                const layers = smartCanvasLayers(item);
-                if (item.id !== board?.id) {
-                    const next = layers.filter((layer) => layer.sourceNodeId !== node.id);
-                    return next.length === layers.length ? item : { ...item, metadata: { ...item.metadata, boardLayers: next } };
-                }
-                if (layers.some((layer) => layer.sourceNodeId === node.id)) return item;
-                return { ...item, metadata: { ...item.metadata, boardLayers: [...layers, createPsImageLayer(item, node)] } };
-            });
-        }
         if (op.type === "duplicate_node") {
             const source = nodes.find((node) => node.id === op.id);
             if (!source) return;
@@ -193,9 +160,7 @@ export function applyCanvasAgentOps(snapshot: CanvasAgentSnapshot, ops?: CanvasA
         if (op.type === "move_node_layer") {
             const index = nodes.findIndex((node) => node.id === op.nodeId);
             if (index < 0) return;
-            const step = op.direction === "up" ? 1 : -1;
-            let target = index + step;
-            while (target >= 0 && target < nodes.length && nodes[target].type === CanvasNodeType.SmartCanvas) target += step;
+            const target = index + (op.direction === "up" ? 1 : -1);
             if (target < 0 || target >= nodes.length) return;
             const next = [...nodes];
             const [node] = next.splice(index, 1);
@@ -368,31 +333,7 @@ export function applyCanvasAgentOps(snapshot: CanvasAgentSnapshot, ops?: CanvasA
         if (op.type === "set_asset_source") {
             nodes = nodes.map((node) => (node.id === op.nodeId ? { ...node, metadata: { ...node.metadata, assetSource: op.source } } : node));
         }
-        if (op.type === "set_board_ratio") {
-            nodes = nodes.map((node) => {
-                if (node.id !== op.id || node.type !== CanvasNodeType.SmartCanvas) return node;
-                if (op.ratio === node.metadata?.boardRatio) return { ...node, metadata: { ...node.metadata, boardRatio: op.ratio } };
-                const size = smartCanvasSizeForRatio(op.ratio);
-                return { ...node, ...size, position: { x: node.position.x + node.width / 2 - size.width / 2, y: node.position.y + node.height / 2 - size.height / 2 }, metadata: { ...node.metadata, boardRatio: op.ratio } };
-            });
-        }
-        if (op.type === "set_board_resolution") {
-            nodes = nodes.map((node) => (node.id === op.id && node.type === CanvasNodeType.SmartCanvas ? { ...node, metadata: { ...node.metadata, boardResolution: op.resolution } } : node));
-        }
-        if (op.type === "set_board_background") {
-            nodes = nodes.map((node) => (node.id === op.id && node.type === CanvasNodeType.SmartCanvas ? { ...node, metadata: { ...node.metadata, boardBackground: op.background, ...(op.opacity === undefined ? {} : { boardBackgroundOpacity: op.opacity }) } } : node));
-        }
-        if (op.type === "update_board_layers") {
-            nodes = nodes.map((node) => (node.id === op.id && node.type === CanvasNodeType.SmartCanvas ? { ...node, metadata: { ...node.metadata, boardLayers: op.layers } } : node));
-        }
-        if (op.type === "move_board_layer") {
-            nodes = nodes.map((node) => {
-                if (node.id !== op.id || node.type !== CanvasNodeType.SmartCanvas) return node;
-                const layers = movePsLayer(node, op.layerId, op.direction);
-                return layers === smartCanvasLayers(node) ? node : { ...node, metadata: { ...node.metadata, boardLayers: layers } };
-            });
-        }
-        // Async ops (crop_image, split_image, upscale_image, ... compose_board) are executed by the page handlers wired through the agent bridge, not by this pure reducer.
+        // Async ops (crop_image, split_image, upscale_image, ...) are executed by the page handlers wired through the agent bridge, not by this pure reducer.
     });
 
     return { ...snapshot, nodes, connections, selectedNodeIds, viewport };

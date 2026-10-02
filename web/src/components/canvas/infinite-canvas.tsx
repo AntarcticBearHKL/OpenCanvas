@@ -1,10 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { isCanvasOverlayTarget } from "@/lib/canvas/canvas-overlays";
+import { setViewportSignal } from "@/lib/canvas/viewport-signal";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import type { ViewportTransform } from "@/types/canvas";
 
+const GRID_SIZE = 48;
 
 type InfiniteCanvasProps = {
     containerRef: React.RefObject<HTMLDivElement | null>;
@@ -35,14 +37,31 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
     const zoomMarkerRef = useRef<number | null>(null);
     const frameRef = useRef<number | null>(null);
     const nextViewportRef = useRef<ViewportTransform | null>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const gridRef = useRef<HTMLDivElement>(null);
     const [isSpacePressed, setIsSpacePressed] = useState(false);
     const [isControlPressed, setIsControlPressed] = useState(false);
     const [isPanning, setIsPanning] = useState(false);
 
-    useEffect(() => {
+    // Pan / zoom run entirely on the compositor: the transform and grid are written straight to the DOM while a
+    // gesture is active, so React never re-renders the canvas tree per frame. State is committed once on release.
+    const applyViewport = useCallback((next: ViewportTransform) => {
+        const content = contentRef.current;
+        if (content) content.style.transform = `translate(${next.x}px, ${next.y}px) scale(${next.k})`;
+        const grid = gridRef.current;
+        if (grid) {
+            const gridSize = GRID_SIZE * next.k;
+            grid.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+            grid.style.backgroundPosition = `${next.x % gridSize}px ${next.y % gridSize}px`;
+        }
+        setViewportSignal(next);
+    }, []);
+
+    useLayoutEffect(() => {
         scaleRef.current = viewport.k;
         viewportRef.current = viewport;
-    }, [viewport]);
+        applyViewport(viewport);
+    }, [viewport, applyViewport]);
 
     useEffect(
         () => () => {
@@ -104,6 +123,7 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
         zoomMarkerRef.current = window.setTimeout(() => {
             zoomMarkerRef.current = null;
             delete containerRef.current?.dataset.canvasZooming;
+            onViewportChange(viewportRef.current);
         }, 160);
 
         if (frameRef.current) return;
@@ -122,11 +142,14 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
             const mouseY = pending.clientY - rect.top;
             const worldX = (mouseX - current.x) / current.k;
             const worldY = (mouseY - current.y) / current.k;
-            onViewportChange({
+            const next = {
                 x: mouseX - worldX * newScale,
                 y: mouseY - worldY * newScale,
                 k: newScale,
-            });
+            };
+            scaleRef.current = next.k;
+            viewportRef.current = next;
+            applyViewport(next);
         });
     };
 
@@ -146,8 +169,8 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
                 isPanning: true,
                 startX: event.clientX,
                 startY: event.clientY,
-                initialX: viewport.x,
-                initialY: viewport.y,
+                initialX: viewportRef.current.x,
+                initialY: viewportRef.current.y,
                 hasMoved: false,
                 startedOnBackground: isBackgroundClick,
             };
@@ -173,15 +196,18 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
                 panState.current.hasMoved = true;
             }
 
-            nextViewportRef.current = {
+            const next = {
                 x: panState.current.initialX + dx,
                 y: panState.current.initialY + dy,
                 k: scaleRef.current,
             };
+            nextViewportRef.current = next;
+            viewportRef.current = next;
             if (frameRef.current) return;
             frameRef.current = requestAnimationFrame(() => {
                 frameRef.current = null;
-                if (nextViewportRef.current) onViewportChange(nextViewportRef.current);
+                const pending = nextViewportRef.current;
+                if (pending) applyViewport(pending);
             });
         };
 
@@ -190,6 +216,11 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
 
             if (!panState.current.hasMoved && panState.current.startedOnBackground) {
                 onCanvasDeselect?.();
+            }
+            const final = nextViewportRef.current;
+            if (panState.current.hasMoved && final) {
+                applyViewport(final);
+                onViewportChange(final);
             }
             panState.current.isPanning = false;
             setIsPanning(false);
@@ -205,7 +236,7 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
             window.removeEventListener("pointercancel", handlePointerUp);
             document.body.style.cursor = "";
         };
-    }, [onCanvasDeselect, onViewportChange]);
+    }, [applyViewport, onCanvasDeselect, onViewportChange]);
 
     useEffect(() => {
         const container = containerRef.current;
@@ -223,6 +254,9 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
     const temporaryTool = isControlPressed || isSpacePressed;
     const activeTool = temporaryTool ? (tool === "select" ? "pan" : "select") : tool;
     const cursor = isPanning ? "grabbing" : activeTool === "pan" ? "grab" : undefined;
+    const dotSize = viewport.k < 0.12 ? 0.8 : 1.15;
+    const gridImage =
+        backgroundMode === "dots" ? `radial-gradient(circle, ${theme.canvas.dot} ${dotSize}px, transparent ${dotSize + 0.2}px)` : backgroundMode === "blank" ? undefined : `linear-gradient(${theme.canvas.line} 1px, transparent 1px), linear-gradient(90deg, ${theme.canvas.line} 1px, transparent 1px)`;
 
     return (
         <div
@@ -234,38 +268,10 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
             onDragOver={(event) => event.preventDefault()}
             onDrop={onDrop}
         >
-            <CanvasGrid viewport={viewport} mode={backgroundMode} />
-            <div
-                className="absolute origin-top-left"
-                style={{
-                    transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.k})`,
-                }}
-            >
+            {gridImage ? <div ref={gridRef} className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: gridImage }} /> : null}
+            <div ref={contentRef} className="absolute origin-top-left" style={{ willChange: "transform" }}>
                 {children}
             </div>
         </div>
-    );
-}
-
-function CanvasGrid({ viewport, mode }: { viewport: ViewportTransform; mode: CanvasBackgroundMode }) {
-    const theme = useCanvasTheme();
-    if (mode === "blank") return null;
-
-    const gridSize = 48 * viewport.k;
-    const x = viewport.x % gridSize;
-    const y = viewport.y % gridSize;
-    const dotSize = viewport.k < 0.12 ? 0.8 : 1.15;
-    const backgroundImage =
-        mode === "dots" ? `radial-gradient(circle, ${theme.canvas.dot} ${dotSize}px, transparent ${dotSize + 0.2}px)` : `linear-gradient(${theme.canvas.line} 1px, transparent 1px), linear-gradient(90deg, ${theme.canvas.line} 1px, transparent 1px)`;
-
-    return (
-        <div
-            className="pointer-events-none absolute inset-0 opacity-40"
-            style={{
-                backgroundImage,
-                backgroundSize: `${gridSize}px ${gridSize}px`,
-                backgroundPosition: `${x}px ${y}px`,
-            }}
-        />
     );
 }

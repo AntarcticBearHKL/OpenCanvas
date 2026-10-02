@@ -1,13 +1,16 @@
+import { useSyncExternalStore } from "react";
+
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
-import type { ViewportTransform } from "@/types/canvas";
+import { getViewportSignal, subscribeViewportSignal } from "@/lib/canvas/viewport-signal";
 
 const RULER_THICKNESS = 20;
 const MIN_TICK_SPACING = 56;
 const BASE_TICK = 100;
 const TOP_BAR_HEIGHT = 56;
 
-export function CanvasRulers({ viewport, viewportSize }: { viewport: ViewportTransform; viewportSize: { width: number; height: number } }) {
+export function CanvasRulers({ viewportSize }: { viewportSize: { width: number; height: number } }) {
     const theme = useCanvasTheme();
+    const viewport = useSyncExternalStore(subscribeViewportSignal, getViewportSignal);
     const step = BASE_TICK * Math.max(1, Math.ceil(MIN_TICK_SPACING / (BASE_TICK * viewport.k)));
     const ticksX: number[] = [];
     for (let value = Math.floor(-viewport.x / viewport.k / step) * step; ; value += step) {

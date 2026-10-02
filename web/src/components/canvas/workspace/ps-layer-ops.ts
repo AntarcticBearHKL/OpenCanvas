@@ -1,22 +1,23 @@
 import { nanoid } from "nanoid";
-import type { Dispatch, SetStateAction } from "react";
 
 import { createPsLayerStyle } from "@/lib/canvas/ps-layer-styles";
-import { psBoxUnion, psLayerBox, psLayerChildIds, psRotatePoint, psTopLayers } from "@/lib/canvas/smart-canvas";
-import type { CanvasNodeData, CanvasPsLayer, CanvasPsLayerStyleType, CanvasPsParamValue } from "@/types/canvas";
+import { psBoxUnion, psLayerBox, psLayerChildIds, psRotatePoint, psTopLayers, type SmartCanvasBoard } from "@/lib/canvas/smart-canvas";
+import type { CanvasPsLayer, CanvasPsLayerStyleType, CanvasPsParamValue } from "@/types/canvas";
 
 export type PsResizeCorner = "nw" | "ne" | "sw" | "se";
 
 type PsBox = { x: number; y: number; width: number; height: number };
 
+export type PsBoardCommit = (boardId: string, patch: Partial<SmartCanvasBoard>) => void;
+
 const MIN_LAYER_SIZE = 8;
 /** ax / ay pick the fixed edge: 0 keeps left/top, 1 keeps right/bottom. */
 const RESIZE_ANCHORS: Record<PsResizeCorner, { ax: 0 | 1; ay: 0 | 1 }> = { nw: { ax: 1, ay: 1 }, ne: { ax: 0, ay: 1 }, sw: { ax: 1, ay: 0 }, se: { ax: 0, ay: 0 } };
 
-/** Every layer document mutation funnels through here, so undo, autosave and persistence come from setNodes. */
-export function commitBoardLayers(setNodes: Dispatch<SetStateAction<CanvasNodeData[]>>, boardId: string, next: CanvasPsLayer[]) {
+/** Every layer document mutation funnels through here, so undo, autosave and persistence come from the studio commit. */
+export function commitBoardLayers(commit: PsBoardCommit, boardId: string, next: CanvasPsLayer[]) {
     const layers = syncPsGroupBoxes(next);
-    setNodes((prev) => prev.map((node) => (node.id === boardId ? { ...node, metadata: { ...node.metadata, boardLayers: layers } } : node)));
+    commit(boardId, { boardLayers: layers });
 }
 
 export function findPsLayer(layers: CanvasPsLayer[], id: string) {
@@ -75,7 +76,7 @@ export function rasterizePsLayer(layers: CanvasPsLayer[], id: string, storageKey
     return syncPsGroupBoxes(
         layers
             .filter((item) => !children.has(item.id))
-            .map((item) => (item.id === id ? { ...item, kind: "pixel" as const, storageKey, sourceNodeId: undefined, children: undefined, adjustment: undefined } : item)),
+            .map((item) => (item.id === id ? { ...item, kind: "pixel" as const, storageKey, content: undefined, children: undefined, adjustment: undefined } : item)),
     );
 }
 

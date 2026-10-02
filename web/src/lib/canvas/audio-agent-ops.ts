@@ -73,6 +73,7 @@ import {
     createAudioMarker,
     createAudioSend,
     createAudioTrack,
+    type AudioProjectDocument,
 } from "@/lib/canvas/audio-project";
 import type {
     CanvasAudioAutomationCurve,
@@ -86,8 +87,6 @@ import type {
     CanvasAudioSnap,
     CanvasAudioTrack,
     CanvasAudioTrackType,
-    CanvasNodeData,
-    CanvasNodeMetadata,
 } from "@/types/canvas";
 
 /** One control height of the clip fade toggles, mirroring DEFAULT_FADE_SECONDS in audio-studio.tsx. */
@@ -198,15 +197,15 @@ export function duplicateAudioTrack(
     trackId: string,
     fallbackName: (track: CanvasAudioTrack) => string,
     id: string = nanoid(),
-): Partial<CanvasNodeMetadata> | null {
+): Partial<AudioProjectDocument> | null {
     const source = tracks.find((track) => track.id === trackId);
     if (!source || audioTrackType(source) === "master") return null;
     const next = [...tracks];
     next.splice(tracks.findIndex((track) => track.id === trackId) + 1, 0, { ...source, id, name: source.name ? `${source.name} 2` : fallbackName(source) });
     return {
-        audioTracks: next,
-        audioClips: [...clips, ...audioTrackClips(clips, trackId).map((clip) => ({ ...clip, id: nanoid(), trackId: id }))],
-        audioMidiRegions: [...regions, ...audioTrackRegions(regions, trackId).map((region) => ({ ...duplicateRegion(region), trackId: id }))],
+        tracks: next,
+        clips: [...clips, ...audioTrackClips(clips, trackId).map((clip) => ({ ...clip, id: nanoid(), trackId: id }))],
+        midiRegions: [...regions, ...audioTrackRegions(regions, trackId).map((region) => ({ ...duplicateRegion(region), trackId: id }))],
     };
 }
 
@@ -215,7 +214,7 @@ export function duplicateAudioTrack(
  * numeric fields are clamped exactly like the studio UI, and the patch only carries the fields the ops
  * actually touched (clip writes are committed through the studio's `commitClips` so `applyOverlap` runs).
  */
-export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[]): Partial<CanvasNodeMetadata> {
+export function applyAudioAgentOps(project: AudioProjectDocument, ops: AudioAgentOp[]): Partial<AudioProjectDocument> {
     const before = {
         tracks: audioProjectTracks(project),
         clips: audioProjectClips(project),
@@ -230,35 +229,35 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
         capture: audioProjectCapture(project),
         ppqn: audioProjectPpqn(project),
     };
-    const patch: Partial<CanvasNodeMetadata> = {};
-    const tracks = () => patch.audioTracks ?? before.tracks;
-    const clips = () => patch.audioClips ?? before.clips;
-    const midi = () => patch.audioMidiRegions ?? before.midi;
-    const markers = () => patch.audioMarkers ?? before.markers;
-    const automation = () => patch.audioAutomation ?? before.automation;
-    const grid = () => patch.audioGrid ?? before.grid;
-    const cycle = () => patch.audioCycle ?? before.cycle;
-    const punch = () => patch.audioPunch ?? before.punch;
-    const metronome = () => patch.audioMetronome ?? before.metronome;
-    const capture = () => patch.audioCapture ?? before.capture;
-    const ppqn = () => patch.audioPpqn ?? before.ppqn;
-    const meter = () => patch.audioTimeSignature ?? before.meter;
+    const patch: Partial<AudioProjectDocument> = {};
+    const tracks = () => patch.tracks ?? before.tracks;
+    const clips = () => patch.clips ?? before.clips;
+    const midi = () => patch.midiRegions ?? before.midi;
+    const markers = () => patch.markers ?? before.markers;
+    const automation = () => patch.automation ?? before.automation;
+    const grid = () => patch.grid ?? before.grid;
+    const cycle = () => patch.cycle ?? before.cycle;
+    const punch = () => patch.punch ?? before.punch;
+    const metronome = () => patch.metronome ?? before.metronome;
+    const capture = () => patch.capture ?? before.capture;
+    const ppqn = () => patch.ppqn ?? before.ppqn;
+    const meter = () => patch.timeSignature ?? before.meter;
     const track = (id?: string) => tracks().find((item) => item.id === id);
     const clip = (id?: string) => clips().find((item) => item.id === id);
     const region = (id?: string) => midi().find((item) => item.id === id);
     const lane = (id?: string) => automation().find((item) => item.id === id);
     const patchTrack = (trackId: string, next: CanvasAudioTrack) => {
-        patch.audioTracks = tracks().map((item) => (item.id === trackId ? next : item));
+        patch.tracks = tracks().map((item) => (item.id === trackId ? next : item));
     };
     const patchRegionNotes = (regionId: string, notes: CanvasAudioNote[]) => {
-        patch.audioMidiRegions = midi().map((item) => (item.id === regionId ? { ...item, notes } : item));
+        patch.midiRegions = midi().map((item) => (item.id === regionId ? { ...item, notes } : item));
     };
     const patchLanePoints = (laneId: string, points: CanvasAudioAutomationPoint[]) => {
-        patch.audioAutomation = automation().map((item) => (item.id === laneId ? { ...item, points } : item));
+        patch.automation = automation().map((item) => (item.id === laneId ? { ...item, points } : item));
     };
     const pruneSendAutomation = (nextTracks: CanvasAudioTrack[]) => {
         const next = pruneAutomation(automation(), nextTracks);
-        if (next !== automation()) patch.audioAutomation = next;
+        if (next !== automation()) patch.automation = next;
     };
 
     (Array.isArray(ops) ? ops : []).forEach((op) => {
@@ -266,7 +265,7 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
 
         // Tracks
         if (op.type === "audio.track.create") {
-            patch.audioTracks = [...tracks(), withId(createAudioTrack(op.trackType ?? "audio"), op.id)];
+            patch.tracks = [...tracks(), withId(createAudioTrack(op.trackType ?? "audio"), op.id)];
             return;
         }
         if (op.type === "audio.track.duplicate") {
@@ -282,9 +281,9 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
                 .map((item) => ({ ...item, output: item.output === target.id ? undefined : item.output, sends: item.sends?.length ? item.sends.filter((send) => send.targetTrackId !== target.id) : item.sends }));
             const nextClips = clips().filter((item) => item.trackId !== target.id);
             const nextMidi = midi().filter((item) => item.trackId !== target.id);
-            patch.audioTracks = nextTracks;
-            if (nextClips.length !== clips().length) patch.audioClips = nextClips;
-            if (nextMidi.length !== midi().length) patch.audioMidiRegions = nextMidi;
+            patch.tracks = nextTracks;
+            if (nextClips.length !== clips().length) patch.clips = nextClips;
+            if (nextMidi.length !== midi().length) patch.midiRegions = nextMidi;
             pruneSendAutomation(nextTracks);
             return;
         }
@@ -321,7 +320,7 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
                     return { ...created, gain: clampGain(send.gain ?? created.gain), pre: send.pre ?? created.pre, enabled: send.enabled ?? created.enabled };
                 });
             const nextTracks = tracks().map((item) => (item.id === target.id ? { ...item, sends: sends.length ? sends : undefined } : item));
-            patch.audioTracks = nextTracks;
+            patch.tracks = nextTracks;
             pruneSendAutomation(nextTracks);
             return;
         }
@@ -330,7 +329,7 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
         if (op.type === "audio.clip.patch") {
             const target = clip(op.clipId);
             if (!target || !op.patch) return;
-            patch.audioClips = patchClip(clips(), target.id, op.patch);
+            patch.clips = patchClip(clips(), target.id, op.patch);
             return;
         }
         if (op.type === "audio.clip.move") {
@@ -339,68 +338,68 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
             const trackId = op.trackId ?? target.trackId;
             const destination = track(trackId);
             if (!destination || !canHostClips(destination)) return;
-            patch.audioClips = moveClip(clips(), target.id, op.start, trackId);
+            patch.clips = moveClip(clips(), target.id, op.start, trackId);
             return;
         }
         if (op.type === "audio.clip.duplicate") {
             const target = clip(op.clipId);
             if (!target) return;
-            patch.audioClips = [...clips(), withId(duplicateClip(target, op.start ?? clipEnd(target)), op.id)];
+            patch.clips = [...clips(), withId(duplicateClip(target, op.start ?? clipEnd(target)), op.id)];
             return;
         }
         if (op.type === "audio.clip.trimIn") {
             if (!clip(op.clipId)) return;
-            patch.audioClips = trimClipIn(clips(), op.clipId, op.delta);
+            patch.clips = trimClipIn(clips(), op.clipId, op.delta);
             return;
         }
         if (op.type === "audio.clip.trimOut") {
             if (!clip(op.clipId)) return;
-            patch.audioClips = trimClipOut(clips(), op.clipId, op.delta);
+            patch.clips = trimClipOut(clips(), op.clipId, op.delta);
             return;
         }
         if (op.type === "audio.clip.setFade") {
             if (!clip(op.clipId)) return;
-            patch.audioClips = setClipFade(clips(), op.clipId, op.edge, op.seconds);
+            patch.clips = setClipFade(clips(), op.clipId, op.edge, op.seconds);
             return;
         }
         if (op.type === "audio.clip.split") {
             const next = splitClip(clips(), op.clipId, op.time);
-            if (next) patch.audioClips = next;
+            if (next) patch.clips = next;
             return;
         }
         if (op.type === "audio.clip.shift") {
             if (!(op.clipIds ?? []).some((id) => clip(id))) return;
-            patch.audioClips = shiftClips(clips(), op.clipIds, op.deltaSeconds);
+            patch.clips = shiftClips(clips(), op.clipIds, op.deltaSeconds);
             return;
         }
         if (op.type === "audio.clip.moveToTrack") {
             const destination = track(op.trackId);
             if (!destination || !canHostClips(destination) || !(op.clipIds ?? []).some((id) => clip(id))) return;
-            patch.audioClips = moveClipsToTrack(clips(), op.clipIds, destination.id);
+            patch.clips = moveClipsToTrack(clips(), op.clipIds, destination.id);
             return;
         }
         if (op.type === "audio.clip.glue") {
             const next = glueClip(clips(), op.clipId);
-            if (next) patch.audioClips = next;
+            if (next) patch.clips = next;
             return;
         }
         if (op.type === "audio.clip.crossfade") {
             const next = crossfadeClip(clips(), op.clipId);
-            if (next) patch.audioClips = next;
+            if (next) patch.clips = next;
             return;
         }
         if (op.type === "audio.clip.delete") {
             const ids = new Set(op.clipIds ?? (op.clipId ? [op.clipId] : []));
             if (!ids.size) return;
             const next = clips().filter((item) => !ids.has(item.id));
-            if (next.length !== clips().length) patch.audioClips = next;
+            if (next.length !== clips().length) patch.clips = next;
             return;
         }
         if (op.type === "audio.clip.toggleField") {
             const primary = clip(op.clipIds[op.clipIds.length - 1]);
             if (!primary) return;
             const value = !primary[op.field];
-            patch.audioClips = clips().map((item) => (op.clipIds.includes(item.id) ? { ...item, [op.field]: value } : item));
+            patch.clips = clips().map((item) => (op.clipIds.includes(item.id) ? { ...item, [op.field]: value } : item));
             return;
         }
         if (op.type === "audio.clip.toggleFade") {
@@ -408,7 +407,7 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
             if (!primary) return;
             const current = (op.edge === "in" ? primary.fadeIn : primary.fadeOut) ?? 0;
             const value = current > 0 ? 0 : Math.min(AUDIO_DEFAULT_FADE_SECONDS, primary.duration);
-            patch.audioClips = clips().map((item) => (op.clipIds.includes(item.id) ? (op.edge === "in" ? { ...item, fadeIn: value } : { ...item, fadeOut: value }) : item));
+            patch.clips = clips().map((item) => (op.clipIds.includes(item.id) ? (op.edge === "in" ? { ...item, fadeIn: value } : { ...item, fadeOut: value }) : item));
             return;
         }
 
@@ -417,7 +416,7 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
             const destination = track(op.trackId);
             if (!destination || !canHostMidi(destination)) return;
             const created = createAudioMidiRegion(op.trackId, op.startTicks ?? nextMidiRegionStart(midi(), op.trackId), op.durationTicks ?? barTicks(ppqn(), meter()), op.name ?? "");
-            patch.audioMidiRegions = [...midi(), withId(created, op.id)];
+            patch.midiRegions = [...midi(), withId(created, op.id)];
             return;
         }
         if (op.type === "audio.midi.region.move") {
@@ -426,20 +425,20 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
             const trackId = op.trackId ?? target.trackId;
             const destination = track(trackId);
             if (!destination || !canHostMidi(destination)) return;
-            patch.audioMidiRegions = moveRegion(midi(), target.id, op.startTicks, trackId);
+            patch.midiRegions = moveRegion(midi(), target.id, op.startTicks, trackId);
             return;
         }
         if (op.type === "audio.midi.region.duplicate") {
             const target = region(op.regionId);
             if (!target) return;
-            patch.audioMidiRegions = [...midi(), withId(duplicateRegion(target), op.id)];
+            patch.midiRegions = [...midi(), withId(duplicateRegion(target), op.id)];
             return;
         }
         if (op.type === "audio.midi.region.delete") {
             const ids = new Set(op.regionIds ?? (op.regionId ? [op.regionId] : []));
             if (!ids.size) return;
             const next = midi().filter((item) => !ids.has(item.id));
-            if (next.length !== midi().length) patch.audioMidiRegions = next;
+            if (next.length !== midi().length) patch.midiRegions = next;
             return;
         }
         if (op.type === "audio.midi.region.split") {
@@ -447,19 +446,19 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
             if (!target) return;
             const halves = splitRegionAt(target, op.cutTicks);
             if (!halves) return;
-            patch.audioMidiRegions = midi().flatMap((item) => (item.id === target.id ? halves : [item]));
+            patch.midiRegions = midi().flatMap((item) => (item.id === target.id ? halves : [item]));
             return;
         }
         if (op.type === "audio.midi.region.trimStart") {
             const target = region(op.regionId);
             if (!target) return;
-            patch.audioMidiRegions = midi().map((item) => (item.id === target.id ? trimRegionStart(item, op.deltaTicks) : item));
+            patch.midiRegions = midi().map((item) => (item.id === target.id ? trimRegionStart(item, op.deltaTicks) : item));
             return;
         }
         if (op.type === "audio.midi.region.trimEnd") {
             const target = region(op.regionId);
             if (!target) return;
-            patch.audioMidiRegions = midi().map((item) => (item.id === target.id ? trimRegionEnd(item, op.durationTicks) : item));
+            patch.midiRegions = midi().map((item) => (item.id === target.id ? trimRegionEnd(item, op.durationTicks) : item));
             return;
         }
         if (op.type === "audio.midi.note.add") {
@@ -501,7 +500,7 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
 
         // Mixer
         if (op.type === "audio.mixer.setMasterGain") {
-            patch.audioMasterGain = clampGain(op.gain);
+            patch.masterGain = clampGain(op.gain);
             return;
         }
         if (op.type === "audio.mixer.setTrackGain") {
@@ -516,7 +515,7 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
         }
         if (op.type === "audio.mixer.setClipGain") {
             const target = clip(op.clipId);
-            if (target) patch.audioClips = patchClip(clips(), target.id, { gain: clampClipGain(op.gain) });
+            if (target) patch.clips = patchClip(clips(), target.id, { gain: clampClipGain(op.gain) });
             return;
         }
         if (op.type === "audio.mixer.setMute") {
@@ -555,44 +554,44 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
             const target = track(op.trackId);
             if (!target?.sends?.some((send) => send.id === op.sendId)) return;
             const nextTracks = tracks().map((item) => (item.id === target.id ? { ...item, sends: (item.sends ?? []).filter((send) => send.id !== op.sendId) } : item));
-            patch.audioTracks = nextTracks;
+            patch.tracks = nextTracks;
             pruneSendAutomation(nextTracks);
             return;
         }
 
         // Transport / session
         if (op.type === "audio.transport.setTempo") {
-            if (Number.isFinite(op.tempo)) patch.audioTempo = clampRange(op.tempo, 20, 300);
+            if (Number.isFinite(op.tempo)) patch.tempo = clampRange(op.tempo, 20, 300);
             return;
         }
         if (op.type === "audio.transport.setTimeSignature") {
             if (!Number.isFinite(op.numerator) || !Number.isFinite(op.denominator) || op.numerator <= 0 || op.denominator <= 0) return;
-            patch.audioTimeSignature = { numerator: Math.round(op.numerator), denominator: Math.round(op.denominator) };
+            patch.timeSignature = { numerator: Math.round(op.numerator), denominator: Math.round(op.denominator) };
             return;
         }
         if (op.type === "audio.transport.setGrid") {
-            patch.audioGrid = { enabled: op.enabled ?? grid().enabled, snap: op.snap ?? grid().snap };
+            patch.grid = { enabled: op.enabled ?? grid().enabled, snap: op.snap ?? grid().snap };
             return;
         }
         if (op.type === "audio.transport.setCycle") {
-            patch.audioCycle = { enabled: op.enabled ?? cycle().enabled, start: clampSeconds(op.start ?? cycle().start), end: clampSeconds(op.end ?? cycle().end) };
+            patch.cycle = { enabled: op.enabled ?? cycle().enabled, start: clampSeconds(op.start ?? cycle().start), end: clampSeconds(op.end ?? cycle().end) };
             return;
         }
         if (op.type === "audio.transport.setPunch") {
-            patch.audioPunch = { enabled: op.enabled ?? punch().enabled, in: clampSeconds(op.in ?? punch().in), out: clampSeconds(op.out ?? punch().out) };
+            patch.punch = { enabled: op.enabled ?? punch().enabled, in: clampSeconds(op.in ?? punch().in), out: clampSeconds(op.out ?? punch().out) };
             return;
         }
         if (op.type === "audio.transport.setMetronome") {
-            patch.audioMetronome = { enabled: op.enabled ?? metronome().enabled, volumeDb: Math.round(clampRange(op.volumeDb ?? metronome().volumeDb, -40, 0)) };
+            patch.metronome = { enabled: op.enabled ?? metronome().enabled, volumeDb: Math.round(clampRange(op.volumeDb ?? metronome().volumeDb, -40, 0)) };
             return;
         }
         if (op.type === "audio.transport.setCountIn") {
-            patch.audioCountIn = Math.round(clampRange(op.countIn, 0, 4));
+            patch.countIn = Math.round(clampRange(op.countIn, 0, 4));
             return;
         }
         if (op.type === "audio.transport.setCapture") {
             const current = capture();
-            patch.audioCapture = {
+            patch.capture = {
                 mode: op.mode === "punch" ? "punch" : op.mode === "normal" ? "normal" : current.mode,
                 channels: op.channels === 1 ? 1 : op.channels === 2 ? 2 : current.channels,
                 gainDb: Math.round(clampRange(op.gainDb ?? current.gainDb, -24, 24)),
@@ -601,21 +600,21 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
             return;
         }
         if (op.type === "audio.transport.setPpqn") {
-            patch.audioPpqn = clampPpqn(op.ppqn);
+            patch.ppqn = clampPpqn(op.ppqn);
             return;
         }
         if (op.type === "audio.marker.create") {
-            patch.audioMarkers = [...markers(), withId(createAudioMarker(op.time, op.name ?? ""), op.id)];
+            patch.markers = [...markers(), withId(createAudioMarker(op.time, op.name ?? ""), op.id)];
             return;
         }
         if (op.type === "audio.marker.rename") {
             if (!markers().some((item) => item.id === op.markerId)) return;
-            patch.audioMarkers = markers().map((item) => (item.id === op.markerId ? { ...item, name: op.name } : item));
+            patch.markers = markers().map((item) => (item.id === op.markerId ? { ...item, name: op.name } : item));
             return;
         }
         if (op.type === "audio.marker.remove") {
             if (!markers().some((item) => item.id === op.markerId)) return;
-            patch.audioMarkers = markers().filter((item) => item.id !== op.markerId);
+            patch.markers = markers().filter((item) => item.id !== op.markerId);
             return;
         }
 
@@ -623,8 +622,8 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
         if (op.type === "audio.automation.lane.add") {
             const target = track(op.trackId);
             if (!target || findAutomationLane(automation(), target.id, op.target)) return;
-            patch.audioAutomation = [...automation(), withId(createAudioAutomationLane(target.id, op.target), op.id)];
-            patch.audioTracks = tracks().map((item) => (item.id === target.id ? { ...item, collapsed: false } : item));
+            patch.automation = [...automation(), withId(createAudioAutomationLane(target.id, op.target), op.id)];
+            patch.tracks = tracks().map((item) => (item.id === target.id ? { ...item, collapsed: false } : item));
             return;
         }
         if (op.type === "audio.automation.lane.patch") {
@@ -633,17 +632,17 @@ export function applyAudioAgentOps(project: CanvasNodeData, ops: AudioAgentOp[])
             const next: CanvasAudioAutomationLane = { ...target };
             if (op.patch.enabled !== undefined) next.enabled = op.patch.enabled;
             if (op.patch.target !== undefined) next.target = op.patch.target;
-            patch.audioAutomation = automation().map((item) => (item.id === target.id ? next : item));
+            patch.automation = automation().map((item) => (item.id === target.id ? next : item));
             return;
         }
         if (op.type === "audio.automation.lane.remove") {
             if (!lane(op.laneId)) return;
-            patch.audioAutomation = automation().filter((item) => item.id !== op.laneId);
+            patch.automation = automation().filter((item) => item.id !== op.laneId);
             return;
         }
         if (op.type === "audio.automation.lane.clearTrack") {
             const next = automation().filter((item) => item.trackId !== op.trackId);
-            if (next.length !== automation().length) patch.audioAutomation = next;
+            if (next.length !== automation().length) patch.automation = next;
             return;
         }
         if (op.type === "audio.automation.points.set") {
@@ -697,7 +696,7 @@ function audioOpVariant(type: string, properties: Record<string, unknown>, requi
 }
 
 const AUDIO_OP_SPECS: { type: string; required?: string[]; properties: Record<string, unknown> }[] = [
-    { type: "audio.track.create", properties: { trackType: { type: "string", enum: ["audio", "instrument", "midi", "group", "return"] }, id: P_STRING } },
+    { type: "audio.track.create", properties: { trackType: { type: "string", enum: ["audio", "instrument", "group", "return"] }, id: P_STRING } },
     { type: "audio.track.duplicate", required: ["trackId"], properties: { trackId: P_STRING, id: P_STRING } },
     { type: "audio.track.remove", required: ["trackId"], properties: { trackId: P_STRING } },
     {

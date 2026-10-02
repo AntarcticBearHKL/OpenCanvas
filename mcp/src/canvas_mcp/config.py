@@ -2,13 +2,12 @@
 
 Mirrors the TypeScript ``config.ts`` (agent instructions + version) and adds the
 environment-driven settings the standalone server needs (host, port, origin
-allowlist, token, debug logging).
+allowlist and debug logging).
 """
 
 from __future__ import annotations
 
 import os
-import secrets
 from pathlib import Path
 
 VERSION = "0.1.0"
@@ -40,6 +39,3 @@ class Settings:
         self.port = int(os.environ.get("CANVAS_MCP_PORT", "3210"))
         self.debug = _flag("CANVAS_MCP_DEBUG")
         self.origins = [item.strip() for item in os.environ.get("CANVAS_MCP_ORIGINS", "").split(",") if item.strip()]
-        token = os.environ.get("CANVAS_MCP_TOKEN", "").strip()
-        self.token_generated = not token
-        self.token = token or secrets.token_urlsafe(32)

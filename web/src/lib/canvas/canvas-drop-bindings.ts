@@ -11,7 +11,6 @@ const CANVAS_DROP_RULES: CanvasDropRule[] = [
     { sourceType: CanvasNodeType.Image, targetType: CanvasNodeType.VideoPrompt, binding: "slot" },
     { sourceType: CanvasNodeType.Video, targetType: CanvasNodeType.VideoPrompt, binding: "slot" },
     { sourceType: CanvasNodeType.Audio, targetType: CanvasNodeType.VideoPrompt, binding: "slot" },
-    { sourceType: CanvasNodeType.Audio, targetType: CanvasNodeType.AudioProject, binding: "track" },
 ];
 
 export function resolveCanvasDropBinding(sourceType: CanvasNodeTypeId, targetType: CanvasNodeTypeId): CanvasDropBinding | null {

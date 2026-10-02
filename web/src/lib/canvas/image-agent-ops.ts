@@ -7,8 +7,8 @@ import { addPsLayer, addPsLayerAbove, duplicatePsLayer, ensurePsLayerStyle, find
 import { clampLayerOpacity } from "@/lib/canvas/blend-modes";
 import { PS_ADJUSTMENT_NAME_KEYS, PS_ADJUSTMENT_TYPES } from "@/lib/canvas/ps-adjustments";
 import { PS_LAYER_STYLE_TYPES } from "@/lib/canvas/ps-layer-styles";
-import { BOARD_LAYOUT_TEMPLATES, PS_SHAPE_KINDS, arrangePsLayers, createPsAdjustmentLayer, createPsImageLayer, createPsPixelLayer, createPsShapeLayer, createPsTextLayer, smartCanvasLayers, smartCanvasSizeForRatio, type BoardLayoutTemplate, type SmartCanvasResolution } from "@/lib/canvas/smart-canvas";
-import type { CanvasNodeData, CanvasNodeMetadata, CanvasPsAdjustmentType, CanvasPsLayer, CanvasPsLayerStyleType, CanvasPsParamValue, CanvasPsShapeKind } from "@/types/canvas";
+import { BOARD_LAYOUT_TEMPLATES, PS_SHAPE_KINDS, arrangePsLayers, createPsAdjustmentLayer, createPsImageLayer, createPsPixelLayer, createPsShapeLayer, createPsTextLayer, smartCanvasLayers, smartCanvasSizeForRatio, type BoardLayoutTemplate, type PsImageSource, type SmartCanvasBoard, type SmartCanvasResolution } from "@/lib/canvas/smart-canvas";
+import type { CanvasPsAdjustmentType, CanvasPsLayer, CanvasPsLayerStyleType, CanvasPsParamValue, CanvasPsShapeKind } from "@/types/canvas";
 
 // Flat `{ ns: "image", type, ...fields }` ops for the Smart Canvas layer document; ids / names are optional so
 // callers can drive the pure reducer deterministically (the nanoid fallback only runs when they are omitted).
@@ -63,7 +63,7 @@ const LAYER_SCHEMA: Record<string, unknown> = {
         id: { type: "string" },
         name: { type: "string" },
         kind: { type: "string", enum: ["image", "text", "group", "pixel", "shape", "adjustment"] },
-        sourceNodeId: { type: "string" },
+        content: { type: "string" },
         storageKey: { type: "string" },
         maskStorageKey: { type: "string" },
         adjustment: { type: "string", enum: PS_ADJUSTMENT_TYPES },
@@ -151,10 +151,10 @@ export const IMAGE_AGENT_SCHEMA: Record<string, unknown> = {
     oneOf: IMAGE_OP_SPECS.map((spec) => imageOpVariant(spec.type, spec.properties, spec.required)),
 };
 
-export type ImageAgentInput = { board: CanvasNodeData; nodes: CanvasNodeData[] };
+export type ImageAgentInput = { board: SmartCanvasBoard; images: (PsImageSource & { id: string })[] };
 
-/** `size` is the document geometry after the fold, `metadata` the board-node settings patch (`document.set*`). */
-export type ImageAgentResult = { layers: CanvasPsLayer[]; size?: { width: number; height: number }; metadata?: Partial<CanvasNodeMetadata> };
+/** `size` is the document geometry after the fold, `metadata` the board settings patch (`document.set*`). */
+export type ImageAgentResult = { layers: CanvasPsLayer[]; size?: { width: number; height: number }; metadata?: Partial<SmartCanvasBoard> };
 
 function psAgentLayer(layer: CanvasPsLayer, id?: string, name?: string) {
     return { ...layer, ...(id ? { id } : {}), ...(name ? { name } : {}) };
@@ -168,7 +168,7 @@ export function applyImageAgentOps(input: ImageAgentInput, ops?: ImageAgentOp[])
     let layers = smartCanvasLayers(source);
     let width = Math.max(1, Math.round(source.width));
     let height = Math.max(1, Math.round(source.height));
-    let metadata: Partial<CanvasNodeMetadata> | undefined;
+    let metadata: Partial<SmartCanvasBoard> | undefined;
 
     const trimDocument = (documentWidth: number, documentHeight: number) => {
         const box = psTrimBox(layers, documentWidth, documentHeight);
@@ -180,7 +180,7 @@ export function applyImageAgentOps(input: ImageAgentInput, ops?: ImageAgentOp[])
 
     (Array.isArray(ops) ? ops : []).forEach((op) => {
         if (!op?.type) return;
-        const board: CanvasNodeData = { ...source, width, height, metadata: { ...source.metadata, boardLayers: layers } };
+        const board: SmartCanvasBoard = { ...source, width, height, boardLayers: layers };
         const target = "id" in op && typeof op.id === "string" ? findPsLayer(layers, op.id) : undefined;
         if (op.type === "layer.add") layers = addPsLayer(layers, op.layer, op.groupId);
         if (op.type === "layer.addAbove") layers = addPsLayerAbove(layers, op.layer, op.targetId);
@@ -202,8 +202,8 @@ export function applyImageAgentOps(input: ImageAgentInput, ops?: ImageAgentOp[])
         if (op.type === "layer.create.shape") layers = addPsLayer(layers, psAgentLayer(createPsShapeLayer(op.shape, op.box, op.name || i18n.t(SHAPE_NAME_KEYS[op.shape]), op.fill || "#000000", op.stroke || "#000000", op.strokeWidth ?? 0), op.id));
         if (op.type === "layer.create.adjustment") layers = addPsLayer(layers, psAgentLayer(createPsAdjustmentLayer(board, op.adjustment, op.name || i18n.t(PS_ADJUSTMENT_NAME_KEYS[op.adjustment])), op.id));
         if (op.type === "layer.create.image") {
-            const sourceNode = input.nodes.find((node) => node.id === op.nodeId);
-            if (sourceNode) layers = addPsLayer(layers, psAgentLayer(createPsImageLayer(board, sourceNode), op.id, op.name));
+            const sourceImage = input.images.find((image) => image.id === op.nodeId);
+            if (sourceImage) layers = addPsLayer(layers, psAgentLayer(createPsImageLayer(board, sourceImage), op.id, op.name));
         }
         if (op.type === "board.arrange") layers = arrangePsLayers(board, op.template || "grid");
         if (op.type === "image.scaleLayers") layers = psScaleLayers(layers, op.sx, op.sy);

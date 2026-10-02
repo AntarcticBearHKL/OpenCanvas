@@ -1,16 +1,15 @@
-import type { Dispatch, SetStateAction } from "react";
 import { Blend, Camera, CircleDot, Contrast, Droplets, Grid2x2, Palette, Paintbrush, Pipette, RefreshCw, Scale, SlidersHorizontal, Spline, Sun, SunMedium } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { addPsLayerAbove, commitBoardLayers, patchPsLayer } from "@/components/canvas/workspace/ps-layer-ops";
+import { addPsLayerAbove, commitBoardLayers, patchPsLayer, type PsBoardCommit } from "@/components/canvas/workspace/ps-layer-ops";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { PS_ADJUSTMENT_DEFAULTS, PS_ADJUSTMENT_NAME_KEYS, PS_ADJUSTMENT_TYPES, psCopyParams } from "@/lib/canvas/ps-adjustments";
-import { createPsAdjustmentLayer, smartCanvasLayers } from "@/lib/canvas/smart-canvas";
-import type { CanvasNodeData, CanvasPsAdjustmentType, CanvasPsLayer } from "@/types/canvas";
+import { createPsAdjustmentLayer, smartCanvasLayers, type SmartCanvasBoard } from "@/lib/canvas/smart-canvas";
+import type { CanvasPsAdjustmentType, CanvasPsLayer } from "@/types/canvas";
 
 type PsAdjustmentsPanelProps = {
-    board: CanvasNodeData;
-    setNodes: Dispatch<SetStateAction<CanvasNodeData[]>>;
+    board: SmartCanvasBoard;
+    commitBoard: PsBoardCommit;
     selected: CanvasPsLayer | null;
     onSelect: (layerId: string) => void;
 };
@@ -33,18 +32,18 @@ const ICONS: Record<CanvasPsAdjustmentType, typeof Sun> = {
     "selective-color": Pipette,
 };
 
-export default function PsAdjustmentsPanel({ board, setNodes, selected, onSelect }: PsAdjustmentsPanelProps) {
+export default function PsAdjustmentsPanel({ board, commitBoard, selected, onSelect }: PsAdjustmentsPanelProps) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     const layers = smartCanvasLayers(board);
     const pick = (type: CanvasPsAdjustmentType) => {
         const name = t(PS_ADJUSTMENT_NAME_KEYS[type]);
         if (selected?.kind === "adjustment") {
-            commitBoardLayers(setNodes, board.id, patchPsLayer(layers, selected.id, { adjustment: type, adjustmentParams: psCopyParams(PS_ADJUSTMENT_DEFAULTS[type]), name }));
+            commitBoardLayers(commitBoard, board.id, patchPsLayer(layers, selected.id, { adjustment: type, adjustmentParams: psCopyParams(PS_ADJUSTMENT_DEFAULTS[type]), name }));
             return;
         }
         const layer = createPsAdjustmentLayer(board, type, name);
-        commitBoardLayers(setNodes, board.id, addPsLayerAbove(layers, layer, selected?.id));
+        commitBoardLayers(commitBoard, board.id, addPsLayerAbove(layers, layer, selected?.id));
         onSelect(layer.id);
     };
     return (

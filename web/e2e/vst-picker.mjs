@@ -37,26 +37,17 @@ const HARD_TIMEOUT_MS = 300000;
 const ARTIFACTS = resolve("e2e", "artifacts", new Date().toISOString().replace(/[:.]/g, "-"));
 const CHROME = ["C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome"].find((path) => existsSync(path));
 
-const CANVAS_STORE_KEY = "infinite-canvas:canvas_store";
-const PROJECT_NODE_ID = "vst-picker-project";
+const AUDIO_STORE_KEY = "infinite-canvas:audio_projects";
 const TRACK_ID = "t1";
 const REGION_ID = "r1";
-const SEED_NODE = {
-    id: PROJECT_NODE_ID,
-    type: "audio-project",
-    title: "VST picker project",
-    position: { x: 80, y: 80 },
-    width: 900,
-    height: 560,
-    metadata: {
-        audioPpqn: 960,
-        audioTempo: 120,
-        audioTracks: [
-            { id: TRACK_ID, name: "VST track", type: "instrument", gain: 1, pan: 0, mute: false, solo: false, instrument: { kind: "synth", preset: "saw-lead" } },
-            { id: "master", name: "Master", type: "master", gain: 1, pan: 0, mute: false, solo: false },
-        ],
-        audioMidiRegions: [{ id: REGION_ID, trackId: TRACK_ID, startTicks: 0, durationTicks: 960 * 8, name: "VST region", notes: [{ id: "n1", tick: 0, durationTicks: 960 * 4, pitch: 60, velocity: 0.8 }] }],
-    },
+const SEED_DOCUMENT = {
+    ppqn: 960,
+    tempo: 120,
+    tracks: [
+        { id: TRACK_ID, name: "VST track", type: "instrument", gain: 1, pan: 0, mute: false, solo: false, instrument: { kind: "synth", preset: "saw-lead" } },
+        { id: "master", name: "Master", type: "master", gain: 1, pan: 0, mute: false, solo: false },
+    ],
+    midiRegions: [{ id: REGION_ID, trackId: TRACK_ID, startTicks: 0, durationTicks: 960 * 8, name: "VST region", notes: [{ id: "n1", tick: 0, durationTicks: 960 * 4, pitch: 60, velocity: 0.8 }] }],
 };
 
 // ---------------------------------------------------------------------------
@@ -64,17 +55,17 @@ const SEED_NODE = {
 // ---------------------------------------------------------------------------
 
 const SEED_SCRIPT = `(async () => {
-    const ARGS = ${JSON.stringify({ baseUrl: HOST_URL, token: TOKEN, node: SEED_NODE, storageKey: CANVAS_STORE_KEY })};
+    const ARGS = ${JSON.stringify({ baseUrl: HOST_URL, token: TOKEN, document: SEED_DOCUMENT, storageKey: AUDIO_STORE_KEY })};
     const wait = (ms) => new Promise((resolveWait) => setTimeout(resolveWait, ms));
     localStorage.setItem("infinite-canvas:locale", "zh-CN");
     localStorage.setItem("canvas-vst-url", ARGS.baseUrl);
     localStorage.setItem("canvas-vst-token", ARGS.token);
-    const store = (await import("/src/stores/canvas/use-canvas-store.ts")).useCanvasStore;
+    const store = (await import("/src/stores/use-audio-store.ts")).useAudioStore;
     const storage = (await import("/src/lib/localforage-storage.ts")).localForageStorage;
     const hydratedDeadline = Date.now() + 15000;
     while (!store.getState().hydrated && Date.now() < hydratedDeadline) await wait(100);
     const projectId = store.getState().createProject("VST picker e2e");
-    store.getState().updateProject(projectId, { nodes: [ARGS.node], connections: [] });
+    store.getState().updateProject(projectId, ARGS.document);
     let persisted = false;
     const flushDeadline = Date.now() + 8000;
     while (!persisted && Date.now() < flushDeadline) {
@@ -171,15 +162,14 @@ const clickOptionScript = (pluginName) => `(async () => {
 })()`;
 
 const readTrackScript = (projectId) => `(async () => {
-    const ARGS = ${JSON.stringify({ projectId, storageKey: CANVAS_STORE_KEY })};
+    const ARGS = ${JSON.stringify({ projectId, storageKey: AUDIO_STORE_KEY })};
     const storage = (await import("/src/lib/localforage-storage.ts")).localForageStorage;
     const raw = await storage.getItem(ARGS.storageKey);
     const parsed = raw ? JSON.parse(raw) : null;
     const projects = (parsed && parsed.state && parsed.state.projects) || [];
     const project = projects.find((item) => item.id === ARGS.projectId);
-    const node = project ? project.nodes.find((item) => item.id === ${JSON.stringify(PROJECT_NODE_ID)}) : null;
-    const track = node ? ((node.metadata && node.metadata.audioTracks) || []).find((item) => item.id === ${JSON.stringify(TRACK_ID)}) : null;
-    return { source: "storage", projectFound: Boolean(project), instrument: track ? track.instrument || null : null };
+    const track = project ? ((project.tracks) || []).find((item) => item.id === ${JSON.stringify(TRACK_ID)}) : null;
+    return { projectFound: Boolean(project), instrument: track ? track.instrument || null : null };
 })()`;
 
 const READ_SELECT_TEXT_SCRIPT = `(() => {
@@ -418,7 +408,7 @@ async function run() {
     writeFileSync(join(ARTIFACTS, "seed.json"), JSON.stringify(seed, null, 2));
 
     currentPhase = "project page";
-    await send(state.socket, nextId++, "Page.navigate", { url: `${BASE}/canvas/${seed.projectId}/audio` });
+    await send(state.socket, nextId++, "Page.navigate", { url: `${BASE}/audio/${seed.projectId}` });
     await waitFor(async () => (await exec(REGION_EXISTS_SCRIPT)) === true, 40000, "audio studio region");
 
     currentPhase = "roll open";

@@ -1,15 +1,16 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Input, InputNumber, Select, Slider, Switch } from "antd";
-import { Circle, FolderKanban, Link2, Music2, Plus, Search, SlidersVertical, Trash2 } from "lucide-react";
+import { Circle, FileMusic, FolderKanban, Link2, Music2, Plus, Search, SlidersVertical, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import PsColorPicker from "@/components/canvas/workspace/ps-color-picker";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
-import { STUDIO_FLAT_BUTTON_CLASS, STUDIO_PANEL_LABEL_CLASS, STUDIO_PANEL_ROW_CLASS } from "@/components/canvas/workspace/studio-chrome";
+import { STUDIO_FLAT_BUTTON_CLASS, STUDIO_PANEL_ROW_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import { AUDIO_AUTOMATION_GAIN, AUDIO_AUTOMATION_PAN, audioAutomationSendTarget, automationOwns } from "@/lib/canvas/audio-automation";
 import { AUDIO_FADER_MAX_DB, AUDIO_FADER_MIN_DB, AUDIO_GAIN_MAX, audioReturnTracks, audioRoutingCycle, audioTrackType, clampGain, createAudioSend, faderDbGain, formatFaderDb, gainFaderDb, parseDbValue, parseGainPercent } from "@/lib/canvas/audio-project";
 import { formatAudioTime } from "@/lib/canvas/audio-waveform";
-import type { CanvasAudioAutomationLane, CanvasAudioCapture, CanvasAudioClip, CanvasAudioFadeShape, CanvasAudioSend, CanvasAudioSnap, CanvasAudioTrack, CanvasAudioTrackType, CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
+import type { AudioProjectDocument } from "@/lib/canvas/audio-project";
+import { CanvasNodeType, type CanvasAudioAutomationLane, type CanvasAudioCapture, type CanvasAudioClip, type CanvasAudioFadeShape, type CanvasAudioSend, type CanvasAudioSnap, type CanvasAudioTrack, type CanvasAudioTrackType, type CanvasNodeData } from "@/types/canvas";
 
 export const AUDIO_SNAP_OPTIONS: CanvasAudioSnap[] = ["off", "bar", "beat", "1/2", "1/4", "1/8", "1/16"];
 export const AUDIO_SNAP_LABEL_KEYS: Record<CanvasAudioSnap, string> = { off: "canvas.audioStudio.snapOff", bar: "canvas.audioStudio.snapBar", beat: "canvas.audioStudio.snapBeat", "1/2": "canvas.audioStudio.snapHalf", "1/4": "canvas.audioStudio.snapQuarter", "1/8": "canvas.audioStudio.snapEighth", "1/16": "canvas.audioStudio.snapSixteenth" };
@@ -25,17 +26,39 @@ export const AUDIO_FADE_SHAPE_LABEL_KEYS: Record<CanvasAudioFadeShape, string> =
 export const AUDIO_TRACK_TYPE_LABEL_KEYS: Record<CanvasAudioTrackType, string> = {
     audio: "canvas.audioStudio.trackTypeAudio",
     instrument: "canvas.audioStudio.trackTypeInstrument",
-    midi: "canvas.audioStudio.trackTypeMidi",
     group: "canvas.audioStudio.trackTypeGroup",
     return: "canvas.audioStudio.trackTypeReturn",
     master: "canvas.audioStudio.trackTypeMaster",
 };
 
 export const AUDIO_NODE_DRAG_MIME = "application/x-infinite-canvas-audio-node";
+export const AUDIO_MIDI_NODE_DRAG_MIME = "application/x-infinite-canvas-audio-midi-node";
+
+/** Read-only track-type badge; soft-token color distinguishes buses from plain audio/instrument tracks. */
+export function AudioTypeChip({ type, className = "" }: { type: CanvasAudioTrackType; className?: string }) {
+    const { t } = useTranslation();
+    const theme = useCanvasTheme();
+    const style =
+        type === "group"
+            ? { background: theme.node.infoSoft, color: theme.node.info }
+            : type === "return"
+              ? { background: theme.node.successSoft, color: theme.node.success }
+              : type === "master"
+                ? { background: theme.node.warningSoft, color: theme.node.warning }
+                : { background: theme.node.accentSoft, color: theme.node.accentText };
+    return (
+        <span className={`inline-flex max-w-full min-w-0 items-center truncate rounded px-1.5 py-px text-xs font-medium ${className}`} style={style}>
+            {t(AUDIO_TRACK_TYPE_LABEL_KEYS[type])}
+        </span>
+    );
+}
 
 const ROW_CLASS = STUDIO_PANEL_ROW_CLASS;
-const LABEL_CLASS = STUDIO_PANEL_LABEL_CLASS;
+const LABEL_CLASS = "w-[70px] shrink-0 text-xs font-medium";
+const VALUE_CLASS = "tabular-nums";
 const SECTION_CLASS = "flex shrink-0 flex-col gap-0.5 px-2 pb-2 pt-1.5";
+const SECTION_DIVIDER_CLASS = "mx-2 h-px shrink-0";
+const SECTION_LABEL_CLASS = "text-xs font-medium tracking-wide";
 const FLAT_BUTTON_CLASS = STUDIO_FLAT_BUTTON_CLASS;
 
 export function AudioMeter({ trackId, register, className = "" }: { trackId: string; register: (trackId: string, channel: number, element: HTMLElement | null) => void; className?: string }) {
@@ -60,8 +83,8 @@ export function AudioToggle({ label, active, activeColor, activeBackground, onCl
     return (
         <button
             type="button"
-            className={`grid shrink-0 place-items-center rounded-md text-sm font-medium transition hover:bg-hover ${className}`}
-            style={active ? { background: activeBackground || theme.toolbar.activeBg, color: activeColor || theme.toolbar.activeText } : { color: theme.node.muted }}
+            className={`grid shrink-0 place-items-center rounded-md border text-sm font-medium transition hover:bg-hover ${className}`}
+            style={active ? { background: activeBackground || theme.node.accentSoft, color: activeColor || theme.node.accent, borderColor: theme.toolbar.border } : { color: theme.node.muted, borderColor: theme.toolbar.border }}
             aria-label={label}
             title={label}
             aria-pressed={active}
@@ -107,7 +130,7 @@ export function AudioSlider({ label, value, min, max, step = 1, linked = false, 
                     onCommit(next);
                 }}
             />
-            <span className="w-10 shrink-0 text-right text-sm tabular-nums" style={{ color: theme.node.muted }}>
+            <span className={`w-10 shrink-0 text-right text-sm ${VALUE_CLASS}`} style={{ color: theme.node.text }}>
                 {text}
             </span>
         </label>
@@ -164,14 +187,12 @@ export function AudioSendList({ track, tracks, automation, onChange }: { track: 
     return (
         <div className={SECTION_CLASS}>
             <div className="flex items-center gap-1.5">
-                <span className="text-sm" style={{ color: theme.node.muted }}>
+                <span className={SECTION_LABEL_CLASS} style={{ color: theme.node.muted }}>
                     {t("canvas.audioStudio.sends")}
                 </span>
-                <span className="min-w-0 flex-1" />
                 {returns.length ? (
                     <Select
                         size="small"
-                        variant="borderless"
                         className="min-w-0 flex-1"
                         value={null}
                         placeholder={t("canvas.audioStudio.sendAdd")}
@@ -182,7 +203,7 @@ export function AudioSendList({ track, tracks, automation, onChange }: { track: 
                         onChange={(target: string) => onChange([...sends, createAudioSend(target)])}
                     />
                 ) : (
-                    <span className="truncate text-sm" style={{ color: theme.node.placeholder }}>
+                    <span className="min-w-0 flex-1 truncate text-xs" style={{ color: theme.node.placeholder }}>
                         {t("canvas.audioStudio.noReturnTracks")}
                     </span>
                 )}
@@ -191,14 +212,13 @@ export function AudioSendList({ track, tracks, automation, onChange }: { track: 
                 sends.map((send) => {
                     const linked = automationOwns(automation, track.id, audioAutomationSendTarget(send.id));
                     return (
-                    <div key={send.id} className="flex flex-col gap-0.5 border-t pt-0.5" style={{ borderColor: theme.toolbar.border }}>
+                    <div key={send.id} className="flex flex-col gap-1 rounded-md border p-1" style={{ background: theme.node.panel, borderColor: theme.toolbar.border }}>
                         <div className="flex items-center gap-1">
                             <AudioToggle label={t("canvas.audioStudio.sendEnable")} active={send.enabled} onClick={() => patch(send.id, { enabled: !send.enabled })} className="size-4">
                                 <Circle className="size-2" fill={send.enabled ? "currentColor" : "none"} />
                             </AudioToggle>
                             <Select
                                 size="small"
-                                variant="borderless"
                                 className="min-w-0 flex-1"
                                 value={send.targetTrackId}
                                 options={returns.map((item) => ({ value: item.id, label: item.name || t("canvas.audioStudio.trackTypeReturn") }))}
@@ -209,8 +229,8 @@ export function AudioSendList({ track, tracks, automation, onChange }: { track: 
                             />
                             <button
                                 type="button"
-                                className="shrink-0 rounded-md px-1 text-sm transition hover:bg-hover"
-                                style={send.pre ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
+                                className="shrink-0 rounded-md border px-1 text-sm transition hover:bg-hover"
+                                style={send.pre ? { background: theme.node.accentSoft, color: theme.node.accent, borderColor: theme.toolbar.border } : { color: theme.node.muted, borderColor: theme.toolbar.border }}
                                 aria-label={t("canvas.audioStudio.sendPre")}
                                 title={t(send.pre ? "canvas.audioStudio.sendPre" : "canvas.audioStudio.sendPost")}
                                 aria-pressed={send.pre}
@@ -218,18 +238,8 @@ export function AudioSendList({ track, tracks, automation, onChange }: { track: 
                             >
                                 {t(send.pre ? "canvas.audioStudio.sendPre" : "canvas.audioStudio.sendPost")}
                             </button>
-                            <button
-                                type="button"
-                                className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover hover:opacity-100 hover:bg-hover"
-                                style={{ color: theme.node.muted }}
-                                aria-label={t("canvas.audioStudio.sendRemove")}
-                                title={t("canvas.audioStudio.sendRemove")}
-                                onClick={() => onChange(sends.filter((item) => item.id !== send.id))}
-                            >
-                                <Trash2 className="size-3" />
-                            </button>
                         </div>
-                        <div className="flex items-center gap-1 pl-5">
+                        <div className="flex items-center gap-1">
                             {linked ? (
                                 <span className="flex shrink-0" style={{ color: theme.node.muted }} title={t("canvas.audioStudio.automationLink")} aria-hidden>
                                     <Link2 className="size-2.5" />
@@ -244,15 +254,25 @@ export function AudioSendList({ track, tracks, automation, onChange }: { track: 
                                 disabled={linked}
                                 className="min-w-0 flex-1"
                             />
-                            <span className="w-3 shrink-0 text-sm" style={{ color: theme.node.muted }}>
+                            <span className="w-3 shrink-0 text-xs" style={{ color: theme.node.muted }}>
                                 %
                             </span>
+                            <button
+                                type="button"
+                                className="grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover"
+                                style={{ color: theme.node.muted }}
+                                aria-label={t("canvas.audioStudio.sendRemove")}
+                                title={t("canvas.audioStudio.sendRemove")}
+                                onClick={() => onChange(sends.filter((item) => item.id !== send.id))}
+                            >
+                                <Trash2 className="size-3" />
+                            </button>
                         </div>
                     </div>
                     );
                 })
             ) : (
-                <span className="px-0.5 text-sm" style={{ color: theme.node.placeholder }}>
+                <span className="px-0.5 text-xs" style={{ color: theme.node.placeholder }}>
                     {t("canvas.audioStudio.noSends")}
                 </span>
             )}
@@ -313,9 +333,13 @@ export function AudioInspectorPanel({ tracks, selectedTrackId, clips, selectedCl
                     <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
                         {t("canvas.audioStudio.trackType")}
                     </span>
-                    <span>
-                        {t(AUDIO_TRACK_TYPE_LABEL_KEYS[type])}
-                        {master ? "" : ` · ${t(type === "return" ? "canvas.audioStudio.trackRoleReturn" : type === "group" ? "canvas.audioStudio.trackRoleGroup" : "canvas.audioStudio.trackRoleSource")}`}
+                    <span className="flex min-w-0 items-center gap-1.5">
+                        <AudioTypeChip type={type} />
+                        {master ? null : (
+                            <span className="truncate text-xs" style={{ color: theme.node.muted }}>
+                                {t(type === "return" ? "canvas.audioStudio.trackRoleReturn" : type === "group" ? "canvas.audioStudio.trackRoleGroup" : "canvas.audioStudio.trackRoleSource")}
+                            </span>
+                        )}
                     </span>
                 </div>
                 <label className={ROW_CLASS}>
@@ -356,7 +380,7 @@ export function AudioInspectorPanel({ tracks, selectedTrackId, clips, selectedCl
                         disabled={gainAutomated}
                         className="w-16 shrink-0"
                     />
-                    <span className="shrink-0 text-sm" style={{ color: theme.node.muted }}>
+                    <span className="shrink-0 text-xs" style={{ color: theme.node.muted }}>
                         dB
                     </span>
                 </div>
@@ -404,42 +428,49 @@ export function AudioInspectorPanel({ tracks, selectedTrackId, clips, selectedCl
                     </label>
                 )}
             </div>
-            {master ? null : <AudioSendList track={track} tracks={tracks} automation={automation} onChange={(sends) => onTrackPatch(track.id, { sends })} />}
+            {master ? null : (
+                <>
+                    <span className={SECTION_DIVIDER_CLASS} style={{ background: theme.toolbar.border }} />
+                    <AudioSendList track={track} tracks={tracks} automation={automation} onChange={(sends) => onTrackPatch(track.id, { sends })} />
+                </>
+            )}
+            <span className={SECTION_DIVIDER_CLASS} style={{ background: theme.toolbar.border }} />
             <div className={SECTION_CLASS}>
-                <span className="text-sm" style={{ color: theme.node.muted }}>
+                <span className={SECTION_LABEL_CLASS} style={{ color: theme.node.muted }}>
                     {t("canvas.audioStudio.inspectorClip")}
                 </span>
                 {clip ? (
                     <div className="flex flex-col gap-0.5">
                         <span className="truncate">{clip.name || t("canvas.nodeTypes.audio")}</span>
-                        <span style={{ color: theme.node.muted }}>
+                        <span className={`text-xs ${VALUE_CLASS}`} style={{ color: theme.node.muted }}>
                             {t("canvas.audioStudio.clipStart")} {formatAudioTime(clip.start)} · {t("canvas.audioStudio.clipLength")} {formatAudioTime(clip.duration)}
                         </span>
                     </div>
                 ) : (
-                    <span style={{ color: theme.node.placeholder }}>{t("canvas.audioStudio.noClipSelection")}</span>
+                    <span className="text-xs" style={{ color: theme.node.placeholder }}>{t("canvas.audioStudio.noClipSelection")}</span>
                 )}
             </div>
         </div>
     );
 }
 
-export function AudioMediaPoolPanel({ audioNodes }: { audioNodes: CanvasNodeData[]; onGoCanvas?: () => void }) {
+export function AudioMediaPoolPanel({ audioNodes, midiNodes = [], onGoCanvas }: { audioNodes: CanvasNodeData[]; midiNodes?: CanvasNodeData[]; onGoCanvas?: () => void }) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     const [search, setSearch] = useState("");
 
+    const poolNodes = useMemo(() => [...audioNodes, ...midiNodes], [audioNodes, midiNodes]);
     const filtered = useMemo(() => {
-        if (!search.trim()) return audioNodes;
+        if (!search.trim()) return poolNodes;
         const q = search.toLowerCase();
-        return audioNodes.filter((node) => {
+        return poolNodes.filter((node) => {
             const canvasName = (node.metadata?.canvasTitle as string) || "";
             const title = node.title || "";
             return canvasName.toLowerCase().includes(q) || title.toLowerCase().includes(q);
         });
-    }, [audioNodes, search]);
+    }, [poolNodes, search]);
 
-    if (!audioNodes.length) {
+    if (!poolNodes.length) {
         return (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center glass-card">
                 <Music2 className="size-5" style={{ color: theme.node.muted }} />
@@ -471,6 +502,7 @@ export function AudioMediaPoolPanel({ audioNodes }: { audioNodes: CanvasNodeData
                     </div>
                 ) : (
                     filtered.map((node) => {
+                        const isMidi = node.type === CanvasNodeType.Midi;
                         const canvasTitle = (node.metadata?.canvasTitle as string) || "Untitled Canvas";
                         return (
                             <div
@@ -478,15 +510,15 @@ export function AudioMediaPoolPanel({ audioNodes }: { audioNodes: CanvasNodeData
                                 draggable
                                 className="group flex w-full cursor-grab items-center gap-2 rounded-lg p-1.5 text-left text-sm transition hover:bg-hover border"
                                 style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
-                                title={t("canvas.audioStudio.mediaDragHint", { defaultValue: "Drag into track to create clip" })}
+                                title={isMidi ? t("canvas.audioStudio.midiDragHint", { defaultValue: "拖到轨道上创建 MIDI 音轨" }) : t("canvas.audioStudio.mediaDragHint", { defaultValue: "Drag into track to create clip" })}
                                 onDragStart={(event) => {
                                     event.dataTransfer.effectAllowed = "copy";
-                                    event.dataTransfer.setData(AUDIO_NODE_DRAG_MIME, node.id);
+                                    event.dataTransfer.setData(isMidi ? AUDIO_MIDI_NODE_DRAG_MIME : AUDIO_NODE_DRAG_MIME, node.id);
                                     event.dataTransfer.setData("text/plain", node.id);
                                 }}
                             >
                                 <div className="relative flex size-8 shrink-0 items-center justify-center rounded bg-black/10 dark:bg-white/10">
-                                    <Music2 className="size-4 shrink-0" style={{ color: theme.node.muted }} />
+                                    {isMidi ? <FileMusic className="size-4 shrink-0" style={{ color: theme.node.muted }} /> : <Music2 className="size-4 shrink-0" style={{ color: theme.node.muted }} />}
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="truncate text-xs font-medium">
@@ -498,7 +530,7 @@ export function AudioMediaPoolPanel({ audioNodes }: { audioNodes: CanvasNodeData
                                     </div>
                                 </div>
                                 <span className="shrink-0 text-xs tabular-nums" style={{ color: theme.node.muted }}>
-                                    {formatAudioTime((node.metadata?.durationMs || 0) / 1000)}
+                                    {isMidi ? t("canvas.audioStudio.midiBadge", { defaultValue: "MIDI" }) : formatAudioTime((node.metadata?.durationMs || 0) / 1000)}
                                 </span>
                             </div>
                         );
@@ -519,7 +551,7 @@ type AudioProjectSettingsPanelProps = {
     capture: CanvasAudioCapture;
     countIn: number;
     masterGain: number;
-    onPatch: (patch: Partial<CanvasNodeMetadata>) => void;
+    onPatch: (patch: Partial<AudioProjectDocument>) => void;
 };
 
 export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, metronome, capture, countIn, masterGain, onPatch }: AudioProjectSettingsPanelProps) {
@@ -536,7 +568,7 @@ export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, me
                     <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
                         {t("canvas.audioStudio.tempo")}
                     </span>
-                    <InputNumber size="small" min={20} max={300} step={1} value={tempo} aria-label={t("canvas.audioStudio.tempo")} onChange={(value) => value !== null && onPatch({ audioTempo: Math.min(300, Math.max(20, value)) })} />
+                    <InputNumber size="small" min={20} max={300} step={1} value={tempo} aria-label={t("canvas.audioStudio.tempo")} onChange={(value) => value !== null && onPatch({ tempo: Math.min(300, Math.max(20, value)) })} />
                 </label>
                 <label className={ROW_CLASS}>
                     <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
@@ -552,7 +584,7 @@ export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, me
                         aria-label={t("canvas.audioStudio.meter")}
                         onChange={(value: string) => {
                             const [numerator, denominator] = value.split("/").map(Number);
-                            onPatch({ audioTimeSignature: { numerator, denominator } });
+                            onPatch({ timeSignature: { numerator, denominator } });
                         }}
                     />
                 </label>
@@ -560,7 +592,7 @@ export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, me
                     <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
                         {t("canvas.audioStudio.grid")}
                     </span>
-                    <Switch size="small" checked={grid.enabled} aria-label={t("canvas.audioStudio.grid")} onChange={(checked) => onPatch({ audioGrid: { ...grid, enabled: checked } })} />
+                    <Switch size="small" checked={grid.enabled} aria-label={t("canvas.audioStudio.grid")} onChange={(checked) => onPatch({ grid: { ...grid, enabled: checked } })} />
                     <Select
                         size="small"
                         className="min-w-0 flex-1"
@@ -569,28 +601,28 @@ export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, me
                         popupMatchSelectWidth={false}
                         styles={{ popup: { root: { zIndex: 1300 } } }}
                         aria-label={t("canvas.audioStudio.snap")}
-                        onChange={(value: CanvasAudioSnap) => onPatch({ audioGrid: { ...grid, snap: value } })}
+                        onChange={(value: CanvasAudioSnap) => onPatch({ grid: { ...grid, snap: value } })}
                     />
                 </label>
                 <label className={ROW_CLASS}>
                     <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
                         {t("canvas.audioStudio.cycle")}
                     </span>
-                    <Switch size="small" checked={cycle.enabled} aria-label={t("canvas.audioStudio.cycle")} onChange={(checked) => onPatch({ audioCycle: { ...cycle, enabled: checked } })} />
-                    <InputNumber size="small" className="!w-[74px]" min={0} step={0.1} value={Math.round(cycle.start * 100) / 100} aria-label={t("canvas.audioStudio.cycleStart")} onChange={(value) => value !== null && onPatch({ audioCycle: { ...cycle, start: Math.max(0, value) } })} />
-                    <span style={{ color: theme.node.muted }}>-</span>
-                    <InputNumber size="small" className="!w-[74px]" min={0} step={0.1} value={Math.round(cycle.end * 100) / 100} aria-label={t("canvas.audioStudio.cycleEnd")} onChange={(value) => value !== null && onPatch({ audioCycle: { ...cycle, end: Math.max(0, value) } })} />
+                    <Switch size="small" checked={cycle.enabled} aria-label={t("canvas.audioStudio.cycle")} onChange={(checked) => onPatch({ cycle: { ...cycle, enabled: checked } })} />
+                    <InputNumber size="small" className="!w-[74px]" min={0} step={0.1} value={Math.round(cycle.start * 100) / 100} aria-label={t("canvas.audioStudio.cycleStart")} onChange={(value) => value !== null && onPatch({ cycle: { ...cycle, start: Math.max(0, value) } })} />
+                    <span className="text-xs" style={{ color: theme.node.muted }}>-</span>
+                    <InputNumber size="small" className="!w-[74px]" min={0} step={0.1} value={Math.round(cycle.end * 100) / 100} aria-label={t("canvas.audioStudio.cycleEnd")} onChange={(value) => value !== null && onPatch({ cycle: { ...cycle, end: Math.max(0, value) } })} />
                 </label>
                 <label className={ROW_CLASS}>
                     <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
                         {t("canvas.audioStudio.punch")}
                     </span>
-                    <Switch size="small" checked={punch.enabled} aria-label={t("canvas.audioStudio.punch")} onChange={(checked) => onPatch({ audioPunch: { ...punch, enabled: checked } })} />
-                    <InputNumber size="small" className="!w-[74px]" min={0} step={0.1} value={Math.round(punch.in * 100) / 100} aria-label={t("canvas.audioStudio.punchIn")} onChange={(value) => value !== null && onPatch({ audioPunch: { ...punch, in: Math.max(0, value) } })} />
-                    <span style={{ color: theme.node.muted }}>-</span>
-                    <InputNumber size="small" className="!w-[74px]" min={0} step={0.1} value={Math.round(punch.out * 100) / 100} aria-label={t("canvas.audioStudio.punchOut")} onChange={(value) => value !== null && onPatch({ audioPunch: { ...punch, out: Math.max(0, value) } })} />
+                    <Switch size="small" checked={punch.enabled} aria-label={t("canvas.audioStudio.punch")} onChange={(checked) => onPatch({ punch: { ...punch, enabled: checked } })} />
+                    <InputNumber size="small" className="!w-[74px]" min={0} step={0.1} value={Math.round(punch.in * 100) / 100} aria-label={t("canvas.audioStudio.punchIn")} onChange={(value) => value !== null && onPatch({ punch: { ...punch, in: Math.max(0, value) } })} />
+                    <span className="text-xs" style={{ color: theme.node.muted }}>-</span>
+                    <InputNumber size="small" className="!w-[74px]" min={0} step={0.1} value={Math.round(punch.out * 100) / 100} aria-label={t("canvas.audioStudio.punchOut")} onChange={(value) => value !== null && onPatch({ punch: { ...punch, out: Math.max(0, value) } })} />
                 </label>
-                <span className="pt-1" style={{ color: theme.node.muted }}>
+                <span className={`${SECTION_LABEL_CLASS} mt-1 border-t pt-1.5`} style={{ borderColor: theme.toolbar.border, color: theme.node.muted }}>
                     {t("canvas.audioStudio.captureTitle")}
                 </span>
                 <label className={ROW_CLASS}>
@@ -608,7 +640,7 @@ export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, me
                         popupMatchSelectWidth={false}
                         styles={{ popup: { root: { zIndex: 1300 } } }}
                         aria-label={t("canvas.audioStudio.captureMode")}
-                        onChange={(value: CanvasAudioCapture["mode"]) => onPatch({ audioCapture: { ...capture, mode: value } })}
+                        onChange={(value: CanvasAudioCapture["mode"]) => onPatch({ capture: { ...capture, mode: value } })}
                     />
                 </label>
                 <label className={ROW_CLASS}>
@@ -623,7 +655,7 @@ export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, me
                         popupMatchSelectWidth={false}
                         styles={{ popup: { root: { zIndex: 1300 } } }}
                         aria-label={t("canvas.audioStudio.countIn")}
-                        onChange={(value: number) => onPatch({ audioCountIn: value })}
+                        onChange={(value: number) => onPatch({ countIn: value })}
                     />
                 </label>
                 <label className={ROW_CLASS}>
@@ -638,7 +670,7 @@ export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, me
                         popupMatchSelectWidth={false}
                         styles={{ popup: { root: { zIndex: 1300 } } }}
                         aria-label={t("canvas.audioStudio.captureChannels")}
-                        onChange={(value: number) => onPatch({ audioCapture: { ...capture, channels: value } })}
+                        onChange={(value: number) => onPatch({ capture: { ...capture, channels: value } })}
                     />
                 </label>
                 <div className={ROW_CLASS}>
@@ -650,11 +682,11 @@ export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, me
                         value={Math.round(capture.gainDb)}
                         format={(value) => String(Math.round(value))}
                         parse={(text) => parseDbValue(text, -24, 24)}
-                        onCommit={(value) => onPatch({ audioCapture: { ...capture, gainDb: Math.round(value) } })}
-                        onReset={() => onPatch({ audioCapture: { ...capture, gainDb: 0 } })}
+                        onCommit={(value) => onPatch({ capture: { ...capture, gainDb: Math.round(value) } })}
+                        onReset={() => onPatch({ capture: { ...capture, gainDb: 0 } })}
                         className="w-12 shrink-0"
                     />
-                    <span className="shrink-0 text-sm" style={{ color: theme.node.muted }}>
+                    <span className="shrink-0 text-xs" style={{ color: theme.node.muted }}>
                         dB
                     </span>
                 </div>
@@ -662,14 +694,14 @@ export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, me
                     <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
                         {t("canvas.audioStudio.captureLatency")}
                     </span>
-                    <InputNumber size="small" className="!w-[74px]" min={0} max={500} step={5} value={capture.inputLatencyMs} aria-label={t("canvas.audioStudio.captureLatency")} onChange={(value) => value !== null && onPatch({ audioCapture: { ...capture, inputLatencyMs: value } })} />
-                    <span style={{ color: theme.node.muted }}>ms</span>
+                    <InputNumber size="small" className="!w-[74px]" min={0} max={500} step={5} value={capture.inputLatencyMs} aria-label={t("canvas.audioStudio.captureLatency")} onChange={(value) => value !== null && onPatch({ capture: { ...capture, inputLatencyMs: value } })} />
+                    <span className="text-xs" style={{ color: theme.node.muted }}>ms</span>
                 </label>
                 <label className={ROW_CLASS}>
                     <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
                         {t("canvas.audioStudio.metronome")}
                     </span>
-                    <Switch size="small" checked={metronome.enabled} aria-label={t("canvas.audioStudio.metronome")} onChange={(checked) => onPatch({ audioMetronome: { ...metronome, enabled: checked } })} />
+                    <Switch size="small" checked={metronome.enabled} aria-label={t("canvas.audioStudio.metronome")} onChange={(checked) => onPatch({ metronome: { ...metronome, enabled: checked } })} />
                 </label>
                 <div className={ROW_CLASS}>
                     <span className={LABEL_CLASS} style={{ color: theme.node.muted }}>
@@ -680,11 +712,11 @@ export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, me
                         value={Math.round(metronome.volumeDb)}
                         format={(value) => String(Math.round(value))}
                         parse={(text) => parseDbValue(text, -40, 0)}
-                        onCommit={(value) => onPatch({ audioMetronome: { ...metronome, volumeDb: Math.round(value) } })}
-                        onReset={() => onPatch({ audioMetronome: { ...metronome, volumeDb: -6 } })}
+                        onCommit={(value) => onPatch({ metronome: { ...metronome, volumeDb: Math.round(value) } })}
+                        onReset={() => onPatch({ metronome: { ...metronome, volumeDb: -6 } })}
                         className="w-12 shrink-0"
                     />
-                    <span className="shrink-0 text-sm" style={{ color: theme.node.muted }}>
+                    <span className="shrink-0 text-xs" style={{ color: theme.node.muted }}>
                         dB
                     </span>
                 </div>
@@ -697,11 +729,11 @@ export function AudioProjectSettingsPanel({ tempo, meter, grid, cycle, punch, me
                         value={Math.round(masterGain * 100)}
                         format={(value) => String(Math.round(value))}
                         parse={(text) => parseGainPercent(text, Math.round(AUDIO_GAIN_MAX * 100))}
-                        onCommit={(value) => onPatch({ audioMasterGain: clampGain(Math.round(value) / 100) })}
-                        onReset={() => onPatch({ audioMasterGain: 1 })}
+                        onCommit={(value) => onPatch({ masterGain: clampGain(Math.round(value) / 100) })}
+                        onReset={() => onPatch({ masterGain: 1 })}
                         className="w-16 shrink-0"
                     />
-                    <span className="shrink-0 text-sm" style={{ color: theme.node.muted }}>
+                    <span className="shrink-0 text-xs" style={{ color: theme.node.muted }}>
                         %
                     </span>
                 </div>

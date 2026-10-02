@@ -3,7 +3,7 @@ import { Select, Slider } from "antd";
 import { Circle, AudioLines, Link2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { AudioMeter, AudioSendList, AudioToggle, AUDIO_TRACK_TYPE_LABEL_KEYS } from "@/components/canvas/workspace/audio-panels";
+import { AudioMeter, AudioSendList, AudioToggle, AudioTypeChip, AUDIO_TRACK_TYPE_LABEL_KEYS } from "@/components/canvas/workspace/audio-panels";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { AUDIO_AUTOMATION_GAIN, AUDIO_AUTOMATION_PAN, automationOwns } from "@/lib/canvas/audio-automation";
 import { AUDIO_FADER_MAX_DB, AUDIO_FADER_MIN_DB, audioMasterTrackId, audioRoutingCycle, audioTrackType, clampGain, faderDbGain, formatFaderDb, gainFaderDb } from "@/lib/canvas/audio-project";
@@ -117,49 +117,52 @@ function MixerStrip({ track, tracks, masterGain, automation, selected, audible, 
     return (
         <div
             data-track-strip={track.id}
-            className={`flex shrink-0 flex-col gap-1 border-r px-1.5 py-1.5 glass-card ${selected ? "" : "max-md:hidden"}`}
-            style={{ width: STRIP_WIDTH, borderColor: theme.toolbar.border, background: selected ? theme.toolbar.activeBg : undefined, opacity: audible ? 1 : 0.45 }}
+            className={`relative flex shrink-0 flex-col gap-1 border-r px-1.5 py-1.5 glass-card ${selected ? "" : "max-md:hidden"}`}
+            style={{ width: STRIP_WIDTH, borderColor: theme.toolbar.border, background: selected ? theme.node.accentSoft : undefined, opacity: audible ? 1 : 0.45 }}
             onPointerDown={() => onSelectTrack(track.id)}
         >
+            {selected ? <span className="pointer-events-none absolute inset-y-0 left-0 w-0.5" style={{ background: theme.node.accent }} aria-hidden /> : null}
             <span className="h-1 w-full shrink-0 rounded-md" style={{ background: track.color || theme.node.faint }} />
-            {renaming ? (
-                <input
-                    autoFocus
-                    className="w-full shrink-0 rounded-md border bg-transparent px-1 py-0.5 text-sm outline-none"
-                    style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
-                    value={nameDraft}
-                    aria-label={t("canvas.audioStudio.name")}
-                    onChange={(event) => setNameDraft(event.target.value)}
-                    onBlur={commitName}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter") commitName();
-                        if (event.key === "Escape") {
+            <div className="flex shrink-0 flex-col gap-1">
+                {renaming ? (
+                    <input
+                        autoFocus
+                        className="w-full shrink-0 rounded-md border bg-transparent px-1 py-0.5 text-sm font-medium outline-none"
+                        style={{ borderColor: theme.toolbar.border, color: selected ? theme.node.accent : theme.node.text }}
+                        value={nameDraft}
+                        aria-label={t("canvas.audioStudio.name")}
+                        onChange={(event) => setNameDraft(event.target.value)}
+                        onBlur={commitName}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") commitName();
+                            if (event.key === "Escape") {
+                                setNameDraft(track.name);
+                                setRenaming(false);
+                            }
+                        }}
+                    />
+                ) : (
+                    <button
+                        type="button"
+                        className="w-full shrink-0 truncate rounded-md px-1 py-0.5 text-left text-sm font-medium transition hover:bg-hover"
+                        style={{ color: selected ? theme.node.accent : theme.node.text }}
+                        title={t("canvas.audioStudio.trackRename")}
+                        onDoubleClick={() => {
                             setNameDraft(track.name);
-                            setRenaming(false);
-                        }
-                    }}
-                />
-            ) : (
-                <button
-                    type="button"
-                    className="w-full shrink-0 truncate rounded-md px-1 py-0.5 text-left text-sm transition hover:bg-hover"
-                    style={{ color: theme.node.text }}
-                    title={t("canvas.audioStudio.trackRename")}
-                    onDoubleClick={() => {
-                        setNameDraft(track.name);
-                        setRenaming(true);
-                    }}
-                    onClick={() => onSelectTrack(track.id)}
-                >
-                    {track.name || trackLabel(track)}
-                </button>
-            )}
-            {master || type === "audio" ? null : (
-                <span className="shrink-0 text-center text-sm" style={{ color: theme.node.muted }}>
-                    {t(AUDIO_TRACK_TYPE_LABEL_KEYS[type])}
+                            setRenaming(true);
+                        }}
+                        onClick={() => onSelectTrack(track.id)}
+                    >
+                        {track.name || trackLabel(track)}
+                    </button>
+                )}
+                <span className="flex justify-center">
+                    <AudioTypeChip type={type} />
                 </span>
-            )}
+            </div>
+            <span className="-mx-1.5 h-px shrink-0" style={{ background: theme.toolbar.border }} />
             {master ? null : <AudioSendList track={track} tracks={tracks} automation={automation} onChange={(sends) => onTrackPatch(track.id, { sends })} />}
+            <span className="-mx-1.5 h-px shrink-0" style={{ background: theme.toolbar.border }} />
             <MixerSlider
                 label={t("canvas.audioStudio.pan")}
                 value={Math.round((track.pan ?? 0) * 100) / 100}
@@ -172,7 +175,8 @@ function MixerStrip({ track, tracks, masterGain, automation, selected, audible, 
                 onCommit={(value) => onTrackPatch(track.id, { pan: value })}
                 onReset={() => onTrackPatch(track.id, { pan: 0 })}
             />
-            <div className="flex min-h-0 flex-1 items-stretch justify-center gap-2 pt-1">
+            <span className="-mx-1.5 h-px shrink-0" style={{ background: theme.toolbar.border }} />
+            <div className="flex min-h-0 flex-1 items-stretch justify-center gap-2">
                 <MixerSlider
                     label={t("canvas.audioStudio.gain")}
                     value={Math.round(gainFaderDb(gain) * 10) / 10}
@@ -188,6 +192,7 @@ function MixerStrip({ track, tracks, masterGain, automation, selected, audible, 
                 />
                 <AudioMeter trackId={track.id} register={registerMeter} className="h-[132px] self-center" />
             </div>
+            <span className="-mx-1.5 h-px shrink-0" style={{ background: theme.toolbar.border }} />
             <div className="flex shrink-0 items-center justify-center gap-1">
                 <AudioToggle label={t("canvas.audioStudio.mute")} active={track.mute} onClick={() => onTrackPatch(track.id, { mute: !track.mute })}>
                     M
@@ -201,23 +206,26 @@ function MixerStrip({ track, tracks, masterGain, automation, selected, audible, 
                     </AudioToggle>
                 ) : null}
             </div>
-            {master ? (
-                <span className="shrink-0 truncate text-center text-sm" style={{ color: theme.node.muted }}>
-                    {t("canvas.audioStudio.trackTypeMaster")}
-                </span>
-            ) : (
-                <Select
-                    size="small"
-                    variant="borderless"
-                    className="w-full"
-                    value={track.output && !audioRoutingCycle(tracks, track.id, track.output) ? track.output : undefined}
-                    placeholder={t("canvas.audioStudio.trackTypeMaster")}
-                    options={outputs.map((item) => ({ value: item.id, label: trackLabel(item) }))}
-                    popupMatchSelectWidth={false}
-                    styles={{ popup: { root: { zIndex: 1300 } } }}
-                    aria-label={t("canvas.audioStudio.trackOutput")}
-                    onChange={(value: string) => onTrackPatch(track.id, { output: value })}
-                />
+            {master ? null : (
+                <>
+                    <span className="-mx-1.5 h-px shrink-0" style={{ background: theme.toolbar.border }} />
+                    <div className="flex shrink-0 flex-col gap-1">
+                        <span className="text-xs font-medium" style={{ color: theme.node.muted }}>
+                            {t("canvas.audioStudio.trackOutput")}
+                        </span>
+                        <Select
+                            size="small"
+                            className="w-full"
+                            value={track.output && !audioRoutingCycle(tracks, track.id, track.output) ? track.output : undefined}
+                            placeholder={t("canvas.audioStudio.trackTypeMaster")}
+                            options={outputs.map((item) => ({ value: item.id, label: trackLabel(item) }))}
+                            popupMatchSelectWidth={false}
+                            styles={{ popup: { root: { zIndex: 1300 } } }}
+                            aria-label={t("canvas.audioStudio.trackOutput")}
+                            onChange={(value: string) => onTrackPatch(track.id, { output: value })}
+                        />
+                    </div>
+                </>
             )}
         </div>
     );
@@ -230,8 +238,8 @@ function MixerSlider({ label, value, min, max, step, vertical = false, linked = 
     const current = draft ?? value;
     return (
         <div className={vertical ? "flex min-w-0 flex-1 flex-col items-center" : "flex w-full shrink-0 flex-col items-center"} onDoubleClick={linked ? undefined : onReset}>
-            <div className="flex w-full shrink-0 items-center justify-between gap-1 text-sm" style={{ color: theme.node.muted }}>
-                <span className="flex min-w-0 items-center gap-0.5">
+            <div className="flex w-full shrink-0 items-center justify-between gap-1 text-xs">
+                <span className="flex min-w-0 items-center gap-0.5" style={{ color: theme.node.muted }}>
                     {linked ? (
                         <span className="flex shrink-0" title={t("canvas.audioStudio.automationLink")} aria-hidden>
                             <Link2 className="size-2.5" />
@@ -239,7 +247,7 @@ function MixerSlider({ label, value, min, max, step, vertical = false, linked = 
                     ) : null}
                     <span className="truncate">{label}</span>
                 </span>
-                <span className="shrink-0 tabular-nums">{format(current)}</span>
+                <span className="shrink-0 text-sm tabular-nums" style={{ color: theme.node.text }}>{format(current)}</span>
             </div>
             <Slider
                 vertical={vertical}

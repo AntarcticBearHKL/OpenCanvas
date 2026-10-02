@@ -504,8 +504,6 @@ function toolLabel(id: string, t: (key: string) => string) {
     if (id === "tool-prompt-group") return t("canvas.toolbar.promptGroup");
     if (id === "tool-generator-group") return t("canvas.toolbar.generatorGroup");
     if (id === "tool-modifiers-group") return t("canvas.toolbar.modifiersGroup");
-    if (id === "tool-audio-project") return t("canvas.nodeTypes.audioProject");
-    if (id === "tool-smart-canvas") return t("canvas.nodeTypes.smartCanvas");
     if (id === "tool-input-group") return t("canvas.toolbar.inputOutputGroup");
     if (id === "tool-extensions") return t("canvas.toolbar.extensions");
     if (id === "tool-zoom") return t("canvas.toolbar.zoom");

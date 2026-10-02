@@ -262,10 +262,19 @@ export async function cleanupUnusedImages(usedData: unknown) {
 export function cleanupUnusedCanvasImages(extra?: unknown) {
     window.setTimeout(async () => {
         const { useCanvasStore } = await import("@/stores/canvas/use-canvas-store");
+        const { useImageStore } = await import("@/stores/use-image-store");
+        const { useAudioStore } = await import("@/stores/use-audio-store");
+        const { usePixelStore } = await import("@/stores/use-pixel-store");
         const { psPatternCleanupExtra } = await import("@/stores/use-ps-asset-store");
         const used = { ...(extra as object | undefined), ...psPatternCleanupExtra() };
-        await cleanupUnusedImages({ projects: useCanvasStore.getState().projects, extra: used });
-        await cleanupUnusedMedia({ projects: useCanvasStore.getState().projects, extra: used });
+        // Studio projects own their bitmaps now, so both sweeps must treat them as live references.
+        const studioProjects = {
+            image: useImageStore.getState().projects,
+            audio: useAudioStore.getState().projects,
+            pixel: usePixelStore.getState().projects,
+        };
+        await cleanupUnusedImages({ projects: useCanvasStore.getState().projects, studioProjects, extra: used });
+        await cleanupUnusedMedia({ projects: useCanvasStore.getState().projects, studioProjects, extra: used });
     }, 0);
 }
 

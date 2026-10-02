@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { App, Button, Dropdown, Empty, Input, InputNumber, Modal, Select, type MenuProps } from "antd";
-import { ArrowLeft, AudioWaveform, Check, Clock, FolderKanban, MoreVertical, Music2, Pencil, Plus, Share2, Sliders, Trash2, X } from "lucide-react";
+import { ArrowLeft, AudioWaveform, Check, Clock, FolderInput, FolderKanban, Pencil, Plus, Share2, Trash2, X } from "lucide-react";
 import { saveAs } from "file-saver";
 import { nanoid } from "nanoid";
 import { useTranslation } from "react-i18next";
@@ -26,7 +26,7 @@ import { uploadMediaFile } from "@/services/file-storage";
 import { useAudioStore } from "@/stores/use-audio-store";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { CanvasNodeType, type CanvasAudioClip, type CanvasNodeData, type CanvasNodeMetadata } from "@/types/canvas";
+import { CanvasNodeType, type CanvasAudioClip, type CanvasNodeData } from "@/types/canvas";
 
 export default function AudioStudioPage() {
     const { t } = useTranslation();
@@ -65,6 +65,7 @@ export default function AudioStudioPage() {
     const [editingGroupName, setEditingGroupName] = useState("");
     const [armedGroupId, setArmedGroupId] = useState<string | null>(null);
     const [armedProjectId, setArmedProjectId] = useState<string | null>(null);
+    const [moveMenuProjectId, setMoveMenuProjectId] = useState<string | null>(null);
 
     const removeGroup = (groupId: string) => {
         if (armedGroupId !== groupId) {
@@ -106,41 +107,13 @@ export default function AudioStudioPage() {
         return projects.find((p) => p.id === id) || null;
     }, [id, projects]);
 
-    // Adapt current project to CanvasNodeData (AudioProject)
-    const currentAudioNode = useMemo<CanvasNodeData | null>(() => {
-        if (!currentProject) return null;
-        return {
-            id: currentProject.id,
-            type: CanvasNodeType.AudioProject,
-            title: currentProject.title,
-            position: { x: 0, y: 0 },
-            width: 800,
-            height: 400,
-            metadata: {
-                audioTracks: currentProject.tracks,
-                audioClips: currentProject.clips,
-                audioTempo: currentProject.tempo,
-                audioTimeSignature: currentProject.timeSignature,
-                audioGrid: currentProject.grid,
-                audioCycle: currentProject.cycle,
-                audioPunch: currentProject.punch,
-                audioMarkers: currentProject.markers,
-                audioMetronome: currentProject.metronome,
-                audioAutomation: currentProject.automation,
-                audioMidiRegions: currentProject.midiRegions,
-                audioPpqn: currentProject.ppqn,
-                audioMasterGain: currentProject.masterGain,
-            },
-        };
-    }, [currentProject]);
-
     // Resource pool: gather all audio nodes across all canvases with [Canvas Title / Audio Name] mapping + recorded nodes
     const resourcePoolNodes = useMemo(() => {
         const list: CanvasNodeData[] = [...recordedNodes];
         for (const proj of canvasProjects) {
             const canvasTitle = proj.title || "Untitled Canvas";
             for (const node of proj.nodes || []) {
-                if (node.type === CanvasNodeType.Audio && (node.metadata?.content || node.metadata?.storageKey)) {
+                if ((node.type === CanvasNodeType.Audio || node.type === CanvasNodeType.Midi) && (node.metadata?.content || node.metadata?.storageKey)) {
                     list.push({
                         ...node,
                         metadata: {
@@ -154,49 +127,14 @@ export default function AudioStudioPage() {
         return list;
     }, [canvasProjects, recordedNodes]);
 
-    const nodesRef = useRef<CanvasNodeData[]>([]);
-    useEffect(() => {
-        nodesRef.current = currentAudioNode ? [currentAudioNode, ...resourcePoolNodes] : resourcePoolNodes;
-    }, [currentAudioNode, resourcePoolNodes]);
-
-    // Sync node commits from audio studio
-    const handleSetNodes = useCallback<Dispatch<SetStateAction<CanvasNodeData[]>>>(
-        (action) => {
-            if (!currentAudioNode) return;
-            const dummy = [currentAudioNode];
-            const next = typeof action === "function" ? action(dummy) : action;
-            const updated = next.find((n) => n.id === currentAudioNode.id);
-            if (updated) {
-                updateProject(currentAudioNode.id, {
-                    title: updated.title,
-                    tracks: updated.metadata?.audioTracks,
-                    clips: updated.metadata?.audioClips,
-                    tempo: updated.metadata?.audioTempo,
-                    timeSignature: updated.metadata?.audioTimeSignature,
-                    grid: updated.metadata?.audioGrid,
-                    cycle: updated.metadata?.audioCycle,
-                    punch: updated.metadata?.audioPunch,
-                    markers: updated.metadata?.audioMarkers,
-                    metronome: updated.metadata?.audioMetronome,
-                    automation: updated.metadata?.audioAutomation,
-                    midiRegions: updated.metadata?.audioMidiRegions,
-                    ppqn: updated.metadata?.audioPpqn,
-                    masterGain: updated.metadata?.audioMasterGain,
-                });
-            }
-        },
-        [currentAudioNode, updateProject],
-    );
-
     // Audio recording handler
     const handleAudioRecorded = useCallback(
-        async (_proj: CanvasNodeData, blob: Blob, take: { trackId: string; start: number; duration: number; name: string }) => {
+        async (blob: Blob, take: { trackId: string; start: number; duration: number; name: string }) => {
             if (!currentProject) return;
             try {
                 const uploaded = await uploadMediaFile(blob, "audio");
-                const audioNodeId = nanoid();
                 const newAudioNode: CanvasNodeData = {
-                    id: audioNodeId,
+                    id: nanoid(),
                     type: CanvasNodeType.Audio,
                     title: take.name,
                     position: { x: 0, y: 0 },
@@ -211,12 +149,13 @@ export default function AudioStudioPage() {
                 };
                 setRecordedNodes((prev) => [newAudioNode, ...prev]);
 
-                // Create a clip referencing this audio node
-                const clipId = nanoid();
+                // Create a clip referencing this take's stored blob
                 const newClip: CanvasAudioClip = {
-                    id: clipId,
+                    id: nanoid(),
                     trackId: take.trackId,
-                    sourceNodeId: audioNodeId,
+                    storageKey: uploaded.storageKey,
+                    content: uploaded.url,
+                    sourceDurationMs: Math.round(take.duration * 1000),
                     name: take.name,
                     start: take.start,
                     duration: take.duration,
@@ -237,12 +176,12 @@ export default function AudioStudioPage() {
 
     // Studio output: Download mixdown
     const handleDownload = async (fileName: string) => {
-        if (!currentAudioNode) return;
-        const tracks = audioProjectTracks(currentAudioNode);
-        const clips = audioProjectClips(currentAudioNode);
-        const regions = audioProjectMidiRegions(currentAudioNode);
-        const ppqn = audioProjectPpqn(currentAudioNode);
-        const tempo = audioProjectTempo(currentAudioNode);
+        if (!currentProject) return;
+        const tracks = audioProjectTracks(currentProject);
+        const clips = audioProjectClips(currentProject);
+        const regions = audioProjectMidiRegions(currentProject);
+        const ppqn = audioProjectPpqn(currentProject);
+        const tempo = audioProjectTempo(currentProject);
 
         if ((!clips.length && !regions.length) || audioProjectDuration(clips, regions, ppqn, tempo) <= 0) {
             message.warning(t("canvas.audioStudio.noContent", { defaultValue: "No audio content in current project" }));
@@ -250,18 +189,15 @@ export default function AudioStudioPage() {
         }
 
         try {
-            const { audio, skipped } = await renderAudioMixdown(
-                {
-                    tracks,
-                    clips,
-                    regions,
-                    ppqn,
-                    tempo,
-                    masterGain: audioProjectMasterGain(currentAudioNode),
-                    automation: audioProjectAutomation(currentAudioNode),
-                },
-                nodesRef.current,
-            );
+            const { audio, skipped } = await renderAudioMixdown({
+                tracks,
+                clips,
+                regions,
+                ppqn,
+                tempo,
+                masterGain: audioProjectMasterGain(currentProject),
+                automation: audioProjectAutomation(currentProject),
+            });
             if (skipped.length) {
                 message.warning(
                     t("canvas.audioStudio.mixdownVstSkipped", {
@@ -279,12 +215,12 @@ export default function AudioStudioPage() {
 
     // Studio output: Export mixdown to selected canvas
     const handleExportToCanvas = async (targetCanvasId: string, nodeTitle: string) => {
-        if (!currentAudioNode) return;
-        const tracks = audioProjectTracks(currentAudioNode);
-        const clips = audioProjectClips(currentAudioNode);
-        const regions = audioProjectMidiRegions(currentAudioNode);
-        const ppqn = audioProjectPpqn(currentAudioNode);
-        const tempo = audioProjectTempo(currentAudioNode);
+        if (!currentProject) return;
+        const tracks = audioProjectTracks(currentProject);
+        const clips = audioProjectClips(currentProject);
+        const regions = audioProjectMidiRegions(currentProject);
+        const ppqn = audioProjectPpqn(currentProject);
+        const tempo = audioProjectTempo(currentProject);
 
         if ((!clips.length && !regions.length) || audioProjectDuration(clips, regions, ppqn, tempo) <= 0) {
             message.warning(t("canvas.audioStudio.noContent", { defaultValue: "No audio content in current project" }));
@@ -292,18 +228,15 @@ export default function AudioStudioPage() {
         }
 
         try {
-            const { audio, skipped } = await renderAudioMixdown(
-                {
-                    tracks,
-                    clips,
-                    regions,
-                    ppqn,
-                    tempo,
-                    masterGain: audioProjectMasterGain(currentAudioNode),
-                    automation: audioProjectAutomation(currentAudioNode),
-                },
-                nodesRef.current,
-            );
+            const { audio, skipped } = await renderAudioMixdown({
+                tracks,
+                clips,
+                regions,
+                ppqn,
+                tempo,
+                masterGain: audioProjectMasterGain(currentProject),
+                automation: audioProjectAutomation(currentProject),
+            });
             if (skipped.length) {
                 message.warning(
                     t("canvas.audioStudio.mixdownVstSkipped", {
@@ -330,7 +263,7 @@ export default function AudioStudioPage() {
             const newNode: CanvasNodeData = {
                 id: nanoid(),
                 type: CanvasNodeType.Audio,
-                title: nodeTitle || currentAudioNode.title || "Audio Artwork",
+                title: nodeTitle || currentProject.title || "Audio Artwork",
                 position: { x: 100, y: 100 },
                 width: size.width,
                 height: size.height,
@@ -366,7 +299,7 @@ export default function AudioStudioPage() {
     // 1. Editor View (when :id is present)
     // =========================================================================
     if (id) {
-        if (!currentProject || !currentAudioNode) {
+        if (!currentProject) {
             return (
                 <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 p-8 text-center bg-background">
                     <Empty description="Audio project not found or has been deleted" />
@@ -380,11 +313,9 @@ export default function AudioStudioPage() {
         return (
             <div className="relative flex h-full flex-col overflow-hidden bg-background">
                 <AudioStudio
-                    project={currentAudioNode}
-                    projects={[currentAudioNode]}
-                    nodes={[currentAudioNode, ...resourcePoolNodes]}
-                    setNodes={handleSetNodes}
-                    onSelectProject={() => undefined}
+                    project={currentProject}
+                    nodes={resourcePoolNodes}
+                    onProjectChange={(patch) => updateProject(currentProject.id, patch)}
                     onOutput={async () => setOutputModalOpen(true)}
                     onExportStems={async () => {
                         message.info("Stem export started");
@@ -398,8 +329,8 @@ export default function AudioStudioPage() {
                     onClose={() => setOutputModalOpen(false)}
                     title="Export Audio Artwork"
                     resourceType="audio"
-                    defaultFileName={`${currentAudioNode.title || "mixdown"}.wav`}
-                    defaultNodeTitle={`${currentAudioNode.title || "Audio"} - Mixdown`}
+                    defaultFileName={`${currentProject.title || "mixdown"}.wav`}
+                    defaultNodeTitle={`${currentProject.title || "Audio"} - Mixdown`}
                     onDownload={handleDownload}
                     onOutputToCanvas={handleExportToCanvas}
                 />
@@ -535,7 +466,7 @@ export default function AudioStudioPage() {
                 {/* Header */}
                 <div className="glass-surface flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-base font-semibold text-foreground">
+                        <h1 className="text-base font-semibold text-foreground" style={{ margin: 0 }}>
                             {selectedGroup ? selectedGroup.name : "Audio Projects"}
                         </h1>
                         <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs text-brand font-medium">
@@ -591,48 +522,14 @@ export default function AudioStudioPage() {
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             {groupProjects.map((project) => {
                                 const otherGroups = groups.filter((g) => g.id !== project.groupId);
-                                const menuItems: MenuProps["items"] = [
-                                    {
-                                        key: "rename",
-                                        label: "Rename",
-                                        icon: <Pencil className="size-3.5" />,
-                                        onClick: () => setRenamingProject({ id: project.id, title: project.title }),
+                                const moveItems: MenuProps["items"] = otherGroups.map((g) => ({
+                                    key: g.id,
+                                    label: g.name,
+                                    onClick: () => {
+                                        setProjectGroup(project.id, g.id);
+                                        message.success(`Moved to "${g.name}"`);
                                     },
-                                    ...(otherGroups.length > 0
-                                        ? [
-                                              {
-                                                  key: "move",
-                                                  label: "Move to Group",
-                                                  icon: <FolderKanban className="size-3.5" />,
-                                                  children: otherGroups.map((g) => ({
-                                                      key: `move-${g.id}`,
-                                                      label: g.name,
-                                                      onClick: () => {
-                                                          setProjectGroup(project.id, g.id);
-                                                          message.success(`Moved to "${g.name}"`);
-                                                      },
-                                                  })),
-                                              },
-                                          ]
-                                        : []),
-                                    {
-                                        type: "divider",
-                                    },
-                                    {
-                                        key: "delete",
-                                        label: armedProjectId === project.id ? "Confirm Delete" : "Delete Project",
-                                        danger: true,
-                                        icon: armedProjectId === project.id ? <Check className="size-3.5" /> : <Trash2 className="size-3.5" />,
-                                        onClick: () => {
-                                            if (armedProjectId !== project.id) {
-                                                setArmedProjectId(project.id);
-                                                return;
-                                            }
-                                            setArmedProjectId(null);
-                                            deleteProject(project.id);
-                                        },
-                                    },
-                                ];
+                                }));
 
                                 return (
                                     <div
@@ -641,23 +538,6 @@ export default function AudioStudioPage() {
                                         className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-4 transition-all hover:border-brand hover:shadow-md cursor-pointer"
                                     >
                                         <div>
-                                            {/* Audio Waveform Banner Preview */}
-                                            <div className="relative mb-3 flex h-32 w-full items-center justify-center overflow-hidden rounded-lg bg-black/5 dark:bg-white/5">
-                                                <div className="flex flex-col items-center gap-2">
-                                                    <div className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand">
-                                                        <Music2 className="size-6" />
-                                                    </div>
-                                                    <span className="text-xs font-semibold tabular-nums text-muted-foreground">
-                                                        {project.tempo} BPM · {project.timeSignature?.numerator || 4}/{project.timeSignature?.denominator || 4}
-                                                    </span>
-                                                </div>
-
-                                                <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
-                                                    <Sliders className="size-3" />
-                                                    <span>{project.tracks?.length || 0} {project.tracks?.length === 1 ? "track" : "tracks"} · {project.clips?.length || 0} {project.clips?.length === 1 ? "clip" : "clips"}</span>
-                                                </div>
-                                            </div>
-
                                             {/* Title & Metadata */}
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="min-w-0 flex-1">
@@ -691,20 +571,40 @@ export default function AudioStudioPage() {
                                                                 type="text"
                                                                 size="small"
                                                                 shape="circle"
+                                                                icon={<Pencil className="size-3.5" />}
+                                                                className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-foreground"
+                                                                onClick={() => setRenamingProject({ id: project.id, title: project.title })}
+                                                                title="Rename"
+                                                            />
+                                                            {otherGroups.length > 0 && (
+                                                                <Dropdown
+                                                                    menu={{ items: moveItems }}
+                                                                    trigger={["click"]}
+                                                                    placement="bottomRight"
+                                                                    open={moveMenuProjectId === project.id}
+                                                                    onOpenChange={(open) => setMoveMenuProjectId(open ? project.id : null)}
+                                                                >
+                                                                    <Button
+                                                                        type="text"
+                                                                        size="small"
+                                                                        shape="circle"
+                                                                        icon={<FolderInput className="size-3.5" />}
+                                                                        className={`text-muted-foreground transition hover:text-foreground ${
+                                                                            moveMenuProjectId === project.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                                                        }`}
+                                                                        title="Move to Group"
+                                                                    />
+                                                                </Dropdown>
+                                                            )}
+                                                            <Button
+                                                                type="text"
+                                                                size="small"
+                                                                shape="circle"
                                                                 icon={<Trash2 className="size-3.5" />}
                                                                 className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-danger"
                                                                 onClick={() => setArmedProjectId(project.id)}
                                                                 title="Delete project"
                                                             />
-                                                            <Dropdown menu={{ items: menuItems }} trigger={["click"]} placement="bottomRight">
-                                                                <Button
-                                                                    type="text"
-                                                                    size="small"
-                                                                    shape="circle"
-                                                                    icon={<MoreVertical className="size-4" />}
-                                                                    className="text-muted-foreground hover:text-foreground"
-                                                                />
-                                                            </Dropdown>
                                                         </>
                                                     )}
                                                 </div>

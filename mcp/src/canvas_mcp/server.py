@@ -1,21 +1,19 @@
-"""Starlette app: browser bridge routes, auth/CORS guard and the MCP mount.
+"""Starlette app: browser bridge routes, CORS guard and the MCP mount.
 
-Port of ``web/server/bridge.ts``, replacing the same-origin guard with an exact
-origin allowlist plus token auth, and mounting the MCP Streamable HTTP session
+Port of ``web/server/bridge.ts``, replacing the same-origin guard with an origin
+allowlist (empty = allow all), and mounting the MCP Streamable HTTP session
 manager whose lifespan is owned by this app.
 """
 
 from __future__ import annotations
 
 import asyncio
-import hmac
 import json
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Any
-from urllib.parse import parse_qs
 
 from mcp.server.streamable_http_manager import StreamableHTTPASGIApp
 from starlette.applications import Starlette
@@ -73,7 +71,7 @@ def _empty_asgi(status: int, extra: list[tuple[bytes, bytes]]) -> Callable[..., 
 
 
 class BridgeGuard:
-    """Raw ASGI middleware: origin allowlist, CORS, preflight and token auth.
+    """Raw ASGI middleware: origin allowlist, CORS and preflight.
 
     Raw ASGI (not ``BaseHTTPMiddleware``) so SSE responses stream unbuffered.
     """
@@ -82,7 +80,6 @@ class BridgeGuard:
         self.app = app
         self.settings = settings
         self.allowed_origins = frozenset(settings.origins)
-        self.token = settings.token
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
         if scope["type"] != "http":
@@ -90,16 +87,12 @@ class BridgeGuard:
             return
         headers = Headers(scope=scope)
         origin = headers.get("origin")
-        if origin is not None and origin not in self.allowed_origins:
+        if self.allowed_origins and origin is not None and origin not in self.allowed_origins:
             await _json_asgi(403, {"error": "origin not allowed"})(scope, receive, send)
             return
         cors = _cors_headers(origin)
-        path = scope.get("path", "")
         if scope["method"] == "OPTIONS":
             await _empty_asgi(204, cors)(scope, receive, send)
-            return
-        if self._needs_token(path) and not self._token_ok(headers, scope.get("query_string", b"")):
-            await _json_asgi(401, {"error": "unauthorized"}, cors)(scope, receive, send)
             return
 
         async def send_cors(message: dict[str, Any]) -> None:
@@ -108,17 +101,6 @@ class BridgeGuard:
             await send(message)
 
         await self.app(scope, receive, send_cors)
-
-    @staticmethod
-    def _needs_token(path: str) -> bool:
-        return path == "/events" or path.startswith("/canvas/") or path == "/mcp" or path.startswith("/mcp/")
-
-    def _token_ok(self, headers: Headers, query_string: bytes) -> bool:
-        authorization = headers.get("authorization") or ""
-        provided = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
-        if not provided:
-            provided = (parse_qs(query_string.decode("latin-1")).get("token") or [""])[0]
-        return bool(provided) and hmac.compare_digest(provided, self.token)
 
 
 def _request_origin(request: Request, settings: Settings) -> str:
@@ -143,7 +125,6 @@ def create_app(settings: Settings) -> Starlette:
                 "ok": True,
                 "protocolVersion": AGENT_PROTOCOL_VERSION,
                 "url": _request_origin(request, settings),
-                "hasToken": True,
             }
         )
 

@@ -1,5 +1,6 @@
 export const ASSET_FOLDER_FILE_LIMIT = 200;
 export const ASSET_FOLDER_DRAG_MIME = "application/x-infinite-canvas-folder-file";
+export const STUDIO_ASSET_DRAG_MIME = "application/x-infinite-canvas-studio-asset";
 
 export type AssetFolderFileKind = "image" | "video" | "audio" | "text";
 

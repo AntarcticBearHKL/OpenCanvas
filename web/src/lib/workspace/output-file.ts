@@ -15,6 +15,7 @@ const MIME_EXTENSIONS: [string, string][] = [
     ["mp4", "mp4"],
     ["webm", "webm"],
     ["mpeg", "mp3"],
+    ["midi", "mid"],
     ["ogg", "ogg"],
     ["wav", "wav"],
 ];
@@ -33,6 +34,7 @@ export function outputFileExtension(mimeType?: string, storageKey?: string) {
     if (match) return match[1];
     if (storageKey?.startsWith("image:")) return "png";
     if (storageKey?.startsWith("video:")) return "mp4";
+    if (storageKey?.startsWith("midi:")) return "mid";
     if (storageKey?.startsWith("audio:")) return "mp3";
     return "png";
 }

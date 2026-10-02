@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { filterNodesByType, isNodeHidden, isNodeLocked } from "@/lib/canvas/canvas-node-geometry";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
-import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
+import type { CanvasNodeData } from "@/types/canvas";
 
 type CanvasNodeListPanelProps = {
     node?: CanvasNodeData | null;
@@ -32,7 +32,7 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
     const [typeFilter, setTypeFilter] = useState("all");
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [titleDraft, setTitleDraft] = useState("");
-    const stack = nodes.filter((item) => item.type !== CanvasNodeType.SmartCanvas);
+    const stack = nodes;
     const stackIndex = node ? stack.findIndex((item) => item.id === node.id) : -1;
     const types = useMemo(() => Array.from(new Set(nodes.map((item) => item.type))), [nodes]);
     const listed = filterNodesByType(nodes, typeFilter);
@@ -168,7 +168,6 @@ export function CanvasNodeListPanel({ node, nodes, onMove, onToggleFlag, onBulkR
 }
 
 function moveTargetIndex(nodes: CanvasNodeData[], index: number, step: 1 | -1) {
-    let target = index + step;
-    while (target >= 0 && target < nodes.length && nodes[target].type === CanvasNodeType.SmartCanvas) target += step;
+    const target = index + step;
     return target >= 0 && target < nodes.length ? target : null;
 }

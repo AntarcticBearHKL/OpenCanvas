@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, ChevronLeft, ChevronRight } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useTranslation } from "react-i18next";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
-import { commitBoardLayers } from "@/components/canvas/workspace/ps-layer-ops";
+import { commitBoardLayers, type PsBoardCommit } from "@/components/canvas/workspace/ps-layer-ops";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { STUDIO_FLAT_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
-import type { CanvasNodeData, CanvasPsLayer } from "@/types/canvas";
+import type { SmartCanvasBoard } from "@/lib/canvas/smart-canvas";
+import type { CanvasPsLayer } from "@/types/canvas";
 
 export type PsHistoryEntry = { id: string; name: string; layers: CanvasPsLayer[] };
 export type PsHistoryState = { entries: PsHistoryEntry[]; index: number };
@@ -20,7 +21,7 @@ const FLAT_BUTTON_CLASS = STUDIO_FLAT_BUTTON_CLASS;
  * History lives only in the editor session: it keeps layer-document snapshots in memory and never writes them into the
  * board, so closing the workspace drops it and the document keeps exactly one saved state.
  */
-export function usePsHistory(board: CanvasNodeData | null, layers: CanvasPsLayer[], setNodes: Dispatch<SetStateAction<CanvasNodeData[]>>) {
+export function usePsHistory(board: SmartCanvasBoard | null, layers: CanvasPsLayer[], commitBoard: PsBoardCommit) {
     const { t } = useTranslation();
     const [state, setState] = useState<PsHistoryState>({ entries: [], index: -1 });
     const labelRef = useRef("");
@@ -59,7 +60,7 @@ export function usePsHistory(board: CanvasNodeData | null, layers: CanvasPsLayer
         window.setTimeout(() => {
             skipRef.current = false;
         }, 0);
-        commitBoardLayers(setNodes, board.id, state.entries[index].layers);
+        commitBoardLayers(commitBoard, board.id, state.entries[index].layers);
         setState((prev) => ({ ...prev, index }));
     };
     const snapshot = () => {

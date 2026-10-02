@@ -190,9 +190,6 @@ function flattenGenerationInputs(inputs: NodeGenerationInput[]) {
 }
 
 function readNodeGenerationResource(node: CanvasNodeData): NodeGenerationResourceInput[] {
-    if (node.type === CanvasNodeType.SmartCanvas) {
-        return [{ nodeId: node.id, type: "image", title: node.title, image: { id: node.id, name: `${node.title || node.id}.png`, type: "image/png", dataUrl: "" } }];
-    }
     const image = readReferenceImage(node);
     if (image) return [{ nodeId: node.id, type: "image", title: node.title, image }];
     const video = readReferenceVideo(node);
@@ -221,16 +218,12 @@ export function buildNodeResponseMessages(context: NodeGenerationContext): AiTex
     ];
 }
 
-export async function hydrateNodeGenerationContext(context: NodeGenerationContext, nodes: CanvasNodeData[] = []) {
+export async function hydrateNodeGenerationContext(context: NodeGenerationContext) {
     const { imageToDataUrl } = await import("@/services/image-storage");
-    const { composeSmartCanvas } = await import("@/lib/canvas/smart-canvas");
     const referenceImages = (
         await Promise.all(
             context.referenceImages.map(async (image): Promise<ReferenceImage | null> => {
-                const board = nodes.find((node) => node.id === image.id && node.type === CanvasNodeType.SmartCanvas);
-                if (!board) return { ...image, dataUrl: await imageToDataUrl(image) };
-                const composed = await composeSmartCanvas(board, nodes);
-                return composed.dataUrl ? { ...image, dataUrl: composed.dataUrl } : null;
+                return { ...image, dataUrl: await imageToDataUrl(image) };
             }),
         )
     ).filter((image): image is ReferenceImage => Boolean(image));

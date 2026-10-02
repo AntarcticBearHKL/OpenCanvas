@@ -7,6 +7,49 @@ description: Implemented changes that still need manual verification
 
 The current release needs manual verification in these areas:
 
+## 音频合成器：AI 音频转 MIDI 与 MIDI 节点
+
+- 画布音频节点悬停工具新增「转 MIDI」：弹窗可选「高精度」（先用 Demucs 分离音轨再逐轨转录，首次需下载约 166MB 模型）与「标准（快）」（直接转录单轨，仅需约 0.2MB 的 Basic Pitch 模型），默认高精度；转换过程显示阶段与进度，可取消。
+- 转换成功后会在源音频节点右侧生成 MIDI 节点，卡片显示轨道数 / 音符数与「拖入音频合成器使用」提示；节点悬停工具可「导出 MIDI」下载 `.mid`。
+- 拖入或上传 `.mid` / `.midi` 文件会直接创建 MIDI 节点（不再被识别为音频节点）。
+- 音频合成器资源库（媒体池）现在同时列出音频与 MIDI 节点；把 MIDI 节点拖到编曲区会新建乐器（MIDI）轨并填入该文件的 MIDI 片段，可在钢琴卷帘继续编辑。
+- 测试方式：生成或导入一段音频 → 点「转 MIDI」（先试「标准」快速验证，再试「高精度」确认分轨）→ 画布出现 MIDI 节点 → 进入音频合成器把该 MIDI 节点拖入编曲区 → 确认生成 MIDI 轨且钢琴卷帘可编辑 → 用「导出 MIDI」下载并用外部工具打开 `.mid` 校验。首次使用会下载模型，需确认缓存与进度提示正常。
+
+## 文本创作器：移除版本历史 / 场景看板 / 资源库与大纲自动命名
+
+- 版本历史（History）功能已整体移除：写作工作台不再注册「版本历史」停靠面板，编辑菜单与编辑器头部不再有「存快照」入口，检视器不再显示版本数量，`WritingProject` 数据模型不再包含 `revisions` / `DocRevision`（旧本地数据里的 `revisions` 字段会被忽略，不再读取）。
+- 场景看板（Board）面板已整体移除：写作工作台底部不再有停靠面板，看板的拖拽改状态 / 排序入口与相关文案一并删除。
+- 资源库（Codex）功能已整体移除：写作工作台不再注册「资源库」面板，编辑器斜杠菜单与「插入」菜单不再有「插入设定」，检视器不再有「关联设定」（人物 / 地点 / 线索），大纲节点与 `WritingProject` 数据模型不再包含 `codex` 与关联字段，AI 提示词也不再拼接关联设定。
+- 大纲新建节点改为按序号自动命名：新建根 / 子节点时，标题默认取该层级现有同级同类型节点的下一个序号，中文为「第N<类型>」（如「第2章」），英文为「<类型> N」（如「Chapter 2」）。
+- 测试方式：打开任一写作工程，确认「窗口」菜单与停靠区中不再有「版本历史」「场景看板」「资源库」；在章节管理器点「添加 / 加下级」，确认新节点名称为递增序号而非「新节点」；在已有「第一章」的工程里新增一个章，应得到「第二章」。
+
+## 文本创作器：大纲精简（单层 / 两次点击删除）
+
+- 移除大纲节点的 AI「展开下级」：章节管理器行内的展开按钮与检视器的「AI 展开下级」按钮、`expandOutline` 与相关提示词全部删除。
+- 移除大纲状态：节点不再有 构想 / 初稿 / 修订 / 完成 状态，行尾状态胶囊与检视器状态下拉一并删除，`OutlineStatus` / `OUTLINE_STATUSES` 数据模型移除。
+- 写作类型已统一：不再区分小说 / 剧本，大纲只保留一层「章」；不能再嵌套，不再有加下级。
+- 每个节点只保留删除操作（两次点击确认）；去掉「加同级」与「加下级」。
+- 删除改为两次点击就地确认：第一次点击图标变为勾选（危险态），再次点击删除，鼠标移开自动取消，不再有弹窗。
+- 测试方式：在章节管理器确认列表为平铺一层、每个节点只有一个删除按钮、无加下级；点删除第一次变勾、第二次删除、移开取消；选中任一节点编辑器都会切换到该节点的正文。
+
+## 文本创作器：提示词查看
+
+- 顶栏新增「提示词」菜单（在 编辑 / 格式 / 视图 之后、窗口之前），点击打开弹窗，展示各 AI 功能实际使用的提示词：先列出「共用上下文」的拼装顺序与含义，再列出 续写 / 改写 / 扩写 / 精简 / 润色 / 写对话 六个功能的指令原文。
+- 测试方式：打开任一写作工程，点顶栏「提示词」，确认弹窗列出共用上下文与六个功能的提示词文本。
+
+## 像素画布工作台（Pixel Studio）
+
+- 顶部导航新增「像素画布」入口，独立库页 `/pixel` 汇总所有画布内的像素画布节点，卡片展示所属画布、像素尺寸、图层数与帧数。
+- 库页左侧为「Pixel Groups」分组栏，与图像 / 音频工作台一致：支持新建 / 重命名 / 两次点击删除分组、组内工程计数、卡片跨组移动（Move to Group）以及重命名 / 删除像素画布；未归属的像素画布会自动归入首个分组。像素工作台全部界面文案为英文。
+- 新建弹窗支持选择目标画布（当前无画布时自动创建默认画布）与 16×16 / 32×32 / 64×64 / 128×128 / 256×256 / 512×512 预设，或自定义宽高；确认后在目标画布中追加一个像素画布节点，并跳转到 `/pixel/:id?canvasId=...`。
+- 画布编辑器访问 `/canvas/:id/pixel`，或在工作区页签选择「像素」，都会重定向到 `/pixel?canvasId=...`；`/pixel/:id` 全屏进入像素编辑器。
+- 测试方式：从顶栏进入 `/pixel`，新建一个 32×32 画布，确认目标画布中新增像素画布节点并能打开全屏编辑器；返回 `/canvas/:id` 切换「pixel」工作区，确认自动跳转到像素画布库。
+- 编辑器提供铅笔 / 橡皮擦 / 油漆桶 / 直线 / 矩形 / 椭圆 / 吸管 / 选框 / 移动 / 抓手工具，笔刷大小与容差、X / Y 轴对称、像素网格、滚轮缩放（整数倍）与适应窗口。
+- 图层面板（显隐 / 不透明度 / 混合模式 / 排序 / 增删）与帧时间轴（增删 / 复制 / 排序 / 单帧时长 / 帧率 / 播放预览）齐备；调色板支持取色与增删；导入支持画布图片节点或本地文件（适应 / 拉伸 / 原始），导出单帧 PNG 与整条动画精灵表。
+- 画布支持到 4K 量级：像素数据分块缓存在内存 + 最近邻缩放渲染，超过 100 万像素时关闭形状实时预览以保证流畅。
+- 注册 `pixel` MCP 命名空间：结构操作（doc / layer / frame / palette）与像素操作（`pixels.set` / `fill` / `shape` / `region.set` / `region.get` / `image.load` / `export`），可由本地画布 MCP 直接逐像素读写。
+- 测试方式：在编辑器中手绘、切换工具与图层 / 帧、导入图片并导出 PNG / 精灵表；通过画布 MCP 的 `app_describe_actions(ns="pixel")` 确认命名空间与 op 列表，并用 `app_apply_ops` 发 `pixels.set` / `region.get` 验证逐像素闭环。
+
 ## Studio 解构与独立项目制（图像工作台 / 音频工作室）
 
 - **分组强约束体系与独立工程库**：
@@ -87,6 +130,9 @@ The current release needs manual verification in these areas:
 - The audio studio menu bar no longer has a "Track" menu — only Edit / Clip / View / Automation remain. The five add-track entries (audio / instrument / MIDI / group / return) now live behind the "Add track" button, which opens a dropdown; both the row at the end of the lane list and the empty-state button were changed (they no longer add an audio track in one click).
 - The track-level actions moved onto every track row: duplicate / remove / export stems are in a new "⋯" button (label "Track actions") at the right end of the track header. The same menu still opens on right-click. `Remove` stays disabled when only one non-master track remains, and `Export stems` stays disabled while an export is running. Note that "Export stems" exports the **whole project**, not the track whose "⋯" you clicked.
 - The Media pool is now drag-only: the per-row "＋" and the "add to the selected track" click flow are gone. Drag a media-pool row onto any track lane to create a clip at the pointer's timeline position (snapped to the grid); the target lane highlights while a valid drop hovers it, and a non-audio drag or a lane that cannot host clips rejects the drop. The MIDI track's "add region" ＋ and the empty-state "go to canvas" ＋ are unchanged.
+- Instrument and MIDI tracks are merged into one instrument track type: the separate "MIDI track" entry is gone, an instrument track hosts MIDI regions, and the piano roll's instrument picker still chooses a built-in synth or a local VST3 instrument.
+- The built-in instruments are now two sampled instruments (piano / guitar) instead of the four oscillator presets: samples come from the open-source FluidR3_GM soundfont (C2–C6, one sample every 3 semitones, with the gaps pitch-shifted by the Sampler), decoded once per preset and shared by playback and the offline mixdown; a track stays silent until its samples are decoded rather than throwing.
+- Every gain ceiling in the audio studio is raised from +6 dB to +24 dB (~15.8×): the mixer fader, inspector gain, clip gain, send gain and master output all use the new maximum, so a quiet track or clip can be pushed much louder (high settings will clip).
 
 ## MCP page namespaces
 
@@ -102,7 +148,7 @@ The current release needs manual verification in these areas:
 - The light theme was re-tuned for contrast. Measured against the paper background: body text 15.2:1, secondary 9.0:1, muted 6.7:1, faint 5.0:1 — previously muted sat at 4.3:1 and faint at 2.3:1, both failing WCAG AA. The dark theme was re-tuned to match (muted 10.2:1, faint 7.2:1).
 - A brand accent (terracotta `#c2410c` in light, `#fb923c` in dark) now drives the Ant Design primary buttons, links, active tabs, selected rows and focus rings, replacing the near-black primary. Success / warning / danger / info each ship with a soft tint used for chips, badges and selected states.
 - The app-wide faint-text pass removed 94 uses of `opacity-40/50/60/70` that dimmed text to roughly 1.8–3:1; only disabled states and non-text decoration (overlays, drag ghosts, spinners) still use an opacity. The minimum text size on every page is now 11px (was 10px), with list and body text at 13–15px.
-- Please verify in BOTH themes: canvas node titles and their metadata strips, connection labels, the node list / layer popover / node dialogs, canvas library rows and cards, every Settings tab, the image studio panels and its dock tab strip, the audio studio track headers / mixer / timeline labels, and the writing studio (outline rows, editor prose, codex, inspector, board, history). Nothing should need squinting, and no text should sit below ~4.5:1.
+- Please verify in BOTH themes: canvas node titles and their metadata strips, connection labels, the node list / layer popover / node dialogs, canvas library rows and cards, every Settings tab, the image studio panels and its dock tab strip, the audio studio track headers / mixer / timeline labels, and the writing studio (outline rows, editor prose, inspector). Nothing should need squinting, and no text should sit below ~4.5:1.
 - Sizes that documented behaviour depends on were preserved: the audio studio's 68px track rows, 28px transport and options controls, 200px track headers and 26px ruler, and the image studio's 24px control rhythm are unchanged.
 - The writing studio editor renders prose at 15px/28px and its outline rows at 13px in `theme.node.text`; the dock panel surfaces stay translucent frosted (`rgba(253,252,250,.80)` in light), so a screenshot tool that does not composite `backdrop-filter` will make those panels look grey — the real browser renders them near-white.
 - The bottom dock splitter now drags the right way: it sits above the bottom panel, so dragging it up grows the panel (the sign was inverted and it used to shrink). Verify in the image studio, the audio studio and the writing studio.
@@ -117,8 +163,8 @@ The current release needs manual verification in these areas:
 
 - The empty strip at the bottom of every page is fixed: the layout's children container declared `flex-1 min-h-0` but was not itself a flex container, so pages that rely on `flex-1` (the writing studio and friends) rendered at content height and left roughly 85px of bare page background at the bottom. The container is now a flex column; measured, the studio's `main` grew from 814px to 899px (955 viewport − 56 header) and the bottom dock sits flush with the window edge. The canvas editor was re-checked and is unaffected (its canvas area already filled the viewport and still does).
 
-- The writing studio now has the same professional top menu row as the image and audio studios (sharing the studio-chrome classes): Edit (undo / redo / snapshot / delete node), Insert (add child / add sibling / insert a codex entry), Format (bold / italic / strikethrough / heading 2 and 3 / bullet and numbered lists / quote / divider), View (focus mode / collapse or expand the whole outline) and Window (panel visibility + reset layout), with the current node and word count on the right. Every menu item is a real action: the format items drive TipTap through a UI-store command channel, the insert items use the outline store, and panel visibility, tab dragging and splitter resizing reuse the same DockArea as the other two studios. Measured: the menu buttons are 14px / 28px like the other studios, the Window menu lists all five panels, and dragging the splitter up 60px grew the bottom dock from 208px to 268px.
-- The "My Assets" library is gone from the whole system: the top nav has only My Canvases / Writing Studio / Settings, `/assets` falls through to the 404 page, and neither the canvas toolbars nor the writing codex entries offer a library entry point any more (the portrait field was removed with it). The canvas 「资源」 node (bound to a local folder) still works. Also confirm that deleting a canvas project or a node still reclaims the image and media blobs it no longer references — that garbage collection moved from the deleted store into `services/image-storage.ts`.
+- The writing studio now has the same professional top menu row as the image and audio studios (sharing the studio-chrome classes): Edit (undo / redo / delete node), Insert (add child), Format (bold / italic / strikethrough / heading 2 and 3 / bullet and numbered lists / quote / divider), View (focus mode / collapse or expand the whole outline) and Window (panel visibility + reset layout), with the current node and word count on the right. Every menu item is a real action: the format items drive TipTap through a UI-store command channel, the insert items use the outline store, and panel visibility, tab dragging and splitter resizing reuse the same DockArea as the other two studios. Measured: the menu buttons are 14px / 28px like the other studios, the Window menu lists every panel, and dragging the splitter changes the dock size.
+- The "My Assets" library is gone from the whole system: the top nav has only My Canvases / Writing Studio / Settings, `/assets` falls through to the 404 page, and the canvas toolbars no longer offer a library entry point (the portrait field was removed with it). The canvas 「资源」 node (bound to a local folder) still works. Also confirm that deleting a canvas project or a node still reclaims the image and media blobs it no longer references — that garbage collection moved from the deleted store into `services/image-storage.ts`.
 
 ## Frosted glass, panel tabs and the writing library
 
@@ -214,18 +260,14 @@ The current release needs manual verification in these areas:
 
 ## Writing studio (文本创作器)
 
-- The top navigation has a fourth tab, Writing Studio, at `/write`. `/write` lists every work as a card (title, template, word and unit counts) with New work (name plus a Novel / Screenplay template), rename and delete; opening a work goes to `/write/:id`, and a work is one self-contained document (outline + prose + its own codex + snapshots) stored under `infinite-canvas:writing_store` through localforage like the canvas library.
-- Novel works use 卷 / 章 / 场景 / 节拍 with the chapter as the writing unit; Screenplay works use 幕 / 场 / 镜头 with the scene as the writing unit. The template is fixed at creation. Prose is stored per writing unit, so word counts, snapshots and AI context are bounded by the unit.
-- The studio is a dockable layout: Outline and Codex on the left, Inspector on the right, Board and History at the bottom, the editor in the centre. The Window menu shows or hides panels and resets the layout, panel tabs drag between the left, right and bottom docks, and the layout persists per studio (same storage key prefix as the image and audio studios).
-- Outline (章节管理器): collapse/expand, inline rename on double-clicking a title, per-row add child / add sibling / AI expand / delete, drag-and-drop that reorders and re-parents (drop on a row's edge to place before/after, on its middle to nest) and refuses dropping a node into its own subtree, a search box that filters by title or summary while keeping ancestors visible, and a footer with word and unit counts.
-- Editor: a TipTap block editor bound to the writing unit of the current selection, with ~600ms debounced autosave, a toolbar (bold / italic / strike / H2 / bullet and numbered lists / blockquote / divider / undo / redo), a `/` slash menu on an empty line (heading, list, quote, divider, insert codex entry, AI writing), a snapshot button, and a focus mode that hides the chrome and centres the column.
-- AI writing: a non-empty selection shows a floating bar with Continue, Rewrite, Expand, Condense, Polish and Dialogue (rewrite replaces the selection; the others insert at the cursor), the header has the same list for the whole unit, output streams into a preview panel with Stop / Accept / Discard, and an unconfigured text model reports "configure the text model in Settings" instead of failing silently. Prompt context is assembled from the work's logline and synopsis, the ancestor outline nodes, the codex entries linked to the node, the previous units' prose tails, the unit's own prose, and the work's POV / tense / style sheet.
-- AI expand on an outline node asks the model for 3-6 children of the next level (volume→chapter→scene→beat, act→scene→shot) and creates them with their summaries; an unparseable reply creates nothing and reports a failure.
-- Codex (资源库): character / location / lore / item / thread entries scoped to the work, with a kind filter, search, add, inline editing of name / aliases / summary / tags / custom key-value fields, and delete that also unlinks the entry from every outline node.
-- Inspector: kind, editable title, status (Idea / Draft / Revised / Done), summary, linked characters / location / plot threads (one select per codex kind plus removable chips), tags, the owning unit's word count and revision count, and an AI expand button for nodes that have a child level.
-- Board (场景看板): the work's writing units in four status columns with counts; dragging a card to another column changes its status, dropping it onto another card reorders it next to that card, and clicking a card selects it.
-- History (版本历史): the live document plus the unit's snapshots newest-first, with Take snapshot, Restore (confirmed) and Delete; the live card shows the current word count and snapshots show their label, time and word count.
-- Export Fountain in the studio header downloads the work as a `.fountain` file: screenplay projects emit slug lines and promote `名字：台词` paragraphs to dialogue, novel projects emit section headings with action paragraphs, and an empty work still produces a valid title page.
+- The top navigation has a fourth tab, Writing Studio, at `/write`. `/write` lists every work as a card (title, template, word and unit counts) with New work (name plus a Novel / Screenplay template), rename and delete; opening a work goes to `/write/:id`, and a work is one self-contained document (outline + prose) stored under `infinite-canvas:writing_store` through localforage like the canvas library.
+- Novel works use a single 章 (chapter) level; Screenplay works use a single 场景 (scene) level. The template is fixed at creation. Prose is stored per unit, so word counts and AI context are bounded by the unit.
+- The studio is a dockable layout: Outline on the left, Inspector on the right, the editor in the centre. The Window menu shows or hides panels and resets the layout, panel tabs drag between the left, right and bottom docks, and the layout persists per studio (same storage key prefix as the image and audio studios).
+- Outline (章节管理器): click to select, inline rename on double-clicking a title, per-row delete, drag to reorder, a search box that filters by title or summary, and a footer with word and unit counts.
+- Editor: a TipTap block editor bound to the writing unit of the current selection, with ~600ms debounced autosave, a toolbar (bold / italic / strike / H2 / bullet and numbered lists / blockquote / divider / undo / redo), a `/` slash menu on an empty line (heading, list, quote, divider, AI writing), and a focus mode that hides the chrome and centres the column.
+- AI writing: a non-empty selection shows a floating bar with Continue, Rewrite, Expand, Condense, Polish and Dialogue (rewrite replaces the selection; the others insert at the cursor), the header has the same list for the whole unit, output streams into a preview panel with Stop / Accept / Discard, and an unconfigured text model reports "configure the text model in Settings" instead of failing silently. Prompt context is assembled from the work's logline and synopsis, the ancestor outline nodes, the previous units' prose tails, the unit's own prose, and the work's POV / tense / style sheet.
+- Inspector: kind, editable title, summary, tags, and the owning unit's word count.
+- Export Fountain in the studio header downloads the work as a `.fountain` file: each chapter emits a section heading plus its prose, and an empty work still produces a valid title page.
 - The canvas writing node family is gone: no Writing menu in the bottom toolbar, no story node type or `metadata.story` field, no story relations (Story flow / Character arc / Setting / Theme / Plot thread) and no `expand_story` agent operation or permission; the connection label fallback never shows a raw key for a relation that no longer exists.
 
 - Creating a node, duplicating/pasting nodes, and single-clicking a node no longer open the lower panel on their own; the panel only opens from the node-list panel toggle or when a plugin asks for it.
@@ -336,3 +378,10 @@ The current release needs manual verification in these areas:
 
 - The removed-Agent chat data is gone from the canvas model: chat sessions, the active chat id and assistant-image hydration no longer exist, the exported zip no longer carries chat fields, and the `agent_chat_messages` storage label is removed. Undo/redo, canvas export/import and normal editing should behave exactly as before.
 - Dead code and unused copy are removed: the unmounted local-workspace sync store/module and the unused output-resolution helper are deleted, unused i18n keys and unnecessary exports are gone, and the MCP tool set is unchanged at 30 tools. Two raw-key labels are fixed: the Audio asset kind and Untitled canvas now render as proper text.
+
+## Audio mixer hierarchy
+
+- The audio studio Mixer channel strip now reads as labelled blocks — name plus a type chip (audio / instrument / group / return / master, each with its own soft-token colour), sends, pan, fader with meter, M/S/arm and the output selector — separated by hairline dividers. The selected strip uses the brand accent surface with an accent left marker, non-audible strips stay dimmed, and labels (small, muted) are visually separated from their values (full-contrast, tabular).
+- Sends are inset sub-rows with a bordered target/add select and a bordered pre/post toggle; the output select is bordered with an Output caption; M/S/arm toggles keep a hairline outline when inactive. The inspector, its sends block and the project-settings panel use the same label / value / section treatment.
+- Test by opening an audio project in the Audio Studio: compare a selected vs unselected strip, an audible vs muted track, and read pan/gain values against their labels; then check the inspector and project settings in both light and dark themes.
+- The audio studio arrangement now has a Volume / Spectrum switch: a small segmented control appears in the toolbar in Arrangement view and switches every lane (audio clips and instrument tracks) between waveform and spectrogram; instrument (MIDI) tracks no longer draw MIDI note blocks and instead show their offline-rendered audio, with a faint baseline while a render is pending or for VST3 tracks, and region selection, dragging and double-click-to-open-piano-roll keep working.

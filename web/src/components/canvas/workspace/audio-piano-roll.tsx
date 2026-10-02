@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Select } from "antd";
 import { Music2, SlidersHorizontal, X, ZoomIn, ZoomOut } from "lucide-react";
 import { nanoid } from "nanoid";
 import * as Tone from "tone";
 import { useTranslation } from "react-i18next";
 
-import { AUDIO_TRACK_TYPE_LABEL_KEYS } from "@/components/canvas/workspace/audio-panels";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import {
     addNote,
@@ -30,7 +29,8 @@ import {
     setNoteVelocity,
     snapTicks,
 } from "@/lib/canvas/audio-midi";
-import { audioTrackType } from "@/lib/canvas/audio-project";
+import { preloadSamplerBuffers } from "@/lib/canvas/audio-instruments";
+import { audioTrackType, canHostMidi } from "@/lib/canvas/audio-project";
 import type { AudioGraphVstSource } from "@/lib/canvas/audio-graph";
 import { createVstClient } from "@/lib/canvas/audio-vst";
 import type { VstPlugin } from "@/lib/canvas/audio-vst-protocol";
@@ -38,7 +38,8 @@ import { startVstStateSession, type VstStateSession } from "@/lib/canvas/vst-sta
 import type { CanvasAudioMidiRegion, CanvasAudioNote, CanvasAudioSnap, CanvasAudioTrack } from "@/types/canvas";
 
 const KEY_WIDTH = 46;
-const ROW_HEIGHT = 12;
+const MIN_ROW_HEIGHT = 6;
+const MAX_ROW_HEIGHT = 40;
 const VELOCITY_HEIGHT = 56;
 const NOTE_EDGE_PX = 5;
 const ROW_COUNT = AUDIO_NOTE_MAX - AUDIO_NOTE_MIN + 1;
@@ -93,7 +94,6 @@ type AudioPianoRollProps = {
     tempo: number;
     meter: { numerator: number; denominator: number };
     snap: CanvasAudioSnap;
-    onRegionPatch: (patch: Partial<CanvasAudioMidiRegion>) => void;
     onNotes: (notes: CanvasAudioNote[]) => void;
     onTrackPatch: (patch: Partial<CanvasAudioTrack>) => void;
     getVstSource: (trackId: string) => AudioGraphVstSource | null;
@@ -113,7 +113,7 @@ type NoteGesture = {
     moved: boolean;
 };
 
-export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap, onRegionPatch, onNotes, onTrackPatch, getVstSource, onClose }: AudioPianoRollProps) {
+export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap, onNotes, onTrackPatch, getVstSource, onClose }: AudioPianoRollProps) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     const vst = useVstInstruments();
@@ -126,6 +126,11 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
     const [noteDraft, setNoteDraft] = useState<CanvasAudioNote[] | null>(null);
     const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
     const [pxPerBeat, setPxPerBeat] = useState(40);
+    const [rowHeight, setRowHeight] = useState(12);
+    const [viewportWidth, setViewportWidth] = useState(0);
+    const pxPerBeatRef = useRef(pxPerBeat);
+    const rowHeightRef = useRef(rowHeight);
+    const pendingScrollRef = useRef<{ left: number; top: number } | null>(null);
     const notes = noteDraft ?? region?.notes ?? EMPTY_NOTES;
     const trackId = track?.id ?? "";
     const vstPluginId = track?.instrument?.kind === "vst3" ? track.instrument.pluginId : "";
@@ -138,21 +143,93 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
     const noteStep = snapTicks(snap, ppqn, meter);
     const pxPerTick = pxPerBeat / ppqn;
     const gridWidth = region ? Math.max(160, region.durationTicks * pxPerTick) : 160;
-    const gridHeight = ROW_COUNT * ROW_HEIGHT;
+    const fillWidth = Math.max(gridWidth, viewportWidth - KEY_WIDTH);
+    const gridHeight = ROW_COUNT * rowHeight;
     const barPx = barTicks(ppqn, meter) * pxPerTick;
     const beatPx = beatTicks(ppqn, meter) * pxPerTick;
-    const octavePx = ROW_HEIGHT * 12;
+    const octavePx = rowHeight * 12;
     const regionId = region?.id ?? "";
 
     const snapTick = (ticks: number, suspend: boolean) => (suspend || !noteStep ? Math.round(ticks) : quantizeTicks(ticks, noteStep));
 
+    // The fill width tracks the scroll viewport so a short region's grid covers the whole lane instead of
+    // leaving a blank gap to its right; a long region keeps scrolling because fillWidth falls back to gridWidth.
+    useEffect(() => {
+        const element = scrollRef.current;
+        if (!element) return;
+        const update = () => setViewportWidth(element.clientWidth);
+        update();
+        const observer = new ResizeObserver(update);
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [regionId]);
+
+    useEffect(() => {
+        pxPerBeatRef.current = pxPerBeat;
+        rowHeightRef.current = rowHeight;
+    }, [pxPerBeat, rowHeight]);
+
+    // Wheel zoom is attached natively: React's synthetic wheel listener is passive, so preventDefault
+    // (browser zoom / page scroll) would be ignored. Ctrl = time zoom, Alt = row-height zoom, both anchored
+    // on the pointer; a plain wheel falls through to normal scrolling.
+    useEffect(() => {
+        const element = scrollRef.current;
+        if (!element) return;
+        const onWheel = (event: WheelEvent) => {
+            const zoom = Math.exp(-event.deltaY * 0.002);
+            if (event.ctrlKey) {
+                event.preventDefault();
+                const rect = element.getBoundingClientRect();
+                const pointerX = event.clientX - rect.left;
+                const current = pxPerBeatRef.current;
+                const next = Math.min(MAX_PX_PER_BEAT, Math.max(MIN_PX_PER_BEAT, current * zoom));
+                if (next === current) return;
+                const tick = Math.max(0, pointerX + element.scrollLeft - KEY_WIDTH) / (current / ppqn);
+                const left = Math.max(0, KEY_WIDTH + tick * (next / ppqn) - pointerX);
+                pxPerBeatRef.current = next;
+                pendingScrollRef.current = { left, top: element.scrollTop };
+                setPxPerBeat(next);
+                element.scrollLeft = left;
+                return;
+            }
+            if (event.altKey) {
+                event.preventDefault();
+                const rect = element.getBoundingClientRect();
+                const pointerY = event.clientY - rect.top;
+                const current = rowHeightRef.current;
+                const next = Math.min(MAX_ROW_HEIGHT, Math.max(MIN_ROW_HEIGHT, current * zoom));
+                if (next === current) return;
+                const pitch = Math.max(0, pointerY + element.scrollTop) / current;
+                const top = Math.max(0, pitch * next - pointerY);
+                rowHeightRef.current = next;
+                pendingScrollRef.current = { left: element.scrollLeft, top };
+                setRowHeight(next);
+                element.scrollTop = top;
+            }
+        };
+        element.addEventListener("wheel", onWheel, { passive: false });
+        return () => element.removeEventListener("wheel", onWheel);
+    }, [regionId, ppqn]);
+
+    // A scroll assignment made while the old grid size is still committed gets clamped, so the anchored
+    // position is re-applied once the new size is in the DOM.
+    useLayoutEffect(() => {
+        const element = scrollRef.current;
+        const pending = pendingScrollRef.current;
+        if (!element || !pending) return;
+        pendingScrollRef.current = null;
+        element.scrollLeft = pending.left;
+        element.scrollTop = pending.top;
+    }, [pxPerBeat, rowHeight]);
+
     useEffect(() => {
         setSelectedNoteIds([]);
+        pendingScrollRef.current = null;
         const element = scrollRef.current;
         if (!element || !region) return;
         const pitches = region.notes.map((note) => note.pitch);
         const center = pitches.length ? (Math.max(...pitches) + Math.min(...pitches)) / 2 : 60;
-        element.scrollTop = Math.max(0, (AUDIO_NOTE_MAX - center) * ROW_HEIGHT - element.clientHeight / 2);
+        element.scrollTop = Math.max(0, (AUDIO_NOTE_MAX - center) * rowHeight - element.clientHeight / 2);
         element.scrollLeft = 0;
         gridRef.current?.focus();
     }, [regionId]);
@@ -166,7 +243,7 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
         const tick = () => {
             const ticks = secondsToTicks(Tone.getTransport().seconds, ppqn, tempo) - region.startTicks;
             const x = ticks * pxPerTick;
-            const visible = x >= 0 && x <= gridWidth;
+            const visible = x >= 0 && x <= fillWidth;
             const rounded = Math.round(x);
             if (rounded !== last || visible !== lastVisible) {
                 element.style.display = visible ? "block" : "none";
@@ -178,7 +255,7 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
-    }, [regionId, region?.startTicks, ppqn, tempo, pxPerTick, gridWidth]);
+    }, [regionId, region?.startTicks, ppqn, tempo, pxPerTick, fillWidth]);
 
     // The bridge attach resolves after the graph build, so readiness is polled from the graph handle; the
     // effect only runs while this track's instrument is a vst3 one.
@@ -207,6 +284,13 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
             editorSessionRef.current = null;
             void session?.stop();
         };
+    }, [trackId]);
+
+    // Warm the built-in sampled instrument as soon as the roll opens on a non-vst3 track, so the first note
+    // has its buffers decoded instead of waiting for the graph rebuild.
+    useEffect(() => {
+        if (!track || !canHostMidi(track) || track.instrument?.kind === "vst3") return;
+        void preloadSamplerBuffers([instrumentPreset(track.instrument?.preset).id]);
     }, [trackId]);
 
     const openVstEditor = async () => {
@@ -297,7 +381,7 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
         const tickDelta = Math.max(-bounds.minTick, raw);
         const pitchDelta = Math.min(
             AUDIO_NOTE_MAX - bounds.maxPitch,
-            Math.max(AUDIO_NOTE_MIN - bounds.minPitch, -Math.round((event.clientY - gesture.startClientY) / ROW_HEIGHT)),
+            Math.max(AUDIO_NOTE_MIN - bounds.minPitch, -Math.round((event.clientY - gesture.startClientY) / rowHeight)),
         );
         if (!tickDelta && !pitchDelta) return;
         gesture.moved = true;
@@ -319,7 +403,7 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
         const box = gridRef.current?.getBoundingClientRect();
         if (!box) return;
         const tick = Math.min(Math.max(0, region.durationTicks - 1), snapTick((event.clientX - box.left) / pxPerTick, event.shiftKey));
-        const pitch = clampPitch(AUDIO_NOTE_MAX - Math.floor((event.clientY - box.top) / ROW_HEIGHT));
+        const pitch = clampPitch(AUDIO_NOTE_MAX - Math.floor((event.clientY - box.top) / rowHeight));
         const length = Math.min(Math.max(AUDIO_MIN_NOTE_TICKS, region.durationTicks - tick), noteStep || beatTicks(ppqn, meter));
         const note = createAudioNote(tick, length, pitch);
         setSelectedNoteIds([note.id]);
@@ -351,7 +435,7 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
         commitNotes(moveNotes(notes, selectedNoteIds, Math.max(-bounds.minTick, rawTick), Math.min(AUDIO_NOTE_MAX - bounds.maxPitch, Math.max(AUDIO_NOTE_MIN - bounds.minPitch, rawPitch))));
     };
 
-    const gridImage = `repeating-linear-gradient(to right, ${theme.toolbar.border} 0 1px, transparent 1px ${Math.max(2, barPx)}px), repeating-linear-gradient(to right, ${theme.canvas.line} 0 1px, transparent 1px ${Math.max(2, beatPx)}px), repeating-linear-gradient(to bottom, ${theme.toolbar.border} 0 1px, transparent 1px ${octavePx}px), repeating-linear-gradient(to bottom, ${theme.canvas.line} 0 1px, transparent 1px ${ROW_HEIGHT}px)`;
+    const gridImage = `repeating-linear-gradient(to right, ${theme.toolbar.border} 0 1px, transparent 1px ${Math.max(2, barPx)}px), repeating-linear-gradient(to right, ${theme.canvas.line} 0 1px, transparent 1px ${Math.max(2, beatPx)}px), repeating-linear-gradient(to bottom, ${theme.toolbar.border} 0 1px, transparent 1px ${octavePx}px), repeating-linear-gradient(to bottom, ${theme.canvas.line} 0 1px, transparent 1px ${rowHeight}px)`;
 
     if (!region || !track) {
         return (
@@ -389,15 +473,6 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
     return (
         <div className="flex min-h-0 flex-1 flex-col glass-card">
             <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-2 py-1 text-sm" style={{ borderColor: theme.toolbar.border, color: theme.node.muted }}>
-                <input
-                    className="w-40 min-w-0 shrink rounded-md border bg-transparent px-1.5 py-0.5 text-sm outline-none"
-                    style={{ borderColor: theme.toolbar.border, color: theme.node.text }}
-                    value={region.name || ""}
-                    placeholder={track.name || t(AUDIO_TRACK_TYPE_LABEL_KEYS[audioTrackType(track)])}
-                    aria-label={t("canvas.audioStudio.rollRegionName")}
-                    onChange={(event) => onRegionPatch({ name: event.target.value })}
-                />
-                <span className="shrink-0 tabular-nums">{t("canvas.audioStudio.rollNotes", { count: notes.length })}</span>
                 {audioTrackType(track) === "instrument" ? (
                     <label className="flex shrink-0 items-center gap-1.5" data-roll-instrument="true">
                         <span>{t("canvas.audioStudio.rollInstrument")}</span>
@@ -462,20 +537,19 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
                         <ZoomOut className="size-3.5" />
                     </button>
                 </span>
-                <span className="min-w-0 flex-1 truncate">{t("canvas.audioStudio.rollHint")}</span>
                 <button type="button" className={ROLL_ACTION_CLASS} style={{ color: theme.node.muted }} aria-label={t("canvas.audioStudio.rollClose")} title={t("canvas.audioStudio.rollClose")} onClick={onClose}>
                     <X className="size-3.5" />
                 </button>
             </div>
 
             <div ref={scrollRef} data-midi-roll="true" onPointerDown={() => gridRef.current?.focus()} className="thin-scrollbar relative min-h-0 flex-1 overflow-auto">
-                <div className="relative flex" style={{ width: KEY_WIDTH + gridWidth, height: gridHeight }}>
+                <div className="relative flex" style={{ width: KEY_WIDTH + fillWidth, height: gridHeight }}>
                     <div className="sticky left-0 z-20 shrink-0" style={{ width: KEY_WIDTH }}>
                         {Array.from({ length: ROW_COUNT }, (_, index) => {
                             const pitch = AUDIO_NOTE_MAX - index;
                             const black = isBlackKey(pitch);
                             return (
-                                <div key={pitch} className="flex items-center justify-end pr-1 text-xs leading-3 tabular-nums" style={{ height: ROW_HEIGHT, background: black ? theme.node.faint : theme.toolbar.panel, color: black ? theme.node.muted : theme.node.text, borderBottom: `1px solid ${theme.toolbar.border}` }}>
+                                <div key={pitch} className="flex items-center justify-end pr-1 text-xs leading-3 tabular-nums" style={{ height: rowHeight, background: black ? theme.node.faint : theme.toolbar.panel, color: black ? theme.node.muted : theme.node.text, borderBottom: `1px solid ${theme.toolbar.border}` }}>
                                     {pitch % 12 === 0 ? noteName(pitch) : ""}
                                 </div>
                             );
@@ -485,7 +559,7 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
                         ref={gridRef}
                         tabIndex={0}
                         className="relative shrink-0 outline-none"
-                        style={{ width: gridWidth, height: gridHeight, backgroundImage: gridImage, cursor: "crosshair" }}
+                        style={{ width: fillWidth, height: gridHeight, backgroundImage: gridImage, cursor: "crosshair" }}
                         onKeyDown={nudgeNotes}
                         onDoubleClick={addNoteAt}
                         onPointerMove={moveNoteGesture}
@@ -494,17 +568,19 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
                     >
                         {notes.map((note) => {
                             const selected = selectedNoteIds.includes(note.id);
+                            const velocity = clampVelocity(note.velocity);
                             return (
                                 <div
                                     key={note.id}
                                     className="absolute rounded-md border"
                                     style={{
                                         left: note.tick * pxPerTick,
-                                        top: (AUDIO_NOTE_MAX - note.pitch) * ROW_HEIGHT,
+                                        top: (AUDIO_NOTE_MAX - note.pitch) * rowHeight,
                                         width: Math.max(4, note.durationTicks * pxPerTick),
-                                        height: ROW_HEIGHT - 2,
-                                        background: selected ? theme.node.muted : theme.node.faint,
+                                        height: rowHeight - 2,
+                                        background: selected ? theme.node.muted : theme.node.accent,
                                         borderColor: selected ? theme.node.accent : theme.toolbar.border,
+                                        opacity: selected ? 1 : 0.3 + 0.7 * velocity,
                                         cursor: "grab",
                                     }}
                                     tabIndex={0}
@@ -526,13 +602,13 @@ export default function AudioPianoRoll({ track, region, ppqn, tempo, meter, snap
                         <span ref={playheadRef} className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-px" style={{ background: theme.node.accent }} />
                     </div>
                 </div>
-                <div className="sticky bottom-0 z-30 flex" style={{ width: KEY_WIDTH + gridWidth }}>
+                <div className="sticky bottom-0 z-30 flex" style={{ width: KEY_WIDTH + fillWidth }}>
                     <div className="sticky left-0 z-10 flex shrink-0 items-end justify-end pr-1 pb-1 text-sm" style={{ width: KEY_WIDTH, height: VELOCITY_HEIGHT, background: theme.toolbar.panel, borderTop: `1px solid ${theme.toolbar.border}`, color: theme.node.muted }}>
                         {t("canvas.audioStudio.rollVelocity")}
                     </div>
                     <div
                         className="relative shrink-0"
-                        style={{ width: gridWidth, height: VELOCITY_HEIGHT, background: theme.canvas.background, borderTop: `1px solid ${theme.toolbar.border}` }}
+                        style={{ width: fillWidth, height: VELOCITY_HEIGHT, background: theme.canvas.background, borderTop: `1px solid ${theme.toolbar.border}` }}
                         onPointerDown={(event: ReactPointerEvent<HTMLDivElement>) => {
                             if (event.button !== 0) return;
                             const box = event.currentTarget.getBoundingClientRect();

@@ -12,7 +12,7 @@ import type { CanvasAudioAutomationCurve, CanvasAudioClip, CanvasAudioFadeShape,
 type AudioViewFlags = { grid: boolean; cycle: boolean; metronome: boolean };
 export type AudioAutomationFlags = { visible: boolean; hasLanes: boolean; canAddGain: boolean; canAddPan: boolean; canAddSend: boolean };
 export type AudioEditCommand = "selectAll" | "deselect" | "copy" | "cut" | "paste" | "duplicate" | "split" | "delete" | "setCycle" | "clearCycle";
-export type AudioTrackCommand = "add" | "addGroup" | "addReturn" | "addInstrument" | "addMidi" | "duplicate" | "remove" | "exportStems";
+export type AudioTrackCommand = "add" | "addGroup" | "addReturn" | "addInstrument" | "duplicate" | "remove" | "exportStems";
 export type AudioClipCommand = "split" | "duplicate" | "delete" | "fadeIn" | "fadeOut" | "crossfade" | "loop" | "reverse" | "clipMute" | "lock" | "rename" | "properties";
 export type AudioLaneCommand = "addClip" | "rename" | "showAutomation" | "duplicate" | "remove";
 export type AudioMidiRegionCommand = "open" | "duplicate" | "delete";
@@ -100,7 +100,6 @@ export function audioTrackAddMenuItems(t: TFunction): AudioMenuItems {
     return [
         { key: "add", label: item(t("canvas.audioStudio.addAudioTrack")) },
         { key: "addInstrument", label: item(t("canvas.audioStudio.addInstrumentTrack")) },
-        { key: "addMidi", label: item(t("canvas.audioStudio.addMidiTrack")) },
         { key: "addGroup", label: item(t("canvas.audioStudio.addGroupTrack")) },
         { key: "addReturn", label: item(t("canvas.audioStudio.addReturnTrack")) },
     ];

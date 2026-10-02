@@ -1,16 +1,15 @@
 import { CharacterCount, Placeholder } from "@tiptap/extensions";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
-import { Bold, Camera, Check, ChevronDown, Focus, Heading2, Italic, Library, List, ListOrdered, Minus, Quote, Redo2, Sparkles, Square, Strikethrough, Undo2, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Bold, Check, ChevronDown, Focus, Heading2, Italic, List, ListOrdered, Minus, Quote, Redo2, Sparkles, Square, Strikethrough, Undo2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { STUDIO_BAR_CLASS, STUDIO_DIVIDER_CLASS, STUDIO_FLAT_BUTTON_CLASS, STUDIO_ICON_BUTTON_CLASS, STUDIO_TOOL_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
-import { useWriteAi, type WriteAiMode } from "@/components/write/use-write-ai";
+import { WRITE_AI_MODES as AI_MODES, useWriteAi, type WriteAiMode } from "@/components/write/use-write-ai";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { frostedSurfaceClass } from "@/lib/canvas-theme";
-import { docUnitFor, docUnitNodes } from "@/lib/write/outline";
-import { CODEX_META, levelOf } from "@/lib/write/presets";
+import { findNode, flattenOutline } from "@/lib/write/outline";
 import { countWords, htmlToPlain } from "@/lib/write/text";
 import { useWriteUiStore } from "@/stores/use-write-ui-store";
 import { useWritingProject, useWritingStore } from "@/stores/use-writing-store";
@@ -18,7 +17,6 @@ import type { ChainedCommands, JSONContent } from "@tiptap/react";
 import type { LucideIcon } from "lucide-react";
 
 const SAVE_DELAY = 600;
-const AI_MODES: WriteAiMode[] = ["continue", "rewrite", "expand", "condense", "polish", "dialogue"];
 
 const FLOATING_MENU_CLASS = `absolute z-50 overflow-hidden rounded-xl border ${frostedSurfaceClass}`;
 const MENU_ROW_CLASS = "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-hover";
@@ -62,10 +60,9 @@ export function ProseEditor() {
     const setEditorCommand = useWriteUiStore((state) => state.setEditorCommand);
     const project = useWritingProject(projectId ?? undefined);
     const setDoc = useWritingStore((state) => state.setDoc);
-    const snapshot = useWritingStore((state) => state.snapshot);
     const ai = useWriteAi();
 
-    const unit = project ? docUnitFor(project, selectedOutlineId) ?? docUnitNodes(project)[0] ?? null : null;
+    const unit = project ? findNode(project.outline, selectedOutlineId) ?? flattenOutline(project.outline)[0] ?? null : null;
     const unitId = unit?.id ?? null;
 
     const shellRef = useRef<HTMLDivElement | null>(null);
@@ -78,9 +75,6 @@ export function ProseEditor() {
     const [focused, setFocused] = useState(false);
     const [slashDismissed, setSlashDismissed] = useState(false);
     const [slashPos, setSlashPos] = useState<{ top: number; left: number } | null>(null);
-    const [codexOpen, setCodexOpen] = useState(false);
-    const [codexQuery, setCodexQuery] = useState("");
-    const [codexPos, setCodexPos] = useState<{ top: number; left: number } | null>(null);
     const [aiMenuOpen, setAiMenuOpen] = useState(false);
     const [barPos, setBarPos] = useState<{ top: number; left: number } | null>(null);
 
@@ -191,7 +185,7 @@ export function ProseEditor() {
         },
     });
 
-    const slashOpen = slash !== null && focused && !slashDismissed && !codexOpen;
+    const slashOpen = slash !== null && focused && !slashDismissed;
     const selectedText = selection?.text ?? "";
     const aiOpen = ai.state.mode !== null && (ai.state.running || Boolean(ai.state.text) || Boolean(ai.state.error));
 
@@ -239,48 +233,21 @@ export function ProseEditor() {
     }, [editor, selectedText, selection]);
 
     useEffect(() => {
-        if (!slashOpen && !codexOpen && !aiMenuOpen) return;
+        if (!slashOpen && !aiMenuOpen) return;
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key !== "Escape") return;
             setSlashDismissed(true);
-            setCodexOpen(false);
             setAiMenuOpen(false);
         };
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
-    }, [aiMenuOpen, codexOpen, slashOpen]);
-
-    const codexEntries = useMemo(() => {
-        if (!project) return [];
-        const query = codexQuery.trim().toLowerCase();
-        const list = query
-            ? project.codex.filter((entry) => entry.name.toLowerCase().includes(query) || entry.aliases.some((alias) => alias.toLowerCase().includes(query)))
-            : project.codex;
-        return list.slice(0, 8).map((entry) => ({ id: entry.id, name: entry.name, icon: CODEX_META[entry.kind].icon }));
-    }, [codexQuery, project]);
+    }, [aiMenuOpen, slashOpen]);
 
     const runSlash = (command: (chain: ChainedCommands) => ChainedCommands) => {
         if (!editor) return;
         const { from, to } = editor.state.selection;
         command(editor.chain().focus().deleteRange({ from: from - 1, to })).run();
         setSlashDismissed(true);
-    };
-
-    const openCodexPicker = () => {
-        const shell = shellRef.current;
-        if (!editor || !shell) return;
-        const rect = shell.getBoundingClientRect();
-        const coords = editor.view.coordsAtPos(editor.state.selection.from);
-        setCodexPos({ top: coords.bottom - rect.top + shell.scrollTop + 6, left: Math.max(8, Math.min(coords.left - rect.left, rect.width - 248)) });
-        const { from, to } = editor.state.selection;
-        editor.chain().focus().deleteRange({ from: from - 1, to }).run();
-        setCodexQuery("");
-        setCodexOpen(true);
-    };
-
-    const insertCodex = (name: string) => {
-        setCodexOpen(false);
-        editor?.chain().focus().insertContent(name).run();
     };
 
     const runAi = (mode: WriteAiMode, fromSelection: boolean) => {
@@ -336,7 +303,6 @@ export function ProseEditor() {
         );
     }
 
-    const kindLevel = levelOf(project.template, unit.kind);
     const markTools: ToolItem[] = [
         { key: "bold", label: "Bold", icon: Bold, active: marks?.bold, run: () => editor?.chain().focus().toggleBold().run() },
         { key: "italic", label: "Italic", icon: Italic, active: marks?.italic, run: () => editor?.chain().focus().toggleItalic().run() },
@@ -358,7 +324,6 @@ export function ProseEditor() {
         { key: "bullet", label: t("writing.editor.slash.bullet"), icon: List, run: () => runSlash((chain) => chain.toggleBulletList()) },
         { key: "quote", label: t("writing.editor.slash.quote"), icon: Quote, run: () => runSlash((chain) => chain.toggleBlockquote()) },
         { key: "divider", label: t("writing.editor.slash.divider"), icon: Minus, run: () => runSlash((chain) => chain.setHorizontalRule()) },
-        { key: "codex", label: t("writing.editor.slash.codex"), icon: Library, run: openCodexPicker },
         {
             key: "ai",
             label: t("writing.editor.slash.ai"),
@@ -375,7 +340,6 @@ export function ProseEditor() {
         <section className="relative flex min-h-0 min-w-0 flex-1 flex-col" style={{ background: theme.canvas.background, color: theme.node.text }}>
             <header className={`${STUDIO_BAR_CLASS} h-9 shrink-0`} style={{ borderBottom: `1px solid ${theme.toolbar.border}` }}>
                 <span className="min-w-0 truncate text-sm font-medium">{unit.title}</span>
-                {kindLevel ? <span className="shrink-0 text-sm" style={{ color: theme.node.muted }}>{t(kindLevel.labelKey)}</span> : null}
                 <span className={STUDIO_DIVIDER_CLASS} style={{ background: theme.toolbar.border }} />
                 <span className="shrink-0 text-sm tabular-nums" style={{ color: theme.node.muted }}>{t("writing.editor.words", { count: words })}</span>
                 {saving || saved ? <span className="shrink-0 text-xs" style={{ color: saving ? theme.node.muted : theme.node.success }}>{saving ? t("writing.editor.saving") : t("writing.editor.saved")}</span> : null}
@@ -422,16 +386,6 @@ export function ProseEditor() {
                     <button
                         type="button"
                         className={STUDIO_ICON_BUTTON_CLASS}
-                        style={{ color: theme.node.label }}
-                        aria-label={t("writing.editor.snapshot")}
-                        title={t("writing.editor.snapshot")}
-                        onClick={() => snapshot(project.id, unit.id, t("writing.history.auto"))}
-                    >
-                        <Camera className="size-4" />
-                    </button>
-                    <button
-                        type="button"
-                        className={STUDIO_ICON_BUTTON_CLASS}
                         style={focusMode ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
                         aria-label={t(focusMode ? "writing.editor.exitFocus" : "writing.editor.focus")}
                         title={t(focusMode ? "writing.editor.exitFocus" : "writing.editor.focus")}
@@ -475,40 +429,6 @@ export function ProseEditor() {
                                 <span className="truncate">{item.label}</span>
                             </button>
                         ))}
-                    </div>
-                ) : null}
-                {codexOpen && codexPos ? (
-                    <div className={`${FLOATING_MENU_CLASS} w-60 p-1.5`} style={{ top: codexPos.top, left: codexPos.left, background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
-                        <input
-                            autoFocus
-                            value={codexQuery}
-                            placeholder={t("writing.editor.codexPlaceholder")}
-                            onChange={(event) => setCodexQuery(event.target.value)}
-                            onBlur={() => window.setTimeout(() => setCodexOpen(false), 120)}
-                            className="mb-1 w-full rounded-md bg-transparent px-2 py-1 text-sm outline-none"
-                            style={{ color: theme.node.text, border: `1px solid ${theme.toolbar.border}` }}
-                        />
-                        <div className="thin-scrollbar max-h-52 overflow-y-auto">
-                            {codexEntries.length ? (
-                                codexEntries.map((entry) => (
-                                    <button
-                                        key={entry.id}
-                                        type="button"
-                                        className={MENU_ROW_CLASS}
-                                        style={{ color: theme.node.text }}
-                                        onMouseDown={(event) => {
-                                            event.preventDefault();
-                                            insertCodex(entry.name);
-                                        }}
-                                    >
-                                        <entry.icon className="size-3.5 shrink-0" />
-                                        <span className="truncate">{entry.name}</span>
-                                    </button>
-                                ))
-                            ) : (
-                                <div className="px-2 py-1.5 text-sm" style={{ color: theme.node.muted }}>{t("writing.common.none")}</div>
-                            )}
-                        </div>
                     </div>
                 ) : null}
                 {selectedText && focused && !ai.state.running && barPos ? (

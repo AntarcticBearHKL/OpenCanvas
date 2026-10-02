@@ -1,8 +1,9 @@
 import * as Tone from "tone";
 
 import { AUDIO_AUTOMATION_GAIN, AUDIO_AUTOMATION_PAN, audioAutomationSendTarget, automationEvents, automationKey, automationSendId, automationValueAt, clampAutomationValue } from "@/lib/canvas/audio-automation";
+import { samplerBuffersFor } from "@/lib/canvas/audio-instruments";
 import { AUDIO_DEFAULT_PPQN, clampPitch, clampVelocity, instrumentPreset, noteName, sortNotes, ticksToSeconds } from "@/lib/canvas/audio-midi";
-import { AUDIO_DEFAULT_TEMPO, audioRoutingCycle, audioTrackOutputId, canHostClips, canHostMidi, clampClipGain, clampGain, clampPan, computeAudibility, isVst3Instrument } from "@/lib/canvas/audio-project";
+import { AUDIO_DEFAULT_TEMPO, audioClipSourceKey, audioRoutingCycle, audioTrackOutputId, canHostClips, canHostMidi, clampClipGain, clampGain, clampPan, computeAudibility, isVst3Instrument } from "@/lib/canvas/audio-project";
 import { createVstClient, createVstStreamWorker, VST_WORKLET_PROCESSOR, VST_WORKLET_URL, type VstClient } from "@/lib/canvas/audio-vst";
 import { VST_BUFFER_POOL_SIZE, VST_CHANNELS } from "@/lib/canvas/audio-vst-protocol";
 import { loadAudioBuffer } from "@/lib/canvas/audio-waveform";
@@ -58,7 +59,7 @@ export type AudioGraphVstEffectSource = {
 export type AudioGraph = {
     strips: Map<string, AudioGraphStrip>;
     players: Map<string, Tone.Player>;
-    synths: Map<string, Tone.PolySynth>;
+    synths: Map<string, Tone.Sampler>;
     automated: Set<string>;
     /** Native VST3 sources by track id; empty without vst3 instruments, and a failed attach only silences its own track. */
     vstSources: Map<string, AudioGraphVstSource>;
@@ -99,9 +100,9 @@ type VstEffectBridge = {
     strip: AudioGraphStrip;
 };
 
-/** Load each clip source once, keyed by source node id; unreadable sources are skipped. */
+/** Load each clip source once, keyed by its storageKey / content URL; unreadable sources are skipped. */
 export async function loadAudioGraphBuffers(clips: CanvasAudioClip[], sources: Record<string, string>) {
-    const urls = Array.from(new Set(clips.map((clip) => sources[clip.sourceNodeId]).filter(Boolean)));
+    const urls = Array.from(new Set(clips.map((clip) => sources[audioClipSourceKey(clip)]).filter(Boolean)));
     const loaded = new Map<string, Tone.ToneAudioBuffer>();
     await Promise.all(
         urls.map(async (url) => {
@@ -112,9 +113,10 @@ export async function loadAudioGraphBuffers(clips: CanvasAudioClip[], sources: R
     );
     const buffers = new Map<string, Tone.ToneAudioBuffer>();
     clips.forEach((clip) => {
-        const url = sources[clip.sourceNodeId];
+        const key = audioClipSourceKey(clip);
+        const url = sources[key];
         const buffer = url ? loaded.get(url) : undefined;
-        if (buffer && !buffers.has(clip.sourceNodeId)) buffers.set(clip.sourceNodeId, buffer);
+        if (buffer && key && !buffers.has(key)) buffers.set(key, buffer);
     });
     return buffers;
 }
@@ -203,12 +205,12 @@ export function buildAudioGraph(doc: AudioGraphDoc, buffers: Map<string, Tone.To
         });
     });
 
-    // Instrument and MIDI tracks own one poly synth each, feeding the same strip input as their players. A track
+    // Instrument and MIDI tracks own one sampler each, feeding the same strip input as their players. A track
     // whose instrument is the vst3 variant owns a native bridge source instead: the streaming worker receives the
     // host's PCM and forwards it over a MessagePort straight to the worklet, and the worklet feeds the very same
     // `strip.input`, so gain, pan, mute/solo, sends and master keep working. The attach is asynchronous, never
     // throws, and only ever silences its own track.
-    const synths = new Map<string, Tone.PolySynth>();
+    const synths = new Map<string, Tone.Sampler>();
     const vstBridges = new Map<string, VstBridge>();
     const vstSources = new Map<string, AudioGraphVstSource>();
     const vstEffectBridges = new Map<string, VstEffectBridge>();
@@ -228,7 +230,7 @@ export function buildAudioGraph(doc: AudioGraphDoc, buffers: Map<string, Tone.To
     };
     const panicAllVst = () => vstBridges.forEach(panicVst);
 
-    /** Fire `noteOn`/`noteOff` at the very transport time the PolySynth would have played the note, via real timers. */
+    /** Fire `noteOn`/`noteOff` at the very transport time the built-in sampler would have played the note, via real timers. */
     const scheduleVstNote = (bridge: VstBridge, pitch: number, velocity: number, time: number, length: number) => {
         if (bridge.source.status !== "ready") return;
         const delay = Math.max(0, (time - Tone.now()) * 1000);
@@ -432,10 +434,12 @@ export function buildAudioGraph(doc: AudioGraphDoc, buffers: Map<string, Tone.To
             return;
         }
         const preset = instrumentPreset(instrument?.preset);
-        const synth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: preset.oscillator }, envelope: preset.envelope });
-        synth.volume.value = preset.volume;
-        synth.connect(strip.input);
-        synths.set(track.id, synth);
+        const sampleBuffers = samplerBuffersFor(preset.id);
+        // Stays silent (and never schedules a loading Sampler) until the samples were preloaded.
+        if (!sampleBuffers || !Object.keys(sampleBuffers).length) return;
+        const sampler = new Tone.Sampler({ urls: sampleBuffers, release: preset.release, volume: preset.volume });
+        sampler.connect(strip.input);
+        synths.set(track.id, sampler);
     });
 
     // Inline effects are transport-only: a real-time native plug-in cannot run inside Tone.Offline, so an
@@ -569,7 +573,7 @@ export function buildAudioGraph(doc: AudioGraphDoc, buffers: Map<string, Tone.To
     clips.forEach((clip) => {
         const strip = strips.get(clip.trackId);
         const track = tracks.find((item) => item.id === clip.trackId);
-        const buffer = buffers.get(clip.sourceNodeId);
+        const buffer = buffers.get(audioClipSourceKey(clip));
         if (!strip || !track || !canHostClips(track) || !buffer || clip.duration <= 0 || clip.muted) return;
         const player = new Tone.Player({ fadeIn: clip.fadeIn ?? 0, fadeOut: clip.fadeOut ?? 0 });
         const sourceDuration = buffer.duration;

@@ -25,8 +25,7 @@ export const NODE_DEFAULT_SIZE = {
     [CanvasNodeType.VideoGeneration]: { width: 412, height: 576, get title() { return i18n.t("canvas.nodeTypes.videoGeneration"); } },
     [CanvasNodeType.Video]: { width: 420, height: 236, get title() { return i18n.t("canvas.nodeTypes.video"); } },
     [CanvasNodeType.Audio]: { width: 340, height: 120, get title() { return i18n.t("canvas.nodeTypes.audio"); } },
-    [CanvasNodeType.AudioProject]: { width: 360, height: 200, get title() { return i18n.t("canvas.nodeTypes.audioProject"); } },
-    [CanvasNodeType.SmartCanvas]: { width: 640, height: 360, get title() { return i18n.t("canvas.nodeTypes.smartCanvas"); } },
+    [CanvasNodeType.Midi]: { width: 320, height: 140, get title() { return i18n.t("canvas.nodeTypes.midi"); } },
     [CanvasNodeType.Assets]: { width: 360, height: 320, get title() { return i18n.t("canvas.nodeTypes.assets"); } },
     [CanvasNodeType.Recording]: { width: 300, height: 220, get title() { return i18n.t("canvas.nodeTypes.recording"); } },
     [CanvasNodeType.ImageModifier]: { width: 464, height: 648, get title() { return i18n.t("canvas.nodeTypes.imageModifier"); } },
@@ -85,20 +84,9 @@ export const NODE_SPECS = {
         width: 340, height: 120, get title() { return NODE_DEFAULT_SIZE[CanvasNodeType.Audio].title; },
         metadata: { content: "", status: "idle" },
     },
-    [CanvasNodeType.AudioProject]: {
-        width: 360, height: 200, get title() { return NODE_DEFAULT_SIZE[CanvasNodeType.AudioProject].title; },
-        metadata: {
-            audioTracks: [
-                { id: "track-1", name: "", type: "audio", gain: 1, pan: 0, mute: false, solo: false },
-                { id: "master", name: "", type: "master", gain: 1, pan: 0, mute: false, solo: false },
-            ],
-            audioClips: [],
-            audioMasterGain: 1,
-        },
-    },
-    [CanvasNodeType.SmartCanvas]: {
-        width: 640, height: 360, get title() { return NODE_DEFAULT_SIZE[CanvasNodeType.SmartCanvas].title; },
-        metadata: { status: "idle", boardRatio: "16:9", boardResolution: "2k" },
+    [CanvasNodeType.Midi]: {
+        width: 320, height: 140, get title() { return NODE_DEFAULT_SIZE[CanvasNodeType.Midi].title; },
+        metadata: { content: "", status: "idle" },
     },
     [CanvasNodeType.Assets]: {
         width: 360, height: 320, get title() { return NODE_DEFAULT_SIZE[CanvasNodeType.Assets].title; },

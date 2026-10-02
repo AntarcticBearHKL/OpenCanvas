@@ -1,4 +1,4 @@
-import { Frame, LayoutGrid, Music2, PenLine } from "lucide-react";
+import { Frame, Grid3x3, LayoutGrid, Music2, PenLine } from "lucide-react";
 
 export const navigationTools = [
     {
@@ -8,6 +8,10 @@ export const navigationTools = [
     {
         slug: "image",
         icon: Frame,
+    },
+    {
+        slug: "pixel",
+        icon: Grid3x3,
     },
     {
         slug: "audio",

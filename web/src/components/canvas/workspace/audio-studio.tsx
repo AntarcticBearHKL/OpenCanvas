@@ -1,6 +1,6 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { App, ConfigProvider, Dropdown, InputNumber, Modal, Popover, Segmented, Select, Switch } from "antd";
-import { ArrowLeft, AudioLines, AudioWaveform, ChevronDown, ChevronRight, Circle, CircleStop, Ellipsis, Eraser, Flag, Hand, History, Library, Link, Link2, Lock, Magnet, MoreHorizontal, MousePointer2, Music2, PanelRight, Pause, Pencil, Play, Plus, Repeat, Scissors, Search, Settings2, Share2, SkipBack, SlidersHorizontal, SlidersVertical, SquareDashed, Timer, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, AudioLines, AudioWaveform, ChevronDown, ChevronRight, Circle, CircleStop, Ellipsis, Eraser, Flag, Hand, History, Library, Link, Link2, Lock, MoreHorizontal, MousePointer2, Music2, PanelRight, Pause, Pencil, Play, Plus, Repeat, Scissors, Search, Settings2, Share2, SkipBack, SlidersHorizontal, SlidersVertical, SquareDashed, Timer, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useTranslation } from "react-i18next";
 import * as Tone from "tone";
@@ -11,7 +11,7 @@ import { DockWindowMenu } from "@/components/canvas/dock/dock-window-menu";
 import { AudioAutomationLane, AudioAutomationPanel, AUTOMATION_LANE_HEIGHT, AUTOMATION_PLOT_HEIGHT } from "@/components/canvas/workspace/audio-automation-lane";
 import { AudioAddTrackMenu, AudioClipContextMenu, AudioLaneContextMenu, AudioMenus, AudioMidiRegionContextMenu, AudioRulerContextMenu, AudioTrackMenu, audioCompactMenuItems, audioOptionItems, AUDIO_MENU_BUTTON_CLASS, AUDIO_MENU_POPUP, prefixMenuKeys, type AudioAutomationCommand, type AudioClipCommand, type AudioEditCommand, type AudioLaneCommand, type AudioMidiRegionCommand, type AudioOptionCommand, type AudioTrackCommand, type AudioViewCommand } from "@/components/canvas/workspace/audio-menus";
 import AudioMixer from "@/components/canvas/workspace/audio-mixer";
-import { AudioInspectorPanel, AudioMediaPoolPanel, AudioMeter, AudioProjectSettingsPanel, AudioToggle, AudioValueInput, AUDIO_FADE_SHAPE_LABEL_KEYS, AUDIO_FADE_SHAPE_OPTIONS, AUDIO_METER_OPTIONS, AUDIO_NODE_DRAG_MIME, AUDIO_SNAP_LABEL_KEYS, AUDIO_SNAP_OPTIONS, AUDIO_TRACK_TYPE_LABEL_KEYS } from "@/components/canvas/workspace/audio-panels";
+import { AudioInspectorPanel, AudioMediaPoolPanel, AudioMeter, AudioProjectSettingsPanel, AudioToggle, AudioValueInput, AUDIO_METER_OPTIONS, AUDIO_MIDI_NODE_DRAG_MIME, AUDIO_NODE_DRAG_MIME, AUDIO_TRACK_TYPE_LABEL_KEYS } from "@/components/canvas/workspace/audio-panels";
 import AudioPianoRoll from "@/components/canvas/workspace/audio-piano-roll";
 import PsColorPicker from "@/components/canvas/workspace/ps-color-picker";
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
@@ -23,14 +23,20 @@ import { applyAudioAgentOps, AUDIO_AGENT_EXPORT_TYPES, AUDIO_AGENT_OP_TYPES, AUD
 import { AUDIO_AUTOMATION_GAIN, AUDIO_AUTOMATION_PAN, audioAutomationSendTarget, automationLanesForTrack, automationOwns, automationValueRange, createAudioAutomationLane, findAutomationLane, pruneAutomation } from "@/lib/canvas/audio-automation";
 import { applyOverlap, AUDIO_MIN_CLIP_SECONDS, clipEnd, clipsIntersecting, crossfadeClip, duplicateClip, glueClip, moveClip, moveClipsToTrack, patchClip, setClipFade, shiftClips, splitClip, trimClipIn, trimClipOut } from "@/lib/canvas/audio-clip-ops";
 import { applyAudioGraphMix, applyLiveTrackMix, buildAudioGraph, connectAudioGraphMonitor, liveAutomationValue, loadAudioGraphBuffers, type AudioGraph } from "@/lib/canvas/audio-graph";
+import { preloadSamplerBuffers, samplerPresetIdsFor } from "@/lib/canvas/audio-instruments";
 import { AUDIO_DEFAULT_PPQN, audioTrackRegions, barTicks, beatTicks, createAudioMidiRegion, duplicateRegion, moveRegion, nextMidiRegionStart, secondsToTicks, splitRegionAt, ticksToSeconds, trimRegionEnd, trimRegionStart } from "@/lib/canvas/audio-midi";
-import { AUDIO_DEFAULT_CAPTURE, AUDIO_DEFAULT_CYCLE, AUDIO_DEFAULT_GRID, AUDIO_DEFAULT_METER, AUDIO_DEFAULT_METRONOME, AUDIO_DEFAULT_PUNCH, AUDIO_DEFAULT_TEMPO, AUDIO_FADER_MAX_DB, AUDIO_FADER_MIN_DB, audioProjectAutomation, audioProjectCapture, audioProjectClips, audioProjectCountIn, audioProjectCycle, audioProjectDuration, audioProjectGrid, audioProjectMarkers, audioProjectMasterGain, audioProjectMetronome, audioProjectMidiRegions, audioProjectPpqn, audioProjectPunch, audioProjectTempo, audioProjectTimeSignature, audioProjectTracks, audioTrackClips, audioTrackType, canHostClips, canHostMidi, clampClipGain, clampGain, computeAudibility, createAudioMarker, createAudioTrack, faderDbGain, formatFaderDb, gainFaderDb, nextClipStart, parseDbValue, parseGainPercent, resolveAudioClipUrls, resolveAudioNodeDuration } from "@/lib/canvas/audio-project";
+import { midiToProjectRegions, parseMidiFile } from "@/lib/canvas/audio-midi-file";
+import { AUDIO_DEFAULT_CAPTURE, AUDIO_DEFAULT_CYCLE, AUDIO_DEFAULT_GRID, AUDIO_DEFAULT_METER, AUDIO_DEFAULT_METRONOME, AUDIO_DEFAULT_PUNCH, AUDIO_DEFAULT_TEMPO, AUDIO_FADER_MAX_DB, AUDIO_FADER_MIN_DB, AUDIO_GAIN_MAX, audioProjectAutomation, audioProjectCapture, audioProjectClips, audioProjectCountIn, audioProjectCycle, audioProjectDuration, audioProjectGrid, audioProjectMarkers, audioProjectMasterGain, audioProjectMetronome, audioProjectMidiRegions, audioProjectPpqn, audioProjectPunch, audioProjectTempo, audioProjectTimeSignature, audioProjectTracks, audioTrackClips, audioTrackType, canHostClips, canHostMidi, clampClipGain, clampGain, computeAudibility, createAudioMarker, createAudioTrack, faderDbGain, formatFaderDb, gainFaderDb, nextClipStart, parseDbValue, resolveAudioClipUrls, resolveAudioSourceDuration } from "@/lib/canvas/audio-project";
 import { cutRecordedTake, startAudioRecording, type AudioRecordSession } from "@/lib/canvas/audio-record";
+import { computeSpectrogram, drawSpectrogram, spectrogramLut, toMono, type Spectrogram } from "@/lib/canvas/audio-spectrum";
 import { AUDIO_DEFAULT_PX_PER_SECOND, barSeconds, beatSeconds, chooseGridStep, chooseSnapStep, clampPxPerSecond, formatBarsBeats, secondsToPosition, snapSeconds } from "@/lib/canvas/audio-timeline";
-import { formatAudioTime, getCachedAudioPeaks, loadAudioPeaks, peakBucketIndex, selectPeakBand, type AudioPeaks } from "@/lib/canvas/audio-waveform";
+import { getCachedTrackAudio, requestTrackAudio, trackAudioKey, type TrackAudio } from "@/lib/canvas/audio-track-render";
+import { formatAudioTime, getCachedAudioPeaks, loadAudioBuffer, loadAudioPeaks, peakBucketIndex, selectPeakBand, type AudioPeaks } from "@/lib/canvas/audio-waveform";
 import { type CanvasTheme } from "@/lib/canvas-theme";
+import { getMediaBlob } from "@/services/file-storage";
 import { useAgentStore } from "@/stores/use-agent-store";
-import { STUDIO_BAR_CLASS, STUDIO_DIVIDER_CLASS, STUDIO_ICON_BUTTON_CLASS, STUDIO_LIST_ROW_CLASS, STUDIO_OPTIONS_CLASS, STUDIO_TOOL_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
+import type { AudioProject } from "@/stores/use-audio-store";
+import { STUDIO_BAR_CLASS, STUDIO_DIVIDER_CLASS, STUDIO_ICON_BUTTON_CLASS, STUDIO_LIST_ROW_CLASS, STUDIO_TOOL_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import {
     CanvasNodeType,
     type CanvasAudioAutomationLane,
@@ -44,21 +50,18 @@ import {
     type CanvasAudioTrack,
     type CanvasAudioTrackType,
     type CanvasNodeData,
-    type CanvasNodeMetadata,
 } from "@/types/canvas";
 
 type AudioTake = { trackId: string; start: number; duration: number; name: string };
 type AudioRecordTake = { session: AudioRecordSession; trackId: string; clipStart: number; from: number; until: number | null; punchOut: number | null; count: number; disconnect: () => void };
 
 type AudioStudioProps = {
-    project: CanvasNodeData | null;
-    projects: CanvasNodeData[];
+    project: AudioProject | null;
     nodes: CanvasNodeData[];
-    setNodes: Dispatch<SetStateAction<CanvasNodeData[]>>;
-    onSelectProject: (nodeId: string) => void;
-    onOutput: (project: CanvasNodeData) => Promise<void>;
-    onExportStems: (project: CanvasNodeData) => Promise<void>;
-    onRecorded: (project: CanvasNodeData, blob: Blob, take: AudioTake) => Promise<void>;
+    onProjectChange: (patch: Partial<AudioProject>) => void;
+    onOutput: () => Promise<void>;
+    onExportStems: () => Promise<void>;
+    onRecorded: (blob: Blob, take: AudioTake) => Promise<void>;
     onBack: () => void;
 };
 
@@ -120,9 +123,8 @@ const RECORD_LEAD_SECONDS = 0.08;
 const COMPACT_QUERY = "(max-width: 767px)";
 const OVERLAY_DOCK_QUERY = "(min-width: 768px) and (max-width: 1023px)";
 const FLAT_ACTION_CLASS = STUDIO_ICON_BUTTON_CLASS;
-// One control height for the transport and options rows: 28px, the icon-button size (size-7) and the content box of STUDIO_OPTIONS_CLASS (min-h-9 minus py-1).
+// One control height for every header control: 28px, the icon-button size (size-7) and the antd small control height.
 const CONTROL_CLASS = "!h-7";
-const CONTROL_GROUP_CLASS = "flex h-7 shrink-0 items-center gap-1.5";
 const COMPACT_ACTION_CLASS = "grid size-6 shrink-0 place-items-center rounded-md transition hover:bg-hover hover:opacity-100 hover:bg-hover";
 const TOOL_CLASS = STUDIO_TOOL_BUTTON_CLASS;
 const LIST_ACTION_CLASS = STUDIO_LIST_ROW_CLASS;
@@ -144,17 +146,6 @@ const TOOLS: { id: AudioTool; icon: typeof MousePointer2; labelKey: string; hotk
 ];
 const TOOL_LABELS = Object.fromEntries(TOOLS.map((item) => [item.id, item.labelKey])) as Record<AudioTool, string>;
 const TOOL_HOTKEYS: Record<string, AudioTool> = { v: "select", r: "range", c: "split", d: "draw", e: "erase", g: "glue", h: "hand", z: "zoom" };
-const HINTS: Record<AudioTool, string> = {
-    select: "canvas.audioStudio.hintSelect",
-    range: "canvas.audioStudio.hintRange",
-    split: "canvas.audioStudio.hintSplit",
-    draw: "canvas.audioStudio.hintDraw",
-    erase: "canvas.audioStudio.hintErase",
-    glue: "canvas.audioStudio.hintGlue",
-    hand: "canvas.audioStudio.hintHand",
-    zoom: "canvas.audioStudio.hintZoom",
-};
-const FADE_SHAPE_LABEL_KEYS = AUDIO_FADE_SHAPE_LABEL_KEYS;
 const AUDIO_DOCK_PANELS: DockPanelDef[] = [
     { id: "inspector", labelKey: "canvas.audioStudio.dockInspector", icon: SlidersHorizontal, dock: "right" },
     { id: "automation", labelKey: "canvas.audioStudio.dockAutomation", icon: SlidersVertical, dock: "right" },
@@ -189,14 +180,11 @@ function paintRegionGeometry(element: HTMLElement, region: CanvasAudioMidiRegion
     });
 }
 
-export default function AudioStudio({ project, projects, nodes, setNodes, onSelectProject, onOutput, onExportStems, onRecorded, onBack }: AudioStudioProps) {
+export default function AudioStudio({ project, nodes, onProjectChange, onOutput, onExportStems, onRecorded, onBack }: AudioStudioProps) {
     const { t } = useTranslation();
     const { message } = App.useApp();
     const theme = useCanvasTheme();
     const projectId = project?.id || "";
-    useEffect(() => {
-        if (!project && projects.length) onSelectProject(projects[0].id);
-    }, [onSelectProject, project, projects]);
     const tracks = useMemo(() => (project ? audioProjectTracks(project) : EMPTY_TRACKS), [project]);
     const projectClips = useMemo(() => (project ? audioProjectClips(project) : EMPTY_CLIPS), [project]);
     const projectMidi = useMemo(() => (project ? audioProjectMidiRegions(project) : EMPTY_MIDI), [project]);
@@ -218,6 +206,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     const [exporting, setExporting] = useState(false);
     const [unlocked, setUnlocked] = useState(false);
     const [view, setView] = useState<AudioView>("arrangement");
+    const [visMode, setVisMode] = useState<"waveform" | "spectrum">("waveform");
     const [tool, setTool] = useState<AudioTool>("select");
     const [pxPerSecond, setPxPerSecond] = useState(AUDIO_DEFAULT_PX_PER_SECOND);
     const [sources, setSources] = useState<Record<string, string>>({});
@@ -270,6 +259,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     const overlayDockRef = useRef<HTMLElement>(null);
     const ppsRef = useRef(pxPerSecond);
     const trackWidthRef = useRef(trackWidth);
+    const zoomTouchedRef = useRef(false);
     const viewportRef = useRef(viewport);
     const shortcutsRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
     const audioAgentApplyRef = useRef<(ops: AgentOp[]) => Record<string, unknown> | void>(() => undefined);
@@ -296,7 +286,8 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     const selectedTrack = tracks.find((track) => track.id === selectedTrackId) ?? tracks[0] ?? null;
     const primaryClipTrack = primaryClip ? tracksById.get(primaryClip.trackId) : undefined;
     const audioNodes = useMemo(() => nodes.filter((node) => node.type === CanvasNodeType.Audio && Boolean(node.metadata?.content || node.metadata?.storageKey)), [nodes]);
-    const audioNodesById = useMemo(() => new Map(audioNodes.map((node) => [node.id, node])), [audioNodes]);
+    const midiNodes = useMemo(() => nodes.filter((node) => node.type === CanvasNodeType.Midi && Boolean(node.metadata?.content || node.metadata?.storageKey)), [nodes]);
+    const poolNodesById = useMemo(() => new Map([...audioNodes, ...midiNodes].map((node) => [node.id, node])), [audioNodes, midiNodes]);
     const pickerTrack = tracks.find((track) => track.id === picker?.trackId) ?? null;
     const cycleLoop = cycle.enabled && cycle.end > cycle.start;
     const armedTrack = tracks.find((track) => track.armed && canHostClips(track)) ?? null;
@@ -331,41 +322,40 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
         [laneBlocks, laneTracks],
     );
 
-    const patchMetadata = useCallback(
-        (patch: Partial<CanvasNodeMetadata>) => {
-            if (!projectId) return;
-            setNodes((prev) => prev.map((node) => (node.id === projectId ? { ...node, metadata: { ...node.metadata, ...patch } } : node)));
+    const patchProject = useCallback(
+        (patch: Partial<AudioProject>) => {
+            if (!project) return;
+            onProjectChange(patch);
         },
-        [projectId, setNodes],
+        [project, onProjectChange],
     );
 
     const commitClips = useCallback(
         (next: CanvasAudioClip[]) => {
-            patchMetadata({ audioClips: autoCrossfade ? applyOverlap(next) : next });
+            patchProject({ clips: autoCrossfade ? applyOverlap(next) : next });
         },
-        [autoCrossfade, patchMetadata],
+        [autoCrossfade, patchProject],
     );
 
-    // `audio` namespace: pure metadata math from audio-agent-ops, applied through the studio's own commit paths
-    // (`commitClips` runs `applyOverlap`, `patchMetadata` merges the rest) and fire-and-forget exports.
+    // `audio` namespace: pure document math from audio-agent-ops, applied through the studio's own commit paths
+    // (`commitClips` runs `applyOverlap`, `patchProject` merges the rest) and fire-and-forget exports.
     audioAgentApplyRef.current = (agentOps) => {
         if (!project) return;
         const audioOps = agentOps.map(({ ns, ...op }) => op as AudioAgentOp);
         const patch = applyAudioAgentOps(project, audioOps);
-        const { audioClips, ...rest } = patch;
+        const { clips: audioClips, ...rest } = patch;
         if (audioClips) commitClips(audioClips);
-        if (Object.keys(rest).length) patchMetadata(rest);
+        if (Object.keys(rest).length) patchProject(rest);
         audioOps
             .filter((op) => AUDIO_AGENT_EXPORT_TYPES.includes(op.type))
             .forEach((op) => {
-                if (op.type === "audio.export.mixdown") void onOutput(project);
-                if (op.type === "audio.export.stems") void onExportStems(project);
+                if (op.type === "audio.export.mixdown") void onOutput();
+                if (op.type === "audio.export.stems") void onExportStems();
             });
-        const metadata = { ...project.metadata, ...rest, ...(audioClips ? { audioClips: autoCrossfade ? applyOverlap(audioClips) : audioClips } : {}) };
         return {
             ...(useAgentStore.getState().pageContext?.state ?? {}),
             workspace: "audio",
-            nodes: nodes.map((node) => (node.id === project.id ? { ...node, metadata } : node)),
+            nodes,
         };
     };
 
@@ -413,7 +403,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
 
     useEffect(() => {
         let active = true;
-        void resolveAudioClipUrls(projectClips, nodes).then((urls) => {
+        void resolveAudioClipUrls(projectClips).then((urls) => {
             if (active) setSources((prev) => (sameSources(prev, urls) ? prev : urls));
         });
         return () => {
@@ -496,7 +486,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     // points are deliberately absent, so those edits never rebuild a player.
     const tracksVersion = [
         tracks.map((track) => `${track.id}:${audioTrackType(track)}:${track.output ?? ""}:${track.instrument?.kind === "vst3" ? `vst3:${track.instrument.pluginId}` : track.instrument?.preset ?? ""}:${(track.sends ?? []).map((send) => `${send.id}:${send.targetTrackId}:${send.pre ? 1 : 0}:${send.enabled ? 1 : 0}`).join(",")}`).join("|"),
-        projectClips.map((clip) => `${clip.id}:${clip.trackId}:${clip.sourceNodeId}:${clip.start}:${clip.offset}:${clip.duration}:${clip.loop ? 1 : 0}:${clip.reversed ? 1 : 0}:${clip.muted ? 1 : 0}`).join("|"),
+        projectClips.map((clip) => `${clip.id}:${clip.trackId}:${clip.storageKey || clip.content || ""}:${clip.start}:${clip.offset}:${clip.duration}:${clip.loop ? 1 : 0}:${clip.reversed ? 1 : 0}:${clip.muted ? 1 : 0}`).join("|"),
     ].join("||");
     // MIDI regions and their notes only re-schedule the synths, so they stay out of the structural key above.
     const midiNotesKey = projectMidi
@@ -521,6 +511,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
         let released = false;
         void (async () => {
             const buffers = await loadAudioGraphBuffers(projectClips, sources);
+            await preloadSamplerBuffers(samplerPresetIdsFor(tracks));
             if (released) return;
             graph = buildAudioGraph({ tracks, clips: projectClips, regions: projectMidi, ppqn, tempo, masterGain, automation: projectAutomation }, buffers, { mode: "transport", meters: true });
             graphRef.current = graph;
@@ -811,6 +802,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                 const time = Math.max(0, (element.scrollLeft + viewX - trackWidthRef.current) / ppsRef.current);
                 const next = clampPxPerSecond(ppsRef.current * (event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP));
                 if (next === ppsRef.current) return;
+                zoomTouchedRef.current = true;
                 pendingZoomRef.current = { time, viewX };
                 setPxPerSecond(next);
                 return;
@@ -840,6 +832,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
             const time = Math.max(0, (element.scrollLeft + x - trackWidthRef.current) / ppsRef.current);
             const next = clampPxPerSecond(ppsRef.current * factor);
             if (next === ppsRef.current) return;
+            zoomTouchedRef.current = true;
             pendingZoomRef.current = { time, viewX: x };
             setPxPerSecond(next);
         },
@@ -849,10 +842,19 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     const zoomFit = useCallback(() => {
         const element = scrollRef.current;
         if (!element) return;
-        const width = Math.max(120, element.clientWidth - trackWidth - 8);
-        setPxPerSecond(clampPxPerSecond(width / Math.max(5, projectDuration || MIN_TIMELINE_SECONDS)));
+        zoomTouchedRef.current = false;
+        const width = Math.max(120, element.clientWidth - trackWidth - 32);
+        setPxPerSecond(clampPxPerSecond(width / Math.max(5, timelineSeconds)));
         pendingZoomRef.current = { time: 0, viewX: trackWidth };
-    }, [projectDuration, trackWidth]);
+    }, [timelineSeconds, trackWidth]);
+
+    const zoomFitRef = useRef(zoomFit);
+    zoomFitRef.current = zoomFit;
+
+    useEffect(() => {
+        if (!viewport.width || zoomTouchedRef.current) return;
+        zoomFitRef.current();
+    }, [viewport.width]);
 
     /** A scrub moves the transport clock and the playhead directly; it never writes the document, so no frame re-renders the studio. */
     const scrubSeek = (seconds: number) => {
@@ -1113,11 +1115,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     };
 
     const commitMidi = (next: CanvasAudioMidiRegion[]) => {
-        patchMetadata({ audioMidiRegions: next });
-    };
-
-    const updateRegion = (regionId: string, patch: Partial<CanvasAudioMidiRegion>) => {
-        commitMidi(midi.map((region) => (region.id === regionId ? { ...region, ...patch } : region)));
+        patchProject({ midiRegions: next });
     };
 
     const commitRegionNotes = (regionId: string, notes: CanvasAudioNote[]) => {
@@ -1242,16 +1240,16 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     const updateTrack = (trackId: string, patch: Partial<CanvasAudioTrack>) => {
         const next = tracks.map((track) => (track.id === trackId ? { ...track, ...patch } : track));
         const nextAutomation = patch.sends ? pruneAutomation(projectAutomation, next) : projectAutomation;
-        patchMetadata({ audioTracks: next, ...(nextAutomation === projectAutomation ? {} : { audioAutomation: nextAutomation }) });
+        patchProject({ tracks: next, ...(nextAutomation === projectAutomation ? {} : { automation: nextAutomation }) });
     };
 
     const addTrack = (type: CanvasAudioTrackType = "audio") => {
-        patchMetadata({ audioTracks: [...tracks, createAudioTrack(type)] });
+        patchProject({ tracks: [...tracks, createAudioTrack(type)] });
     };
 
     const duplicateTrack = (trackId: string) => {
         const next = duplicateAudioTrack(tracks, projectClips, projectMidi, trackId, trackPlaceholder);
-        if (next) patchMetadata(next);
+        if (next) patchProject(next);
     };
 
     const removeTrack = (trackId: string) => {
@@ -1261,35 +1259,35 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
             .filter((track) => track.id !== trackId)
             .map((track) => ({ ...track, output: track.output === trackId ? undefined : track.output, sends: track.sends?.length ? track.sends.filter((send) => send.targetTrackId !== trackId) : track.sends }));
         const nextAutomation = pruneAutomation(projectAutomation, next);
-        patchMetadata({
-            audioTracks: next,
-            audioClips: projectClips.filter((clip) => clip.trackId !== trackId),
-            audioMidiRegions: projectMidi.filter((region) => region.trackId !== trackId),
-            ...(nextAutomation === projectAutomation ? {} : { audioAutomation: nextAutomation }),
+        patchProject({
+            tracks: next,
+            clips: projectClips.filter((clip) => clip.trackId !== trackId),
+            midiRegions: projectMidi.filter((region) => region.trackId !== trackId),
+            ...(nextAutomation === projectAutomation ? {} : { automation: nextAutomation }),
         });
     };
 
     const patchAutomation = (laneId: string, patch: Partial<CanvasAudioAutomationLane>) => {
-        patchMetadata({ audioAutomation: projectAutomation.map((lane) => (lane.id === laneId ? { ...lane, ...patch } : lane)) });
+        patchProject({ automation: projectAutomation.map((lane) => (lane.id === laneId ? { ...lane, ...patch } : lane)) });
     };
 
     const commitAutomationPoints = (laneId: string, points: CanvasAudioAutomationPoint[]) => {
-        patchMetadata({ audioAutomation: projectAutomation.map((lane) => (lane.id === laneId ? { ...lane, points } : lane)) });
+        patchProject({ automation: projectAutomation.map((lane) => (lane.id === laneId ? { ...lane, points } : lane)) });
     };
 
     const addAutomationLane = (trackId: string, target: string) => {
         if (findAutomationLane(projectAutomation, trackId, target)) return;
-        patchMetadata({ audioAutomation: [...projectAutomation, createAudioAutomationLane(trackId, target)], audioTracks: tracks.map((track) => (track.id === trackId ? { ...track, collapsed: false } : track)) });
+        patchProject({ automation: [...projectAutomation, createAudioAutomationLane(trackId, target)], tracks: tracks.map((track) => (track.id === trackId ? { ...track, collapsed: false } : track)) });
         setSelectedTrackId(trackId);
         dock.reveal("automation");
     };
 
     const removeAutomationLane = (laneId: string) => {
-        patchMetadata({ audioAutomation: projectAutomation.filter((lane) => lane.id !== laneId) });
+        patchProject({ automation: projectAutomation.filter((lane) => lane.id !== laneId) });
     };
 
     const clearTrackAutomation = (trackId: string) => {
-        patchMetadata({ audioAutomation: projectAutomation.filter((lane) => lane.trackId !== trackId) });
+        patchProject({ automation: projectAutomation.filter((lane) => lane.trackId !== trackId) });
     };
 
     const showTrackAutomation = (trackId: string) => {
@@ -1325,7 +1323,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     const removeClips = (ids: string[]) => {
         const set = new Set(ids);
         setSelectedClipIds((prev) => prev.filter((id) => !set.has(id)));
-        patchMetadata({ audioClips: projectClips.filter((clip) => !set.has(clip.id)) });
+        patchProject({ clips: projectClips.filter((clip) => !set.has(clip.id)) });
     };
 
     const toggleClipField = (ids: string[], field: "loop" | "reversed" | "muted" | "locked") => {
@@ -1460,12 +1458,11 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
         const target = trackId || selectedTrack?.id || "";
         if (command === "add") addTrack("audio");
         else if (command === "addInstrument") addTrack("instrument");
-        else if (command === "addMidi") addTrack("midi");
         else if (command === "addGroup") addTrack("group");
         else if (command === "addReturn") addTrack("return");
         else if (command === "duplicate") duplicateTrack(target);
         else if (command === "exportStems") {
-            if (project) void runExport(() => onExportStems(project));
+            if (project) void runExport(() => onExportStems());
         } else removeTrack(target);
     };
 
@@ -1514,28 +1511,28 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                 removeClips(selectedClipIds);
                 return;
             case "setCycle":
-                if (range) patchMetadata({ audioCycle: { enabled: true, start: range.start, end: range.end } });
+                if (range) patchProject({ cycle: { enabled: true, start: range.start, end: range.end } });
                 return;
             case "clearCycle":
-                patchMetadata({ audioCycle: { enabled: false, start: 0, end: 0 } });
+                patchProject({ cycle: { enabled: false, start: 0, end: 0 } });
                 return;
         }
     };
 
     const handleViewCommand = (command: AudioViewCommand) => {
-        if (command === "grid") patchMetadata({ audioGrid: { ...grid, enabled: !grid.enabled } });
-        else if (command === "snap") patchMetadata({ audioGrid: { ...grid, snap: grid.snap === "off" ? "beat" : "off" } });
-        else if (command === "cycle") patchMetadata({ audioCycle: { ...cycle, enabled: !cycle.enabled } });
-        else if (command === "metronome") patchMetadata({ audioMetronome: { ...metronome, enabled: !metronome.enabled } });
+        if (command === "grid") patchProject({ grid: { ...grid, enabled: !grid.enabled } });
+        else if (command === "snap") patchProject({ grid: { ...grid, snap: grid.snap === "off" ? "beat" : "off" } });
+        else if (command === "cycle") patchProject({ cycle: { ...cycle, enabled: !cycle.enabled } });
+        else if (command === "metronome") patchProject({ metronome: { ...metronome, enabled: !metronome.enabled } });
         else if (command === "zoomIn") zoomBy(ZOOM_STEP);
         else if (command === "zoomOut") zoomBy(1 / ZOOM_STEP);
         else zoomFit();
     };
 
     const handleRulerCommand = (command: "addMarker" | "setCycle" | "clearCycle", time: number) => {
-        if (command === "addMarker") patchMetadata({ audioMarkers: [...markers, createAudioMarker(time)] });
-        else if (command === "setCycle" && range) patchMetadata({ audioCycle: { enabled: true, start: range.start, end: range.end } });
-        else if (command === "clearCycle") patchMetadata({ audioCycle: { enabled: false, start: 0, end: 0 } });
+        if (command === "addMarker") patchProject({ markers: [...markers, createAudioMarker(time)] });
+        else if (command === "setCycle" && range) patchProject({ cycle: { enabled: true, start: range.start, end: range.end } });
+        else if (command === "clearCycle") patchProject({ cycle: { enabled: false, start: 0, end: 0 } });
     };
 
     const setFadeShape = (shape: CanvasAudioFadeShape) => {
@@ -1554,18 +1551,40 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     };
 
     const handleOptionCommand = (command: AudioOptionCommand) => {
-        if (command === "grid") patchMetadata({ audioGrid: { ...grid, enabled: !grid.enabled } });
+        if (command === "grid") patchProject({ grid: { ...grid, enabled: !grid.enabled } });
         else if (command === "loop") toggleClipField(selectedClipIds, "loop");
         else if (command === "reverse") toggleClipField(selectedClipIds, "reversed");
         else if (command === "autoCrossfade") setAutoCrossfade((prev) => !prev);
-        else if (command.startsWith("snap:")) patchMetadata({ audioGrid: { ...grid, snap: command.slice(5) as CanvasAudioSnap } });
+        else if (command.startsWith("snap:")) patchProject({ grid: { ...grid, snap: command.slice(5) as CanvasAudioSnap } });
         else setFadeShape(command.slice(10) as CanvasAudioFadeShape);
     };
 
     const addClip = async (trackId: string, node: CanvasNodeData, at: number | null) => {
-        const duration = await resolveAudioNodeDuration(node);
-        commitClips([...projectClips, { id: nanoid(), trackId, sourceNodeId: node.id, start: Math.max(0, at ?? nextClipStart(projectClips, trackId)), offset: 0, duration }]);
+        const duration = await resolveAudioSourceDuration({ storageKey: node.metadata?.storageKey, content: node.metadata?.content, durationMs: node.metadata?.durationMs, id: node.id });
+        commitClips([...projectClips, { id: nanoid(), trackId, storageKey: node.metadata?.storageKey, content: node.metadata?.content, sourceDurationMs: Math.round(duration * 1000), start: Math.max(0, at ?? nextClipStart(projectClips, trackId)), offset: 0, duration }]);
         setPicker(null);
+    };
+
+    const importMidiNode = async (node: CanvasNodeData, at: number) => {
+        const storageKey = node.metadata?.storageKey;
+        const content = node.metadata?.content;
+        try {
+            const blob = storageKey ? await getMediaBlob(storageKey) : content ? await (await fetch(content)).blob() : undefined;
+            if (!blob) throw new Error("missing MIDI source");
+            const parsed = parseMidiFile(await blob.arrayBuffer());
+            const { tracks: newTracks, regions: newRegions } = midiToProjectRegions(parsed, {
+                startSeconds: Math.max(0, at),
+                tempo,
+                ppqn,
+                fallbackName: node.title || t("canvas.audioStudio.midiTrackFallback", { defaultValue: "MIDI 音轨" }),
+            });
+            if (!newTracks.length) return;
+            patchProject({ tracks: [...tracks, ...newTracks], midiRegions: [...midi, ...newRegions] });
+            setSelectedTrackId(newTracks[0].id);
+            setSelectedRegionId(newRegions[0]?.id ?? "");
+        } catch {
+            message.error(t("canvas.audioStudio.midiLoadFailed", { defaultValue: "无法读取 MIDI 文件" }));
+        }
     };
 
     /** Export runs one at a time: the button swaps to a disabled label until the render and upload finish. */
@@ -1636,7 +1655,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
             return;
         }
         const latency = capture.inputLatencyMs / 1000;
-        await onRecorded(project, cutRecordedTake(buffer, active.from, active.from + performed, capture.channels), { trackId: active.trackId, start: Math.max(0, active.clipStart - latency), duration: performed, name: t("canvas.audioStudio.takeName", { index: active.count }) });
+        await onRecorded(cutRecordedTake(buffer, active.from, active.from + performed, capture.channels), { trackId: active.trackId, start: Math.max(0, active.clipStart - latency), duration: performed, name: t("canvas.audioStudio.takeName", { index: active.count }) });
     };
     finishRecordRef.current = finishRecording;
 
@@ -1732,8 +1751,8 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
         if (lower === "m" && selectedTrack) { consume(); updateTrack(selectedTrack.id, { mute: !selectedTrack.mute }); return; }
         if (lower === "s" && selectedTrack) { consume(); updateTrack(selectedTrack.id, { solo: !selectedTrack.solo }); return; }
         if (lower === "r" && event.shiftKey && selectedTrack) { consume(); updateTrack(selectedTrack.id, { armed: !selectedTrack.armed }); return; }
-        if (lower === "l" && cycle.end > cycle.start) { consume(); patchMetadata({ audioCycle: { ...cycle, enabled: !cycle.enabled } }); return; }
-        if (lower === "t") { consume(); patchMetadata({ audioMetronome: { ...metronome, enabled: !metronome.enabled } }); return; }
+        if (lower === "l" && cycle.end > cycle.start) { consume(); patchProject({ cycle: { ...cycle, enabled: !cycle.enabled } }); return; }
+        if (lower === "t") { consume(); patchProject({ metronome: { ...metronome, enabled: !metronome.enabled } }); return; }
         if (lower === "x") { consume(); handleClipCommand("crossfade"); return; }
         const nextTool = TOOL_HOTKEYS[lower];
         if (nextTool) setTool(nextTool);
@@ -1753,23 +1772,6 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                 <p className="text-sm" style={{ color: theme.node.muted }}>
                     {t("canvas.audioStudio.pickProject")}
                 </p>
-                {projects.length ? (
-                    <div className="flex w-full max-w-xs flex-col gap-0.5">
-                        {projects.map((item) => (
-                            <button key={item.id} type="button" className={LIST_ACTION_CLASS} style={{ color: theme.node.text }} onClick={() => onSelectProject(item.id)}>
-                                <SlidersVertical className="size-3.5 shrink-0" style={{ color: theme.node.muted }} />
-                                <span className="min-w-0 flex-1 truncate">{item.title || t("canvas.node.untitled")}</span>
-                                <span className="shrink-0 tabular-nums" style={{ color: theme.node.muted }}>
-                                    {t("canvas.audioStudio.summary", { tracks: audioProjectTracks(item).length, clips: audioProjectClips(item).length })}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-sm" style={{ color: theme.node.muted }}>
-                        {t("canvas.audioStudio.noProjects")}
-                    </p>
-                )}
             </div>
         );
     }
@@ -1781,8 +1783,6 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
     const labels: number[] = [];
     for (let index = 0; index * labelStep <= timelineSeconds; index += 1) labels.push(index * labelStep);
     const showBars = labelStep >= barSeconds(tempo, meter);
-    const snapLabel = t(AUDIO_SNAP_LABEL_KEYS[grid.snap]);
-    const hint = t(HINTS[tool]);
     const fadeShape = primaryClip?.fadeInShape ?? "linear";
     const selectedTrackLanes = selectedTrack ? automationLanesForTrack(projectAutomation, selectedTrack.id) : EMPTY_AUTOMATION;
     const automationFlags = {
@@ -1806,7 +1806,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                     onSelectTrack={setSelectedTrackId}
                     onTrackPatch={updateTrack}
                     onMixPreview={previewTrackMix}
-                    onMasterGain={(value) => patchMetadata({ audioMasterGain: value })}
+                    onMasterGain={(value) => patchProject({ masterGain: value })}
                 />
             );
         if (panelId === "automation")
@@ -1822,12 +1822,12 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                 />
             );
         if (panelId === "history") return <PanelShell icon={History} hint={t("canvas.audioStudio.historyHint")} theme={theme} />;
-        if (panelId === "media") return <AudioMediaPoolPanel audioNodes={audioNodes} onGoCanvas={onBack} />;
-        if (panelId === "projectSettings") return <AudioProjectSettingsPanel tempo={tempo} meter={meter} grid={grid} cycle={cycle} punch={punch} metronome={metronome} capture={capture} countIn={countIn} masterGain={masterGain} onPatch={patchMetadata} />;
+        if (panelId === "media") return <AudioMediaPoolPanel audioNodes={audioNodes} midiNodes={midiNodes} onGoCanvas={onBack} />;
+        if (panelId === "projectSettings") return <AudioProjectSettingsPanel tempo={tempo} meter={meter} grid={grid} cycle={cycle} punch={punch} metronome={metronome} capture={capture} countIn={countIn} masterGain={masterGain} onPatch={patchProject} />;
         if (panelId === "markers")
             return (
                 <div className="thin-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto p-1.5 glass-card">
-                    <button type="button" className={LIST_ACTION_CLASS} style={{ color: theme.node.text }} onClick={() => patchMetadata({ audioMarkers: [...markers, createAudioMarker(Tone.getTransport().seconds)] })}>
+                    <button type="button" className={LIST_ACTION_CLASS} style={{ color: theme.node.text }} onClick={() => patchProject({ markers: [...markers, createAudioMarker(Tone.getTransport().seconds)] })}>
                         <Plus className="size-3.5 shrink-0" style={{ color: theme.node.muted }} />
                         {t("canvas.audioStudio.markerAtPlayhead")}
                     </button>
@@ -1845,7 +1845,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                     aria-label={t("canvas.audioStudio.markerName")}
                                     onChange={(event) => {
                                         const name = event.target.value;
-                                        patchMetadata({ audioMarkers: markers.map((item) => (item.id === marker.id ? { ...item, name } : item)) });
+                                        patchProject({ markers: markers.map((item) => (item.id === marker.id ? { ...item, name } : item)) });
                                     }}
                                 />
                                 <button
@@ -1854,7 +1854,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                     style={{ color: theme.node.muted }}
                                     aria-label={t("canvas.audioStudio.removeMarker")}
                                     title={t("canvas.audioStudio.removeMarker")}
-                                    onClick={() => patchMetadata({ audioMarkers: markers.filter((item) => item.id !== marker.id) })}
+                                    onClick={() => patchProject({ markers: markers.filter((item) => item.id !== marker.id) })}
                                 >
                                     <Trash2 className="size-3.5" />
                                 </button>
@@ -1872,101 +1872,50 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
 
     return (
         <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${FOCUS_RING_CLASS}`} style={{ "--audio-focus": theme.node.activeStroke } as React.CSSProperties}>
-            <div className={`${STUDIO_BAR_CLASS} glass-surface h-11`}>
+            <div className={`${STUDIO_BAR_CLASS} glass-surface h-11 border-b border-border`}>
                 <IconAction label={t("canvas.workspace.back")} onClick={onBack}>
                     <ArrowLeft className="size-3.5" />
                 </IconAction>
-                {projects.length > 1 ? (
-                    <Select
-                        size="small"
-                        variant="borderless"
-                        className={`${CONTROL_CLASS} min-w-[120px] max-w-[220px]`}
-                        value={project.id}
-                        placeholder={t("canvas.audioStudio.pickProject")}
-                        options={projects.map((item) => ({ value: item.id, label: item.title || t("canvas.node.untitled") }))}
-                        popupMatchSelectWidth={false}
-                        styles={{ popup: { root: { zIndex: 1300 } } }}
-                        aria-label={t("canvas.audioStudio.pickProject")}
-                        onChange={onSelectProject}
-                    />
-                ) : (
-                    <span className="font-semibold text-sm px-2 truncate max-w-[220px]" style={{ color: theme.node.text }}>
-                        {project.title || t("canvas.node.untitled")}
-                    </span>
-                )}
+                <span className="font-semibold text-sm px-2 truncate max-w-[220px]" style={{ color: theme.node.text }}>
+                    {project.title || t("canvas.node.untitled")}
+                </span>
                 <span className={STUDIO_DIVIDER_CLASS} style={{ background: theme.toolbar.border }} />
-                <IconAction label={t("canvas.audioStudio.toStart")} className="hidden lg:grid" onClick={() => seek(0)}>
-                    <SkipBack className="size-3.5" />
-                </IconAction>
-                <IconAction label={t(playing ? "canvas.audioStudio.pause" : "canvas.audioStudio.play")} onClick={() => (playing ? pausePlayback() : void togglePlay())} disabled={!playing && !hasContent}>
-                    {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-                </IconAction>
-                <IconAction label={t("canvas.audioStudio.pause")} className="hidden lg:grid" onClick={pausePlayback} disabled={!playing}>
-                    <Pause className="size-3.5" />
-                </IconAction>
-                <IconAction label={t("canvas.audioStudio.stop")} className="hidden lg:grid" onClick={stopPlayback} disabled={!playing}>
-                    <CircleStop className="size-3.5" />
-                </IconAction>
-                <button
-                    type="button"
-                    className={`${FLAT_ACTION_CLASS} hidden lg:grid`}
-                    style={recording ? { background: theme.node.dangerSoft, color: theme.node.danger } : { color: theme.node.muted }}
-                    aria-label={t(recording ? "canvas.audioStudio.recordStop" : "canvas.audioStudio.record")}
-                    title={t(recording ? "canvas.audioStudio.recordStop" : "canvas.audioStudio.record")}
-                    aria-pressed={recording}
-                    onClick={() => void (recording ? finishRecording() : startRecording())}
-                >
-                    <Circle className="size-3.5" fill={recording ? "currentColor" : "none"} />
-                </button>
-                <span ref={positionRef} role="timer" aria-label={t("canvas.audioStudio.position")} className="w-24 shrink-0 text-center text-sm tabular-nums" style={{ color: playing ? theme.node.text : theme.node.muted }}>
-                    1.01.000
-                </span>
-                <span ref={timeRef} className="hidden w-12 shrink-0 text-center text-sm tabular-nums lg:block" style={{ color: theme.node.muted }}>
-                    0:00
-                </span>
-                <span className={`${STUDIO_DIVIDER_CLASS} hidden lg:block`} style={{ background: theme.toolbar.border }} />
-                <InputNumber size="small" className={`${CONTROL_CLASS} !hidden !w-16 lg:!inline-flex`} min={20} max={300} step={1} value={tempo} aria-label={t("canvas.audioStudio.tempo")} onChange={(value) => value !== null && patchMetadata({ audioTempo: Math.min(300, Math.max(20, value)) })} />
-                <Select
-                    size="small"
-                    className={`${CONTROL_CLASS} !hidden lg:!inline-flex lg:!w-[62px]`}
-                    value={`${meter.numerator}/${meter.denominator}`}
-                    options={AUDIO_METER_OPTIONS.map((value) => ({ value, label: value }))}
-                    popupMatchSelectWidth={false}
-                    styles={{ popup: { root: { zIndex: 1300 } } }}
-                    aria-label={t("canvas.audioStudio.meter")}
-                    onChange={(value) => {
-                        const [numerator, denominator] = value.split("/").map(Number);
-                        patchMetadata({ audioTimeSignature: { numerator, denominator } });
-                    }}
-                />
-                <button
-                    type="button"
-                    className={`${FLAT_ACTION_CLASS} hidden lg:grid`}
-                    style={cycleLoop ? { background: theme.node.warningSoft, color: theme.node.warning } : { color: theme.node.muted }}
-                    aria-label={t("canvas.audioStudio.cycle")}
-                    title={t("canvas.audioStudio.cycle")}
-                    aria-pressed={cycleLoop}
-                    disabled={cycle.end <= cycle.start}
-                    onClick={() => patchMetadata({ audioCycle: { ...cycle, enabled: !cycle.enabled } })}
-                >
-                    <Repeat className="size-3.5" />
-                </button>
-                <button
-                    type="button"
-                    className={`${FLAT_ACTION_CLASS} hidden lg:grid`}
-                    style={metronome.enabled ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
-                    aria-label={t("canvas.audioStudio.metronome")}
-                    title={t("canvas.audioStudio.metronome")}
-                    aria-pressed={metronome.enabled}
-                    onClick={() => patchMetadata({ audioMetronome: { ...metronome, enabled: !metronome.enabled } })}
-                >
-                    <Timer className="size-3.5" />
-                </button>
+                <ImageSettingsTheme theme={theme}>
+                    <span className="hidden xl:flex [&_button]:!h-7">
+                        <AudioMenus
+                            clip={primaryClip}
+                            snap={grid.snap}
+                            view={{ grid: grid.enabled, cycle: cycleLoop, metronome: metronome.enabled }}
+                            automation={automationFlags}
+                            hasClips={Boolean(projectClips.length)}
+                            hasSelection={Boolean(selectedClipIds.length)}
+                            hasRange={Boolean(range)}
+                            hasCycleRange={cycle.end > cycle.start}
+                            canPaste={clipboardCount > 0}
+                            onEdit={handleEditCommand}
+                            onClip={(command) => handleClipCommand(command)}
+                            onView={handleViewCommand}
+                            onAutomation={handleAutomationCommand}
+                        />
+                        <span className="[&_button]:!h-7">
+                            <DockWindowMenu defs={AUDIO_DOCK_PANELS} layout={dock.layout} onToggle={dock.toggle} onReset={dock.reset} />
+                        </span>
+                    </span>
+                    <span className="xl:hidden">
+                        <Dropdown
+                            placement="bottomLeft"
+                            styles={{ root: { zIndex: 1300 } }}
+                            menu={{ ...AUDIO_MENU_POPUP, items: audioCompactMenuItems(t, { clip: primaryClip, view: { grid: grid.enabled, cycle: cycleLoop, metronome: metronome.enabled }, automation: automationFlags, hasClips: Boolean(projectClips.length), hasSelection: Boolean(selectedClipIds.length), hasRange: Boolean(range), hasCycleRange: cycle.end > cycle.start, canPaste: clipboardCount > 0, ...optionFlags }), onClick: handleCompactMenu }}
+                        >
+                            <button type="button" className={`${AUDIO_MENU_BUTTON_CLASS} !h-7`} aria-label={t("canvas.audioStudio.menuOptions")} title={t("canvas.audioStudio.menuOptions")}>
+                                {t("canvas.audioStudio.menuOptions")}
+                                <ChevronDown className="size-3" />
+                            </button>
+                        </Dropdown>
+                    </span>
+                </ImageSettingsTheme>
                 <span className="min-w-0 flex-1" />
-                <span className="hidden w-12 shrink-0 text-center text-sm tabular-nums lg:block" style={{ color: theme.node.muted }}>
-                    {Math.round((pxPerSecond / AUDIO_DEFAULT_PX_PER_SECOND) * 100)}%
-                </span>
-                <button type="button" className="hidden h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent lg:flex hover:bg-hover dark:disabled:hover:bg-transparent" style={{ color: theme.node.text }} disabled={exporting} onClick={() => void runExport(() => onOutput(project))}>
+                        <button type="button" className="hidden h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent lg:flex hover:bg-hover dark:disabled:hover:bg-transparent" style={{ color: theme.node.text }} disabled={exporting} onClick={() => void runExport(() => onOutput())}>
                     <Share2 className="size-3.5" />
                     {t(exporting ? "canvas.audioStudio.exporting" : "studio.output.title", { defaultValue: exporting ? "Exporting..." : "Export" })}
                 </button>
@@ -2016,7 +1965,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                     title={t("canvas.audioStudio.cycle")}
                                     aria-pressed={cycleLoop}
                                     disabled={cycle.end <= cycle.start}
-                                    onClick={() => patchMetadata({ audioCycle: { ...cycle, enabled: !cycle.enabled } })}
+                                    onClick={() => patchProject({ cycle: { ...cycle, enabled: !cycle.enabled } })}
                                 >
                                     <Repeat className="size-3.5" />
                                 </button>
@@ -2027,7 +1976,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                     aria-label={t("canvas.audioStudio.metronome")}
                                     title={t("canvas.audioStudio.metronome")}
                                     aria-pressed={metronome.enabled}
-                                    onClick={() => patchMetadata({ audioMetronome: { ...metronome, enabled: !metronome.enabled } })}
+                                    onClick={() => patchProject({ metronome: { ...metronome, enabled: !metronome.enabled } })}
                                 >
                                     <Timer className="size-3.5" />
                                 </button>
@@ -2036,7 +1985,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                 <span className="w-10 shrink-0" style={{ color: theme.node.muted }}>
                                     {t("canvas.audioStudio.tempo")}
                                 </span>
-                                <InputNumber size="small" className="!w-16" min={20} max={300} step={1} value={tempo} aria-label={t("canvas.audioStudio.tempo")} onChange={(value) => value !== null && patchMetadata({ audioTempo: Math.min(300, Math.max(20, value)) })} />
+                                <InputNumber size="small" className="!w-16" min={20} max={300} step={1} value={tempo} aria-label={t("canvas.audioStudio.tempo")} onChange={(value) => value !== null && patchProject({ tempo: Math.min(300, Math.max(20, value)) })} />
                                 <Select
                                     size="small"
                                     className="w-[62px]"
@@ -2047,7 +1996,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                     aria-label={t("canvas.audioStudio.meter")}
                                     onChange={(value) => {
                                         const [numerator, denominator] = value.split("/").map(Number);
-                                        patchMetadata({ audioTimeSignature: { numerator, denominator } });
+                                        patchProject({ timeSignature: { numerator, denominator } });
                                     }}
                                 />
                             </div>
@@ -2065,129 +2014,17 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                     <Search className="size-3.5" />
                                 </button>
                             </div>
-                            <button type="button" className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-left transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent" style={{ color: theme.node.text }} disabled={exporting} onClick={() => void runExport(() => onOutput(project))}>
+                            <button type="button" className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-left transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent" style={{ color: theme.node.text }} disabled={exporting} onClick={() => void runExport(() => onOutput())}>
                                 <Share2 className="size-3.5" />
                                 {t(exporting ? "canvas.audioStudio.exporting" : "studio.output.title", { defaultValue: exporting ? "Exporting..." : "Export" })}
                             </button>
                         </div>
                     }
                 >
-                    <button type="button" className={`${FLAT_ACTION_CLASS} lg:hidden`} aria-label={t("canvas.audioStudio.menuMore")} title={t("canvas.audioStudio.menuMore")}>
+                    <button type="button" className={`${FLAT_ACTION_CLASS} 2xl:hidden`} aria-label={t("canvas.audioStudio.menuMore")} title={t("canvas.audioStudio.menuMore")}>
                         <Ellipsis className="size-3.5" />
                     </button>
                 </Popover>
-            </div>
-
-            {/* !py-0.5 keeps the row at its 36px min-height now that the controls are 28px: 28 + 4 + 1px border fits, 28 + 8 + 1px would grow it to 37. */}
-            <div className={`${STUDIO_OPTIONS_CLASS} glass-surface !py-0.5`} style={{ color: theme.node.muted, borderColor: theme.toolbar.border }}>
-                <ImageSettingsTheme theme={theme}>
-                    <span className="hidden md:flex [&_button]:!h-7">
-                        <AudioMenus
-                            clip={primaryClip}
-                            snap={grid.snap}
-                            view={{ grid: grid.enabled, cycle: cycleLoop, metronome: metronome.enabled }}
-                            automation={automationFlags}
-                            hasClips={Boolean(projectClips.length)}
-                            hasSelection={Boolean(selectedClipIds.length)}
-                            hasRange={Boolean(range)}
-                            hasCycleRange={cycle.end > cycle.start}
-                            canPaste={clipboardCount > 0}
-                            onEdit={handleEditCommand}
-                            onClip={(command) => handleClipCommand(command)}
-                            onView={handleViewCommand}
-                            onAutomation={handleAutomationCommand}
-                        />
-                        <span className="[&_button]:!h-7">
-                            <DockWindowMenu defs={AUDIO_DOCK_PANELS} layout={dock.layout} onToggle={dock.toggle} onReset={dock.reset} />
-                        </span>
-                    </span>
-                    <span className="hidden md:inline-flex lg:hidden">
-                        <Dropdown
-                            placement="bottomLeft"
-                            styles={{ root: { zIndex: 1300 } }}
-                            menu={{
-                                ...AUDIO_MENU_POPUP,
-                                items: prefixMenuKeys(audioOptionItems(t, optionFlags), "opt:"),
-                                onClick: ({ key }) => handleOptionCommand(key.slice(4) as AudioOptionCommand),
-                            }}
-                        >
-                            <button type="button" className={`${AUDIO_MENU_BUTTON_CLASS} !h-7`} aria-label={t("canvas.audioStudio.menuOptions")} title={t("canvas.audioStudio.menuOptions")}>
-                                {t("canvas.audioStudio.menuOptions")}
-                                <ChevronDown className="size-3" />
-                            </button>
-                        </Dropdown>
-                    </span>
-                    <span className="md:hidden">
-                        <Dropdown
-                            placement="bottomLeft"
-                            styles={{ root: { zIndex: 1300 } }}
-                            menu={{ ...AUDIO_MENU_POPUP, items: audioCompactMenuItems(t, { clip: primaryClip, view: { grid: grid.enabled, cycle: cycleLoop, metronome: metronome.enabled }, automation: automationFlags, hasClips: Boolean(projectClips.length), hasSelection: Boolean(selectedClipIds.length), hasRange: Boolean(range), hasCycleRange: cycle.end > cycle.start, canPaste: clipboardCount > 0, ...optionFlags }), onClick: handleCompactMenu }}
-                        >
-                            <button type="button" className={`${AUDIO_MENU_BUTTON_CLASS} !h-7`} aria-label={t("canvas.audioStudio.menuOptions")} title={t("canvas.audioStudio.menuOptions")}>
-                                {t("canvas.audioStudio.menuOptions")}
-                                <ChevronDown className="size-3" />
-                            </button>
-                        </Dropdown>
-                    </span>
-                    <span className="hidden w-20 shrink-0 truncate font-medium lg:inline" style={{ color: theme.node.text }}>
-                        {t(TOOL_LABELS[tool])}
-                    </span>
-                    <span className="hidden min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 lg:flex">
-                        <OptionToggle label={t("canvas.audioStudio.grid")} checked={grid.enabled} onChange={(checked) => patchMetadata({ audioGrid: { ...grid, enabled: checked } })} />
-                        <label className={CONTROL_GROUP_CLASS}>
-                            <span>{t("canvas.audioStudio.snap")}</span>
-                            <Select
-                                size="small"
-                                className={`${CONTROL_CLASS} w-[74px]`}
-                                value={grid.snap}
-                                options={AUDIO_SNAP_OPTIONS.map((value) => ({ value, label: t(AUDIO_SNAP_LABEL_KEYS[value]) }))}
-                                popupMatchSelectWidth={false}
-                                styles={{ popup: { root: { zIndex: 1300 } } }}
-                                aria-label={t("canvas.audioStudio.snap")}
-                                onChange={(value) => patchMetadata({ audioGrid: { ...grid, snap: value } })}
-                            />
-                        </label>
-                        {primaryClip ? (
-                            <>
-                                <label className={CONTROL_GROUP_CLASS}>
-                                    <span>{t("canvas.audioStudio.fadeShape")}</span>
-                                    <Select
-                                        size="small"
-                                        className={`${CONTROL_CLASS} w-[88px]`}
-                                        value={fadeShape}
-                                        options={AUDIO_FADE_SHAPE_OPTIONS.map((value) => ({ value, label: t(AUDIO_FADE_SHAPE_LABEL_KEYS[value]) }))}
-                                        popupMatchSelectWidth={false}
-                                        styles={{ popup: { root: { zIndex: 1300 } } }}
-                                        aria-label={t("canvas.audioStudio.fadeShape")}
-                                        onChange={(value) => setFadeShape(value)}
-                                    />
-                                </label>
-                                <label className={CONTROL_GROUP_CLASS}>
-                                    <span className="shrink-0">{t("canvas.audioStudio.clipGain")}</span>
-                                    <AudioValueInput
-                                        label={t("canvas.audioStudio.clipGain")}
-                                        value={Math.round(clampClipGain(primaryClip.gain ?? 1) * 100)}
-                                        format={(value) => String(Math.round(value))}
-                                        parse={(text) => parseGainPercent(text, 200)}
-                                        onCommit={(value) => commitClips(clips.map((clip) => (selectedSet.has(clip.id) ? { ...clip, gain: clampClipGain(Math.round(value) / 100) } : clip)))}
-                                        className="h-7 w-12 shrink-0"
-                                    />
-                                    <span className="shrink-0">%</span>
-                                </label>
-                                <OptionToggle label={t("canvas.audioStudio.loop")} checked={Boolean(primaryClip.loop)} onChange={() => toggleClipField(selectedClipIds, "loop")} />
-                                <OptionToggle label={t("canvas.audioStudio.reverse")} checked={Boolean(primaryClip.reversed)} onChange={() => toggleClipField(selectedClipIds, "reversed")} />
-                            </>
-                        ) : null}
-                        <OptionToggle label={t("canvas.audioStudio.autoCrossfade")} checked={autoCrossfade} onChange={setAutoCrossfade} />
-                    </span>
-                </ImageSettingsTheme>
-                <span className="min-w-0 flex-1 truncate">{hint}</span>
-                {grid.snap !== "off" ? (
-                    <span className="flex shrink-0 items-center gap-1">
-                        <Magnet className="size-3" />
-                        {snapLabel}
-                    </span>
-                ) : null}
             </div>
 
             {picker && pickerTrack ? (
@@ -2230,6 +2067,98 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                 edgeClassName={{ left: "hidden lg:flex", bottom: "hidden lg:flex", right: dockOverlay ? "absolute inset-y-0 right-0 z-40 flex outline-none max-md:!hidden md:flex lg:static lg:z-auto glass-raised" : "hidden outline-none lg:flex" }}
                 edgeProps={{ right: { ref: overlayDockRef, tabIndex: -1, onKeyDown: trapDockFocus, "aria-label": t("canvas.audioStudio.dockInspector") } }}
             >
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                    <div className="glass-surface flex h-10 shrink-0 items-center gap-1.5 border-b border-border px-1.5">
+                        <ImageSettingsTheme theme={theme}>
+                            <span className="hidden 2xl:inline" style={{ color: theme.node.text }}>
+                                {t(TOOL_LABELS[tool])}
+                            </span>
+                            <span className="hidden xl:inline-flex">
+                                <Dropdown
+                                    placement="bottomLeft"
+                                    styles={{ root: { zIndex: 1300 } }}
+                                    menu={{
+                                        ...AUDIO_MENU_POPUP,
+                                        items: prefixMenuKeys(audioOptionItems(t, optionFlags), "opt:"),
+                                        onClick: ({ key }) => handleOptionCommand(key.slice(4) as AudioOptionCommand),
+                                    }}
+                                >
+                                    <button type="button" className={`${AUDIO_MENU_BUTTON_CLASS} !h-7`} aria-label={t("canvas.audioStudio.menuOptions")} title={t("canvas.audioStudio.menuOptions")}>
+                                        {t("canvas.audioStudio.menuOptions")}
+                                        <ChevronDown className="size-3" />
+                                    </button>
+                                </Dropdown>
+                            </span>
+                        </ImageSettingsTheme>
+                        <IconAction label={t("canvas.audioStudio.toStart")} className="hidden lg:grid" onClick={() => seek(0)}>
+                            <SkipBack className="size-3.5" />
+                        </IconAction>
+                        <IconAction label={t(playing ? "canvas.audioStudio.pause" : "canvas.audioStudio.play")} onClick={() => (playing ? pausePlayback() : void togglePlay())} disabled={!playing && !hasContent}>
+                            {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+                        </IconAction>
+                        <IconAction label={t("canvas.audioStudio.pause")} className="hidden lg:grid" onClick={pausePlayback} disabled={!playing}>
+                            <Pause className="size-3.5" />
+                        </IconAction>
+                        <IconAction label={t("canvas.audioStudio.stop")} className="hidden lg:grid" onClick={stopPlayback} disabled={!playing}>
+                            <CircleStop className="size-3.5" />
+                        </IconAction>
+                        <button
+                            type="button"
+                            className={`${FLAT_ACTION_CLASS} hidden lg:grid`}
+                            style={recording ? { background: theme.node.dangerSoft, color: theme.node.danger } : { color: theme.node.muted }}
+                            aria-label={t(recording ? "canvas.audioStudio.recordStop" : "canvas.audioStudio.record")}
+                            title={t(recording ? "canvas.audioStudio.recordStop" : "canvas.audioStudio.record")}
+                            aria-pressed={recording}
+                            onClick={() => void (recording ? finishRecording() : startRecording())}
+                        >
+                            <Circle className="size-3.5" fill={recording ? "currentColor" : "none"} />
+                        </button>
+                        <span ref={positionRef} role="timer" aria-label={t("canvas.audioStudio.position")} className="w-24 shrink-0 text-center text-sm tabular-nums" style={{ color: playing ? theme.node.text : theme.node.muted }}>
+                            1.01.000
+                        </span>
+                        <span ref={timeRef} className="hidden w-12 shrink-0 text-center text-sm tabular-nums lg:block" style={{ color: theme.node.muted }}>
+                            0:00
+                        </span>
+                        <span className={`${STUDIO_DIVIDER_CLASS} hidden 2xl:block`} style={{ background: theme.toolbar.border }} />
+                        <InputNumber size="small" className={`${CONTROL_CLASS} !hidden !w-16 2xl:!inline-flex`} min={20} max={300} step={1} value={tempo} aria-label={t("canvas.audioStudio.tempo")} onChange={(value) => value !== null && patchProject({ tempo: Math.min(300, Math.max(20, value)) })} />
+                        <Select
+                            size="small"
+                            className={`${CONTROL_CLASS} !hidden 2xl:!inline-flex lg:!w-[62px]`}
+                            value={`${meter.numerator}/${meter.denominator}`}
+                            options={AUDIO_METER_OPTIONS.map((value) => ({ value, label: value }))}
+                            popupMatchSelectWidth={false}
+                            styles={{ popup: { root: { zIndex: 1300 } } }}
+                            aria-label={t("canvas.audioStudio.meter")}
+                            onChange={(value) => {
+                                const [numerator, denominator] = value.split("/").map(Number);
+                                patchProject({ timeSignature: { numerator, denominator } });
+                            }}
+                        />
+                        <button
+                            type="button"
+                            className={`${FLAT_ACTION_CLASS} hidden 2xl:grid`}
+                            style={cycleLoop ? { background: theme.node.warningSoft, color: theme.node.warning } : { color: theme.node.muted }}
+                            aria-label={t("canvas.audioStudio.cycle")}
+                            title={t("canvas.audioStudio.cycle")}
+                            aria-pressed={cycleLoop}
+                            disabled={cycle.end <= cycle.start}
+                            onClick={() => patchProject({ cycle: { ...cycle, enabled: !cycle.enabled } })}
+                        >
+                            <Repeat className="size-3.5" />
+                        </button>
+                        <button
+                            type="button"
+                            className={`${FLAT_ACTION_CLASS} hidden 2xl:grid`}
+                            style={metronome.enabled ? { background: theme.toolbar.activeBg, color: theme.toolbar.activeText } : { color: theme.node.muted }}
+                            aria-label={t("canvas.audioStudio.metronome")}
+                            title={t("canvas.audioStudio.metronome")}
+                            aria-pressed={metronome.enabled}
+                            onClick={() => patchProject({ metronome: { ...metronome, enabled: !metronome.enabled } })}
+                        >
+                            <Timer className="size-3.5" />
+                        </button>
+                    </div>
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
                 <div className="thin-scrollbar flex h-10 shrink-0 flex-row items-center gap-0.5 overflow-x-auto overflow-y-hidden px-1.5 md:h-auto md:flex-col md:overflow-x-hidden md:overflow-y-auto md:py-2 glass-surface">
                     {TOOLS.map((item) => {
                         const Icon = item.icon;
@@ -2272,6 +2201,19 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                 onChange={(value) => setView(value as AudioView)}
                             />
                         </ConfigProvider>
+                        {view === "arrangement" ? (
+                            <ConfigProvider theme={{ components: { Segmented: { itemColor: theme.node.muted, itemSelectedBg: theme.node.accentSoft, itemSelectedColor: theme.node.accent } } }}>
+                                <Segmented
+                                    size="small"
+                                    value={visMode}
+                                    options={[
+                                        { label: t("canvas.audioStudio.viewWaveform"), value: "waveform" },
+                                        { label: t("canvas.audioStudio.viewSpectrum"), value: "spectrum" },
+                                    ]}
+                                    onChange={(value) => setVisMode(value as "waveform" | "spectrum")}
+                                />
+                            </ConfigProvider>
+                        ) : null}
                     </div>
                     {view === "mixer" ? (
                         <AudioMixer
@@ -2284,7 +2226,7 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                             onSelectTrack={setSelectedTrackId}
                             onTrackPatch={updateTrack}
                             onMixPreview={previewTrackMix}
-                            onMasterGain={(value) => patchMetadata({ audioMasterGain: value })}
+                            onMasterGain={(value) => patchProject({ masterGain: value })}
                         />
                     ) : null}
                     {view === "roll" ? (
@@ -2296,9 +2238,6 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                             meter={meter}
                             snap={grid.snap}
                             getVstSource={getVstSource}
-                            onRegionPatch={(patch) => {
-                                if (selectedRegion) updateRegion(selectedRegion.id, patch);
-                            }}
                             onNotes={(notes) => {
                                 if (selectedRegion) commitRegionNotes(selectedRegion.id, notes);
                             }}
@@ -2319,8 +2258,15 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                         onPointerUp={endPan}
                         onPointerCancel={endPan}
                         onDragOver={(event) => {
-                            if (!event.dataTransfer.types.includes(AUDIO_NODE_DRAG_MIME)) return;
+                            const midiDrag = event.dataTransfer.types.includes(AUDIO_MIDI_NODE_DRAG_MIME);
+                            if (!midiDrag && !event.dataTransfer.types.includes(AUDIO_NODE_DRAG_MIME)) return;
                             const target = trackAtY(contentPoint(event.clientX, event.clientY).y);
+                            if (midiDrag) {
+                                event.preventDefault();
+                                event.dataTransfer.dropEffect = "copy";
+                                setDropTrackId(null);
+                                return;
+                            }
                             if (!target || !canHostClips(target)) {
                                 setDropTrackId(null);
                                 return;
@@ -2334,11 +2280,16 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                         }}
                         onDrop={(event) => {
                             setDropTrackId(null);
-                            const id = event.dataTransfer.getData(AUDIO_NODE_DRAG_MIME) || event.dataTransfer.getData("text/plain");
-                            const node = id ? audioNodesById.get(id) : undefined;
-                            const target = trackAtY(contentPoint(event.clientX, event.clientY).y);
-                            if (!node || !target || !canHostClips(target)) return;
+                            const id = event.dataTransfer.getData(AUDIO_MIDI_NODE_DRAG_MIME) || event.dataTransfer.getData(AUDIO_NODE_DRAG_MIME) || event.dataTransfer.getData("text/plain");
+                            const node = id ? poolNodesById.get(id) : undefined;
+                            if (!node) return;
                             event.preventDefault();
+                            if (node.type === CanvasNodeType.Midi) {
+                                void importMidiNode(node, snapTime(timeAt(event.clientX), false));
+                                return;
+                            }
+                            const target = trackAtY(contentPoint(event.clientX, event.clientY).y);
+                            if (!target || !canHostClips(target)) return;
                             void addClip(target.id, node, snapTime(timeAt(event.clientX), false));
                         }}
                     >
@@ -2545,20 +2496,20 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                                                       <Music2 className="size-2.5 shrink-0" />
                                                                       <span className="min-w-0 flex-1 truncate text-sm" style={{ color: theme.node.text }}>{region.name || t("canvas.audioStudio.regionName")}</span>
                                                                   </div>
-                                                                  <MidiRegionNotes region={region} width={width} ppqn={ppqn} tempo={tempo} pxPerSecond={pxPerSecond} viewFrom={laneView.from} viewTo={laneView.to} theme={theme} />
+                                                                   <InstrumentRegionVisual track={track} region={region} trackRegions={audioTrackRegions(midi, track.id)} width={width} ppqn={ppqn} tempo={tempo} pxPerSecond={pxPerSecond} viewFrom={laneView.from} viewTo={laneView.to} theme={theme} mode={visMode} />
                                                               </div>
                                                           </AudioMidiRegionContextMenu>
                                                       );
                                                   })
                                                 : null}
                                             {audioTrackClips(clips, track.id).map((clip) => {
-                                                const source = audioNodesById.get(clip.sourceNodeId);
-                                                const url = sources[clip.sourceNodeId] || "";
+                                                const sourceKey = clip.storageKey || clip.content || "";
+                                                const url = sources[sourceKey] || "";
                                                 const selected = selectedSet.has(clip.id);
                                                 const width = Math.max(MIN_CLIP_WIDTH, clip.duration * pxPerSecond);
                                                 const fadeIn = Math.min(clip.fadeIn ?? 0, clip.duration) * pxPerSecond;
                                                 const fadeOut = Math.min(clip.fadeOut ?? 0, clip.duration) * pxPerSecond;
-                                                const sourceWindow = (source?.metadata?.durationMs || 0) / 1000;
+                                                const sourceWindow = (clip.sourceDurationMs || 0) / 1000;
                                                 const loopFrom = clip.loop && sourceWindow > 0 ? Math.max(0, (sourceWindow - clip.offset) * pxPerSecond) : 0;
                                                 return (
                                                     <AudioClipContextMenu key={clip.id} clip={clip} onCommand={(command) => handleClipCommand(command, clip.id)}>
@@ -2576,8 +2527,8 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                                             }}
                                                             tabIndex={0}
                                                             data-clip-id={clip.id}
-                                                            title={clip.name || source?.title || t("canvas.nodeTypes.audio")}
-                                                            aria-label={clip.locked ? `${clip.name || source?.title || t("canvas.nodeTypes.audio")} · ${t("canvas.audioStudio.locked")}` : clip.name || source?.title || t("canvas.nodeTypes.audio")}
+                                                            title={clip.name || t("canvas.nodeTypes.audio")}
+                                                            aria-label={clip.locked ? `${clip.name || t("canvas.nodeTypes.audio")} · ${t("canvas.audioStudio.locked")}` : clip.name || t("canvas.nodeTypes.audio")}
                                                         onFocus={() => setSelectedClipIds((prev) => (prev.includes(clip.id) ? prev : [clip.id]))}
                                                         onContextMenu={(event) => event.stopPropagation()}
                                                         onPointerDown={(event) => beginClipGesture(event, clip)}
@@ -2589,10 +2540,10 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                                                             <span className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px]" style={{ background: clip.color || theme.node.faint }} />
                                                             <div className="relative flex h-4 shrink-0 items-center gap-1 px-1.5" style={{ color: theme.node.muted }}>
                                                                 <Music2 className="size-2.5 shrink-0" />
-                                                                <span className="min-w-0 flex-1 truncate text-sm" style={{ color: theme.node.text }}>{clip.name || source?.title || t("canvas.nodeTypes.audio")}</span>
+                                                                <span className="min-w-0 flex-1 truncate text-sm" style={{ color: theme.node.text }}>{clip.name || t("canvas.nodeTypes.audio")}</span>
                                                                 {clip.locked ? <Lock className="size-2.5 shrink-0" aria-hidden /> : null}
                                                             </div>
-                                                            {url ? <ClipWaveform url={url} cacheKey={source?.metadata?.storageKey || url} clip={clip} width={width} pxPerSecond={pxPerSecond} viewFrom={laneView.from} viewTo={laneView.to} theme={theme} /> : null}
+                                                            {url ? <ClipWaveform url={url} cacheKey={sourceKey || url} clip={clip} width={width} pxPerSecond={pxPerSecond} viewFrom={laneView.from} viewTo={laneView.to} theme={theme} mode={visMode} /> : null}
                                                             {loopFrom > 0 && loopFrom < width ? (
                                                                 <span
                                                                     className="pointer-events-none absolute bottom-0 right-0 top-4 opacity-55"
@@ -2686,6 +2637,8 @@ export default function AudioStudio({ project, projects, nodes, setNodes, onSele
                         </div>
                     ) : null}
                 </div>
+                    </div>
+                </div>
 
             </DockArea>
 
@@ -2699,10 +2652,30 @@ function sameSources(current: Record<string, string>, next: Record<string, strin
     return keys.length === Object.keys(next).length && keys.every((key) => current[key] === next[key]);
 }
 
-/** Peak pyramid painted straight to a canvas, clamped to the scrolled window so a long clip never makes an oversized canvas. */
-function ClipWaveform({ url, cacheKey, clip, width, pxPerSecond, viewFrom, viewTo, theme }: { url: string; cacheKey: string; clip: CanvasAudioClip; width: number; pxPerSecond: number; viewFrom: number; viewTo: number; theme: CanvasTheme }) {
+/** Decoded mono PCM of one audio source, cached per source key so zooming and mode switches never re-average the buffer. */
+type ClipPcm = { key: string; mono: Float32Array; sampleRate: number };
+
+const CLIP_PCM_CACHE_LIMIT = 32;
+const CLIP_SPECTROGRAM_CACHE_LIMIT = 64;
+const INSTRUMENT_SPECTROGRAM_CACHE_LIMIT = 64;
+const clipPcmCache = new Map<string, ClipPcm>();
+const clipSpectrograms = new Map<string, Spectrogram>();
+const instrumentSpectrograms = new Map<string, Spectrogram>();
+
+function cacheSpectrogram(cache: Map<string, Spectrogram>, key: string, spectrogram: Spectrogram, limit: number) {
+    cache.set(key, spectrogram);
+    while (cache.size > limit) {
+        const oldest = cache.keys().next().value;
+        if (oldest === undefined) break;
+        cache.delete(oldest);
+    }
+}
+
+/** Peak pyramid or spectrogram painted straight to a canvas, clamped to the scrolled window so a long clip never makes an oversized canvas. */
+function ClipWaveform({ url, cacheKey, clip, width, pxPerSecond, viewFrom, viewTo, theme, mode }: { url: string; cacheKey: string; clip: CanvasAudioClip; width: number; pxPerSecond: number; viewFrom: number; viewTo: number; theme: CanvasTheme; mode: "waveform" | "spectrum" }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [peaks, setPeaks] = useState<AudioPeaks | null>(() => getCachedAudioPeaks(cacheKey));
+    const [pcm, setPcm] = useState<ClipPcm | null>(() => (mode === "spectrum" ? clipPcmCache.get(cacheKey) ?? null : null));
     const left = Math.max(0, viewFrom - clip.start * pxPerSecond);
     const right = Math.min(width, viewTo - clip.start * pxPerSecond);
     const visible = Math.max(0, Math.round(right - left));
@@ -2717,6 +2690,26 @@ function ClipWaveform({ url, cacheKey, clip, width, pxPerSecond, viewFrom, viewT
         };
     }, [cacheKey, url]);
 
+    // The spectrogram needs PCM, not peaks; loadAudioBuffer caches the AudioBuffer by url, so only the mono mixdown is cached here.
+    useEffect(() => {
+        if (mode !== "spectrum" || pcm?.key === cacheKey) return;
+        let active = true;
+        void loadAudioBuffer(url).then((buffer) => {
+            if (!active || !buffer) return;
+            const value = clipPcmCache.get(cacheKey) ?? { key: cacheKey, mono: toMono(buffer), sampleRate: buffer.sampleRate };
+            clipPcmCache.set(cacheKey, value);
+            while (clipPcmCache.size > CLIP_PCM_CACHE_LIMIT) {
+                const oldest = clipPcmCache.keys().next().value;
+                if (oldest === undefined) break;
+                clipPcmCache.delete(oldest);
+            }
+            setPcm(value);
+        });
+        return () => {
+            active = false;
+        };
+    }, [mode, pcm, cacheKey, url]);
+
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas || visible < 1) return;
@@ -2728,7 +2721,23 @@ function ClipWaveform({ url, cacheKey, clip, width, pxPerSecond, viewFrom, viewT
         if (!context) return;
         context.clearRect(0, 0, canvas.width, canvas.height);
         const middle = canvas.height / 2;
-        if (!peaks) {
+        if (mode === "spectrum" && pcm?.key === cacheKey) {
+            const source = pcm;
+            const columns = Math.min(2048, Math.max(1, Math.round(visible * ratio)));
+            const key = `${cacheKey}|${columns}|${left}|${visible}|${clip.offset}|${clip.duration}|${clip.reversed ? 1 : 0}`;
+            let spectrogram = clipSpectrograms.get(key);
+            if (!spectrogram) {
+                spectrogram = computeSpectrogram(source.mono, source.sampleRate, columns, (index, count) => {
+                    const laneX = left + (index / count) * visible;
+                    const seconds = clip.reversed ? clip.offset + clip.duration - laneX / pxPerSecond : clip.offset + laneX / pxPerSecond;
+                    return seconds * source.sampleRate;
+                });
+                cacheSpectrogram(clipSpectrograms, key, spectrogram, CLIP_SPECTROGRAM_CACHE_LIMIT);
+            }
+            drawSpectrogram(context, spectrogram, canvas.width, canvas.height, spectrogramLut([theme.node.fill, theme.node.info, theme.node.accent]));
+            return;
+        }
+        if (mode === "spectrum" || !peaks) {
             context.fillStyle = theme.node.faint;
             for (let x = 0; x < canvas.width; x += 3) context.fillRect(x, middle - 1, 1, 2);
             return;
@@ -2743,20 +2752,35 @@ function ClipWaveform({ url, cacheKey, clip, width, pxPerSecond, viewFrom, viewT
             const bottom = middle - Math.min(-0.015, band.min[index]) * middle;
             context.fillRect(x, top, 1, Math.max(1, bottom - top));
         }
-    }, [peaks, clip.offset, clip.duration, clip.reversed, pxPerSecond, left, visible, theme]);
+    }, [peaks, pcm, mode, clip.offset, clip.duration, clip.reversed, pxPerSecond, left, visible, theme, cacheKey]);
 
     if (visible < 1) return null;
     return <canvas ref={canvasRef} className="pointer-events-none absolute bottom-0 top-4" style={{ left, width: visible }} aria-hidden />;
 }
 
-/** Note preview of a MIDI region on its lane; the region's own pitch range is stretched over the block height. */
-function MidiRegionNotes({ region, width, ppqn, tempo, pxPerSecond, viewFrom, viewTo, theme }: { region: CanvasAudioMidiRegion; width: number; ppqn: number; tempo: number; pxPerSecond: number; viewFrom: number; viewTo: number; theme: CanvasTheme }) {
+/** Offline-rendered audio of one MIDI region on its lane: waveform or spectrogram, never note blocks. */
+function InstrumentRegionVisual({ track, region, trackRegions, width, ppqn, tempo, pxPerSecond, viewFrom, viewTo, theme, mode }: { track: CanvasAudioTrack; region: CanvasAudioMidiRegion; trackRegions: CanvasAudioMidiRegion[]; width: number; ppqn: number; tempo: number; pxPerSecond: number; viewFrom: number; viewTo: number; theme: CanvasTheme; mode: "waveform" | "spectrum" }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const regionStart = ticksToSeconds(region.startTicks, ppqn, tempo) * pxPerSecond;
-    const left = Math.max(0, viewFrom - regionStart);
-    const right = Math.min(width, viewTo - regionStart);
+    const signature = trackAudioKey(track, trackRegions, ppqn, tempo);
+    const [audio, setAudio] = useState<TrackAudio | null>(() => getCachedTrackAudio(track.id));
+
+    useEffect(() => {
+        let active = true;
+        void requestTrackAudio(track, trackRegions, ppqn, tempo).then((value) => {
+            if (active && value) setAudio(value);
+        });
+        return () => {
+            active = false;
+        };
+    }, [signature]);
+
+    const regionStartPx = ticksToSeconds(region.startTicks, ppqn, tempo) * pxPerSecond;
+    const left = Math.max(0, viewFrom - regionStartPx);
+    const right = Math.min(width, viewTo - regionStartPx);
     const visible = Math.max(0, Math.round(right - left));
-    const pxPerTick = (pxPerSecond * 60) / (tempo * ppqn);
+    const regionStartSeconds = ticksToSeconds(region.startTicks, ppqn, tempo);
+    // A cached render from another instrument version, or no render yet (VST3), reads as absent.
+    const rendered = audio && audio.key === signature ? audio : null;
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -2768,14 +2792,34 @@ function MidiRegionNotes({ region, width, ppqn, tempo, pxPerSecond, viewFrom, vi
         const context = canvas.getContext("2d");
         if (!context) return;
         context.clearRect(0, 0, canvas.width, canvas.height);
-        const pitches = region.notes.map((note) => note.pitch);
-        const high = pitches.length ? Math.max(...pitches) : 72;
-        const span = Math.max(1, high - (pitches.length ? Math.min(...pitches) : 60));
+        const middle = canvas.height / 2;
+        if (!rendered) {
+            context.fillStyle = theme.node.faint;
+            for (let x = 0; x < canvas.width; x += 3) context.fillRect(x, middle - 1, 1, 2);
+            return;
+        }
+        const source = rendered;
+        if (mode === "spectrum") {
+            const columns = Math.min(2048, Math.max(1, Math.round(visible * ratio)));
+            const key = `${source.key}|${region.startTicks}|${region.durationTicks}|${columns}`;
+            let spectrogram = instrumentSpectrograms.get(key);
+            if (!spectrogram) {
+                spectrogram = computeSpectrogram(source.mono, source.sampleRate, columns, (index, count) => (regionStartSeconds + ((index / count) * visible) / pxPerSecond) * source.sampleRate);
+                cacheSpectrogram(instrumentSpectrograms, key, spectrogram, INSTRUMENT_SPECTROGRAM_CACHE_LIMIT);
+            }
+            drawSpectrogram(context, spectrogram, canvas.width, canvas.height, spectrogramLut([theme.node.fill, theme.node.info, theme.node.accent]));
+            return;
+        }
+        const band = selectPeakBand(source.peaks, pxPerSecond);
         context.fillStyle = theme.node.faint;
-        region.notes.forEach((note) => {
-            context.fillRect((note.tick * pxPerTick - left) * ratio, ((high - note.pitch) / span) * (canvas.height - 2 * ratio), Math.max(1, note.durationTicks * pxPerTick * ratio), Math.max(1, ratio));
-        });
-    }, [region.notes, left, visible, pxPerTick, theme]);
+        for (let x = 0; x < canvas.width; x += 1) {
+            const absoluteSeconds = regionStartSeconds + (left + x / ratio) / pxPerSecond;
+            const index = peakBucketIndex(band, source.peaks, absoluteSeconds);
+            const top = middle - Math.max(0.015, band.max[index]) * middle;
+            const bottom = middle - Math.min(-0.015, band.min[index]) * middle;
+            context.fillRect(x, top, 1, Math.max(1, bottom - top));
+        }
+    }, [rendered, mode, region.startTicks, region.durationTicks, regionStartSeconds, pxPerSecond, left, visible, theme]);
 
     if (visible < 1) return null;
     return <canvas ref={canvasRef} className="pointer-events-none absolute bottom-0 top-4" style={{ left, width: visible }} aria-hidden />;
@@ -2819,7 +2863,7 @@ function ClipDialog({ clip, kind, onClose, onPatch }: { clip: CanvasAudioClip; k
                                 <span className={labelClass} style={{ color: theme.node.muted }}>
                                     {t("canvas.audioStudio.clipGain")}
                                 </span>
-                                <InputNumber size="small" min={0} max={200} value={form.gain} aria-label={t("canvas.audioStudio.clipGain")} onChange={(value) => value !== null && setForm((prev) => ({ ...prev, gain: value }))} />
+                                <InputNumber size="small" min={0} max={Math.round(AUDIO_GAIN_MAX * 100)} value={form.gain} aria-label={t("canvas.audioStudio.clipGain")} onChange={(value) => value !== null && setForm((prev) => ({ ...prev, gain: value }))} />
                                 <span style={{ color: theme.node.muted }}>%</span>
                             </label>
                             <label className={rowClass}>
@@ -2871,15 +2915,6 @@ function ClipDialog({ clip, kind, onClose, onPatch }: { clip: CanvasAudioClip; k
                 </div>
             </ImageSettingsTheme>
         </Modal>
-    );
-}
-
-function OptionToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-    return (
-        <label className={CONTROL_GROUP_CLASS}>
-            <span className="shrink-0">{label}</span>
-            <Switch size="small" checked={checked} onChange={onChange} />
-        </label>
     );
 }
 

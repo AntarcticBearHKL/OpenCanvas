@@ -1,4 +1,4 @@
-"""MCP server wiring: the 29 tools over the official Streamable HTTP transport.
+"""MCP server wiring: the 30 tools over the official Streamable HTTP transport.
 
 Port of ``web/server/mcp.ts`` using the low-level ``Server`` callbacks so tool
 names, descriptions and input schemas are exactly controlled.
@@ -53,6 +53,11 @@ def create_mcp(session: CanvasSession) -> tuple[Server[Any], StreamableHTTPSessi
             return types.CallToolResult(content=[types.TextContent(type="text", text=str(exc))], is_error=True)
         if isinstance(result, dict) and result.get("ok") is False:
             return types.CallToolResult(content=[types.TextContent(type="text", text=failure_message(result))], is_error=True)
+        data_url = result.get("dataUrl") if isinstance(result, dict) else None
+        if isinstance(data_url, str) and data_url.startswith("data:"):
+            header, _, payload = data_url.partition(",")
+            mime_type = header[5:].split(";", 1)[0] or "image/png"
+            return types.CallToolResult(content=[types.ImageContent(type="image", data=payload, mimeType=mime_type)])
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
         )

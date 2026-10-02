@@ -2,6 +2,7 @@ import { memo } from "react";
 
 import { connectionGeometry, connectionRelationLabel } from "@/lib/canvas/canvas-connections";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
+import { useDragPreviewPosition } from "@/hooks/use-drag-preview";
 import type { CanvasConnection, CanvasNodeData, ConnectionHandle, Position } from "@/types/canvas";
 
 export const ConnectionPath = memo(function ConnectionPath({
@@ -22,8 +23,12 @@ export const ConnectionPath = memo(function ConnectionPath({
     scale: number;
 }) {
     const theme = useCanvasTheme();
-    const { startX, startY, endX, endY, pathD } = connectionGeometry(from, to);
-    const label = connectionRelationLabel(connection, from, to, referenceIndex);
+    const fromPreview = useDragPreviewPosition(from.id);
+    const toPreview = useDragPreviewPosition(to.id);
+    const fromNode = fromPreview ? { ...from, position: fromPreview } : from;
+    const toNode = toPreview ? { ...to, position: toPreview } : to;
+    const { startX, startY, endX, endY, pathD } = connectionGeometry(fromNode, toNode);
+    const label = connectionRelationLabel(connection, fromNode, toNode, referenceIndex);
 
     return (
         <g>

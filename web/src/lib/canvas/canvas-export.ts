@@ -49,6 +49,7 @@ function fileExtension(mimeType: string, storageKey: string) {
     if (mimeType.includes("mp4")) return "mp4";
     if (mimeType.includes("webm")) return "webm";
     if (mimeType.includes("mpeg") || mimeType.includes("mp3")) return "mp3";
+    if (mimeType.includes("midi")) return "mid";
     if (mimeType.includes("wav")) return "wav";
     if (mimeType.includes("ogg")) return "ogg";
     return storageKey.startsWith("image:") ? "png" : "bin";

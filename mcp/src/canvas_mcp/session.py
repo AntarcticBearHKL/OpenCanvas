@@ -17,7 +17,7 @@ from canvas_mcp.operations import build_canvas_tool_request
 from canvas_mcp.tools import is_tool_name, parse_tool_input
 from canvas_mcp.types import PageSnapshot
 
-GENERIC_TOOLS = frozenset({"app_get_state", "app_describe_actions", "app_apply_ops"})
+GENERIC_TOOLS = frozenset({"app_get_state", "app_describe_actions", "app_apply_ops", "app_screenshot"})
 SITE_TOOLS = frozenset({"site_navigate", "canvas_list_projects", "generation_get_status"})
 RELAY_TOOLS = SITE_TOOLS | GENERIC_TOOLS
 

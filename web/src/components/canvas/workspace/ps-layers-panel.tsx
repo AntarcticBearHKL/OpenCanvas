@@ -1,24 +1,24 @@
-import { useMemo, useRef, useState, type Dispatch, type DragEvent, type ReactNode, type SetStateAction } from "react";
+import { useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { Dropdown, Select, Slider, type MenuProps } from "antd";
 import { ChevronDown, ChevronRight, ChevronUp, Copy, Brush, Eye, EyeOff, Folder, FolderMinus, FolderPlus, Image as ImageIcon, ImagePlus, Layers, Lock, LockOpen, Shapes, SlidersHorizontal, Sparkles, Trash2, Type } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useTranslation } from "react-i18next";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
-import { useResolvedBoardImageUrls, useResolvedPsLayerUrls } from "@/components/canvas/smart-canvas-node";
+import { useResolvedPsLayerUrls } from "@/components/canvas/workspace/ps-board-view";
 import PsFxPanel from "@/components/canvas/workspace/ps-fx-panel";
 import type { PsLayerCommand } from "@/components/canvas/workspace/ps-actions-panel";
 import { PS_MENU_POPUP } from "@/components/canvas/workspace/ps-menus";
-import { addPsLayer, addPsLayerAbove, commitBoardLayers, duplicatePsLayer, findPsLayer, groupPsLayers, movePsLayerStep, movePsLayerTo, patchPsLayer, removePsLayer, ungroupPsLayer } from "@/components/canvas/workspace/ps-layer-ops";
+import { addPsLayer, addPsLayerAbove, commitBoardLayers, duplicatePsLayer, findPsLayer, groupPsLayers, movePsLayerStep, movePsLayerTo, patchPsLayer, removePsLayer, ungroupPsLayer, type PsBoardCommit } from "@/components/canvas/workspace/ps-layer-ops";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { CANVAS_BLEND_MODES } from "@/lib/canvas/blend-modes";
 import { PS_ADJUSTMENT_NAME_KEYS, PS_ADJUSTMENT_TYPES } from "@/lib/canvas/ps-adjustments";
-import { createPsAdjustmentLayer, createPsImageLayer, createPsTextLayer, psGroupChildren, psLayerChildIds, psTopLayers, smartCanvasLayers } from "@/lib/canvas/smart-canvas";
+import { createPsAdjustmentLayer, createPsImageLayer, createPsTextLayer, psGroupChildren, psLayerChildIds, psTopLayers, smartCanvasLayers, type PsImageSource, type SmartCanvasBoard } from "@/lib/canvas/smart-canvas";
 import type { CanvasNodeData, CanvasPsAdjustmentType, CanvasPsLayer } from "@/types/canvas";
 
 type PsLayersPanelProps = {
-    board: CanvasNodeData;
-    setNodes: Dispatch<SetStateAction<CanvasNodeData[]>>;
+    board: SmartCanvasBoard;
+    commitBoard: PsBoardCommit;
     imageNodes: CanvasNodeData[];
     selectedId: string;
     onSelect: (layerId: string) => void;
@@ -34,7 +34,7 @@ const PANEL_ACTION_CLASS = "grid size-6 shrink-0 place-items-center rounded-md t
 const ROW_ACTION_CLASS = "grid size-5 shrink-0 place-items-center rounded-md transition hover:bg-hover";
 const FOOTER_ACTION_CLASS = "flex h-6 min-w-0 items-center gap-1 rounded-md px-1.5 text-sm transition hover:bg-hover disabled:opacity-30 disabled:hover:bg-transparent hover:bg-hover dark:disabled:hover:bg-transparent";
 
-export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId, onSelect, maskTarget, maskView, onMaskTarget, onLayerCommand }: PsLayersPanelProps) {
+export default function PsLayersPanel({ board, commitBoard, imageNodes, selectedId, onSelect, maskTarget, maskView, onMaskTarget, onLayerCommand }: PsLayersPanelProps) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     const layers = smartCanvasLayers(board);
@@ -46,19 +46,10 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
     const [fxOpen, setFxOpen] = useState(false);
     const dragIdRef = useRef("");
     const cancelRenameRef = useRef(false);
-    const imageById = useMemo(() => new Map(imageNodes.map((node) => [node.id, node])), [imageNodes]);
-    const sources = useMemo(
-        () => layers.flatMap((layer) => {
-            const node = layer.sourceNodeId ? imageById.get(layer.sourceNodeId) : undefined;
-            return node ? [node] : [];
-        }),
-        [layers, imageById],
-    );
-    const urls = useResolvedBoardImageUrls(sources);
-    const { urls: pixelUrls, masks } = useResolvedPsLayerUrls(layers);
+    const { urls, masks } = useResolvedPsLayerUrls(layers);
     const selected = findPsLayer(layers, selectedId);
     const blendOptions = CANVAS_BLEND_MODES.map((mode) => ({ value: mode.id, label: t(`canvas.blendModes.${mode.id}`) }));
-    const commit = (next: CanvasPsLayer[]) => commitBoardLayers(setNodes, board.id, next);
+    const commit = (next: CanvasPsLayer[]) => commitBoardLayers(commitBoard, board.id, next);
     const childIds = psLayerChildIds(layers);
     const groupTarget = selected?.kind === "group" ? selected.id : undefined;
 
@@ -71,7 +62,8 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
     }, [layers, collapsed]);
 
     const addImageLayer = (node: CanvasNodeData) => {
-        const layer = createPsImageLayer(board, node);
+        const source: PsImageSource = { title: node.title, width: node.width, height: node.height, naturalWidth: node.metadata?.naturalWidth, naturalHeight: node.metadata?.naturalHeight, storageKey: node.metadata?.storageKey, content: node.metadata?.content };
+        const layer = createPsImageLayer(board, source);
         commit(addPsLayer(layers, layer, groupTarget));
         onSelect(layer.id);
         setPickerOpen(false);
@@ -303,7 +295,7 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
                                         onMaskTarget(layer.id, false, false);
                                     }}
                                 >
-                                    <LayerThumb layer={layer} url={layer.kind === "pixel" ? pixelUrls[layer.id] : layer.sourceNodeId ? urls[layer.sourceNodeId] : undefined} theme={theme} active={isSelected && !maskTarget} />
+                                    <LayerThumb layer={layer} url={urls[layer.id]} theme={theme} active={isSelected && !maskTarget} />
                                 </button>
                                 {layer.maskStorageKey && masks[layer.id] ? (
                                     <button
@@ -384,7 +376,7 @@ export default function PsLayersPanel({ board, setNodes, imageNodes, selectedId,
                     {t("canvas.ps.layerStyle")}
                 </button>
             </div>
-            <PsFxPanel board={board} setNodes={setNodes} layer={fxOpen && selected && selected.kind !== "adjustment" ? selected : null} onClose={() => setFxOpen(false)} />
+            <PsFxPanel board={board} commitBoard={commitBoard} layer={fxOpen && selected && selected.kind !== "adjustment" ? selected : null} onClose={() => setFxOpen(false)} />
         </section>
     );
 }

@@ -1,40 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { App, Button, Empty, Input, Spin, Table } from "antd";
-import { Check, Download, FileUp, FolderKanban, FolderPlus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { App, Button, Empty, Input, Spin } from "antd";
+import { Check, FolderKanban, FolderPlus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { cn } from "@/lib/utils";
-import { useCanvasProjectDelete } from "@/hooks/use-canvas-project-delete";
-import { CanvasImportDialog } from "@/components/canvas/canvas-import-dialog";
-import { CanvasProjectRow } from "@/components/canvas/canvas-project-row";
+import { CanvasProjectCard } from "@/components/canvas/canvas-project-row";
 import { cleanupUnusedCanvasImages } from "@/services/image-storage";
-import { useCanvasStore, type CanvasProject } from "@/stores/canvas/use-canvas-store";
+import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
-import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 
 export default function CanvasPage() {
     const { modal } = App.useApp();
     const { t } = useTranslation();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const [importOpen, setImportOpen] = useState(false);
     const autoOpenRef = useRef(false);
     const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
     const [editingGroupName, setEditingGroupName] = useState("");
-    const [dragId, setDragId] = useState<string | null>(null);
-    const [dropIndex, setDropIndex] = useState<number | null>(null);
-    const draggingRef = useRef(false);
     const hydrated = useCanvasStore((state) => state.hydrated);
     const projects = useCanvasStore((state) => state.projects);
     const groups = useCanvasStore((state) => state.groups);
     const createProject = useCanvasStore((state) => state.createProject);
-    const reorderProjects = useCanvasStore((state) => state.reorderProjects);
     const createGroup = useCanvasStore((state) => state.createGroup);
     const renameGroup = useCanvasStore((state) => state.renameGroup);
     const deleteGroup = useCanvasStore((state) => state.deleteGroup);
-    const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
-    const { armedId, confirmDelete, cancel } = useCanvasProjectDelete();
     const [armedGroupId, setArmedGroupId] = useState<string | null>(null);
     const selectedGroupId = useCanvasUiStore((state) => state.selectedGroupId);
     const setSelectedGroupId = useCanvasUiStore((state) => state.setSelectedGroupId);
@@ -51,19 +40,6 @@ export default function CanvasPage() {
     const createAndEnter = () => {
         if (!selectedGroup) return;
         enterProject(createProject(t("canvas.defaultTitle", { count: projects.length + 1 }), selectedGroup.id));
-    };
-    const handleDrop = () => {
-        if (dragId && dropIndex !== null) {
-            const ids = groupProjects.map((project) => project.id);
-            const from = ids.indexOf(dragId);
-            if (from >= 0) {
-                ids.splice(from, 1);
-                ids.splice(dropIndex > from ? dropIndex - 1 : dropIndex, 0, dragId);
-                reorderProjects(ids);
-            }
-        }
-        setDragId(null);
-        setDropIndex(null);
     };
     const addGroup = () => {
         setSelectedGroupId(createGroup());
@@ -182,39 +158,20 @@ export default function CanvasPage() {
                 </div>
             </aside>
 
-            <section className="flex min-w-0 flex-1 flex-col">
-                <header className="shrink-0">
-                    <div className="flex min-h-14 w-full flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2 glass-surface">
-                        <div className="flex min-w-0 items-center gap-2">
-                            <h1 className="truncate text-lg font-semibold text-foreground" style={{ margin: 0 }}>{selectedGroup?.name ?? t("canvas.group.none")}</h1>
-                            {selectedGroup ? <span className="shrink-0 text-xs text-muted-foreground">{t("canvas.group.count", { count: groupProjects.length })}</span> : null}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            {selectedIds.length ? (
-                                <>
-                                    <Button disabled={!hydrated} icon={<Download className="size-4" />} onClick={() => void exportCanvasProjects(projects.filter((project) => selectedIds.includes(project.id)), `${t("canvas.title")}-${selectedIds.length}`)}>
-                                        {t("canvas.exportSelected")}
-                                    </Button>
-                                    <Button disabled={!hydrated} danger={armedId === "selected"} onClick={(event) => confirmDelete("selected", selectedIds, event.currentTarget)} onPointerLeave={cancel}>
-                                        {armedId === "selected" ? t("canvas.project.confirmDelete") : t("canvas.deleteSelected")}
-                                    </Button>
-                                </>
-                            ) : projects.length ? (
-                                <Button disabled={!hydrated} danger={armedId === "all"} onClick={(event) => confirmDelete("all", projects.map((project) => project.id), event.currentTarget)} onPointerLeave={cancel}>
-                                    {armedId === "all" ? t("canvas.project.confirmDelete") : t("canvas.deleteAll")}
-                                </Button>
-                            ) : null}
-                            <Button disabled={!hydrated} icon={<FileUp className="size-4" />} onClick={() => setImportOpen(true)}>
-                                {t("canvas.import")}
-                            </Button>
-                            <Button disabled={!hydrated || !selectedGroup} type="primary" icon={<Plus className="size-4" />} onClick={createAndEnter}>
-                                {t("canvas.create")}
-                            </Button>
-                        </div>
+            <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <div className="glass-surface flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-base font-semibold text-foreground" style={{ margin: 0 }}>{selectedGroup?.name ?? t("canvas.group.none")}</h1>
+                        {selectedGroup ? <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs text-brand font-medium">{groupProjects.length} {groupProjects.length === 1 ? "canvas" : "canvases"}</span> : null}
                     </div>
-                </header>
+                    <div className="flex items-center gap-2">
+                        <Button disabled={!hydrated || !selectedGroup} type="primary" icon={<Plus className="size-4" />} onClick={createAndEnter}>
+                            {t("canvas.create")}
+                        </Button>
+                    </div>
+                </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 glass-card">
+                <div className="thin-scrollbar flex-1 overflow-y-auto p-6">
                     {!hydrated ? (
                         <div className="flex h-full items-center justify-center">
                             <Spin />
@@ -228,59 +185,11 @@ export default function CanvasPage() {
                             </Empty>
                         </div>
                     ) : groupProjects.length ? (
-                        <Table<CanvasProject>
-                            rowKey="id"
-                            dataSource={groupProjects}
-                            pagination={false}
-                            className="[&_.ant-table]:!rounded-none [&_.ant-table]:!bg-transparent [&_.ant-table-container]:!rounded-none [&_.ant-table-thead>tr>th]:!rounded-none [&_.ant-table-thead>tr>th]:!bg-transparent"
-                            rowClassName={(project, index) =>
-                                cn(
-                                    dragId === project.id && "[&>td]:bg-brand-soft",
-                                    dropIndex === index && "[&>td]:border-t-2 [&>td]:border-t-primary",
-                                    dropIndex === groupProjects.length && index === groupProjects.length - 1 && "[&>td]:border-b-2 [&>td]:border-b-primary",
-                                )
-                            }
-                            onRow={(project, index = 0) => ({
-                                draggable: true,
-                                onDragStart: (event) => {
-                                    draggingRef.current = true;
-                                    setDragId(project.id);
-                                    event.dataTransfer.effectAllowed = "move";
-                                    event.dataTransfer.setData("text/plain", project.id);
-                                },
-                                onDragOver: (event) => {
-                                    if (!dragId) return;
-                                    event.preventDefault();
-                                    event.dataTransfer.dropEffect = "move";
-                                    const rect = event.currentTarget.getBoundingClientRect();
-                                    setDropIndex(index + (event.clientY > rect.top + rect.height / 2 ? 1 : 0));
-                                },
-                                onDragEnd: () => {
-                                    setDragId(null);
-                                    setDropIndex(null);
-                                    setTimeout(() => {
-                                        draggingRef.current = false;
-                                    }, 0);
-                                },
-                                onDrop: (event) => {
-                                    event.preventDefault();
-                                    handleDrop();
-                                },
-                                onClickCapture: (event) => {
-                                    if (!draggingRef.current) return;
-                                    event.stopPropagation();
-                                    event.preventDefault();
-                                },
-                            })}
-                            columns={[
-                                {
-                                    title: t("canvas.projects"),
-                                    onHeaderCell: () => ({ style: { padding: "8px" } }),
-                                    onCell: () => ({ style: { padding: 0 } }),
-                                    render: (_, project) => <CanvasProjectRow project={project} />,
-                                },
-                            ]}
-                        />
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                            {groupProjects.map((project) => (
+                                <CanvasProjectCard key={project.id} project={project} />
+                            ))}
+                        </div>
                     ) : (
                         <div className="flex h-full items-center justify-center">
                             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("canvas.group.empty")} className="py-16">
@@ -292,8 +201,6 @@ export default function CanvasPage() {
                     )}
                 </div>
             </section>
-
-            <CanvasImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
         </main>
     );
 }

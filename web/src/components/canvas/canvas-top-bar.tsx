@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Frame, House, LayoutGrid, Music2, PanelLeftClose, PanelLeftOpen, PenLine } from "lucide-react";
+import { Frame, Grid3x3, House, LayoutGrid, Music2, PanelLeftClose, PanelLeftOpen, PenLine } from "lucide-react";
 import { Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 
@@ -122,6 +122,14 @@ export function CanvasTopBar({
                     >
                         <Music2 className="size-3.5 shrink-0" />
                         <span className="hidden sm:inline">{t("navigation.audio")}</span>
+                    </Link>
+                    <Link
+                        to="/pixel"
+                        className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-sm transition hover:bg-hover"
+                        style={{ color: theme.node.muted }}
+                    >
+                        <Grid3x3 className="size-3.5 shrink-0" />
+                        <span className="hidden sm:inline">{t("navigation.pixel")}</span>
                     </Link>
                     <Link
                         to="/write"

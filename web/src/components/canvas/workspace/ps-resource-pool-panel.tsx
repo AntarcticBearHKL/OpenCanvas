@@ -1,12 +1,28 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Empty, Input } from "antd";
 import { FolderKanban, Image as ImageIcon, Plus, Search } from "lucide-react";
 
-import { useResolvedBoardImageUrls } from "@/components/canvas/smart-canvas-node";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
+import { resolveImageUrl } from "@/services/image-storage";
 import type { CanvasNodeData } from "@/types/canvas";
 
 export const IMAGE_NODE_DRAG_MIME = "application/x-infinite-canvas-image-node";
+
+function useResolvedImageNodeUrls(imageNodes: CanvasNodeData[]) {
+    const [urls, setUrls] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        let active = true;
+        void Promise.all(imageNodes.map(async (node) => [node.id, await resolveImageUrl(node.metadata?.storageKey, node.metadata?.content || "")] as const)).then((entries) => {
+            if (active) setUrls(Object.fromEntries(entries));
+        });
+        return () => {
+            active = false;
+        };
+    }, [imageNodes]);
+
+    return urls;
+}
 
 type PsResourcePoolPanelProps = {
     imageNodes: CanvasNodeData[];
@@ -17,7 +33,7 @@ export default function PsResourcePoolPanel({ imageNodes, onAddImageLayer }: PsR
     const theme = useCanvasTheme();
     const [search, setSearch] = useState("");
 
-    const urls = useResolvedBoardImageUrls(imageNodes);
+    const urls = useResolvedImageNodeUrls(imageNodes);
 
     const filtered = useMemo(() => {
         if (!search.trim()) return imageNodes;

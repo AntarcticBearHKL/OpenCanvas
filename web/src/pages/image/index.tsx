@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { App, Button, Dropdown, Empty, Input, Modal, Select, type MenuProps } from "antd";
-import { ArrowLeft, Check, Clock, FolderKanban, Image as ImageIcon, Layers, MoreVertical, Pencil, Plus, Share2, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, Clock, FolderInput, FolderKanban, Image as ImageIcon, Pencil, Plus, Share2, Trash2, X } from "lucide-react";
 import { saveAs } from "file-saver";
 import { nanoid } from "nanoid";
 import { useTranslation } from "react-i18next";
@@ -15,9 +15,9 @@ import { imageMetadata } from "@/lib/canvas/canvas-node-factory";
 import { composeSmartCanvas } from "@/lib/canvas/smart-canvas";
 import { uploadImage } from "@/services/image-storage";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
-import { IMAGE_PRESETS, useImageStore, type ImagePreset } from "@/stores/use-image-store";
+import { IMAGE_PRESETS, useImageStore, type ImagePreset, type ImageProject } from "@/stores/use-image-store";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { CanvasNodeType, type CanvasNodeData, type CanvasNodeMetadata } from "@/types/canvas";
+import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 
 export default function ImageStudioPage() {
     const { t } = useTranslation();
@@ -53,6 +53,7 @@ export default function ImageStudioPage() {
     const [editingGroupName, setEditingGroupName] = useState("");
     const [armedGroupId, setArmedGroupId] = useState<string | null>(null);
     const [armedProjectId, setArmedProjectId] = useState<string | null>(null);
+    const [moveMenuProjectId, setMoveMenuProjectId] = useState<string | null>(null);
 
     const removeGroup = (groupId: string) => {
         if (armedGroupId !== groupId) {
@@ -95,29 +96,6 @@ export default function ImageStudioPage() {
         return projects.find((p) => p.id === id) || null;
     }, [id, projects]);
 
-    // Adapt current project to CanvasNodeData (SmartCanvas)
-    const currentBoard = useMemo<CanvasNodeData | null>(() => {
-        if (!currentProject) return null;
-        return {
-            id: currentProject.id,
-            type: CanvasNodeType.SmartCanvas,
-            title: currentProject.title,
-            position: { x: 0, y: 0 },
-            width: currentProject.width,
-            height: currentProject.height,
-            metadata: {
-                boardRatio: currentProject.boardRatio,
-                boardResolution: currentProject.boardResolution,
-                boardBackground: currentProject.boardBackground,
-                boardBackgroundOpacity: currentProject.boardBackgroundOpacity,
-                boardLayers: currentProject.boardLayers,
-                boardPaths: currentProject.boardPaths,
-                boardAlphaChannels: currentProject.boardAlphaChannels,
-                boardChannelVisibility: currentProject.boardChannelVisibility,
-            },
-        };
-    }, [currentProject]);
-
     // Resource pool: gather all image nodes across all canvases with [Canvas Title / Image Name] mapping
     const resourcePoolNodes = useMemo(() => {
         const list: CanvasNodeData[] = [];
@@ -140,51 +118,17 @@ export default function ImageStudioPage() {
 
     // Sync board changes to image store
     const handleBoardChange = useCallback(
-        (boardId: string, patch: Partial<CanvasNodeMetadata>) => {
-            updateProject(boardId, {
-                ...(patch.boardRatio !== undefined && { boardRatio: patch.boardRatio }),
-                ...(patch.boardResolution !== undefined && { boardResolution: patch.boardResolution as "1k" | "2k" | "4k" }),
-                ...(patch.boardBackground !== undefined && { boardBackground: patch.boardBackground }),
-                ...(patch.boardBackgroundOpacity !== undefined && { boardBackgroundOpacity: patch.boardBackgroundOpacity }),
-                ...(patch.boardLayers !== undefined && { boardLayers: patch.boardLayers }),
-                ...(patch.boardPaths !== undefined && { boardPaths: patch.boardPaths }),
-                ...(patch.boardAlphaChannels !== undefined && { boardAlphaChannels: patch.boardAlphaChannels }),
-                ...(patch.boardChannelVisibility !== undefined && { boardChannelVisibility: patch.boardChannelVisibility }),
-            });
+        (patch: Partial<ImageProject>) => {
+            if (!currentProject) return;
+            updateProject(currentProject.id, patch);
         },
-        [updateProject],
-    );
-
-    // Sync node commits from image studio
-    const handleSetNodes = useCallback<Dispatch<SetStateAction<CanvasNodeData[]>>>(
-        (action) => {
-            if (!currentBoard) return;
-            const dummy = [currentBoard];
-            const next = typeof action === "function" ? action(dummy) : action;
-            const updated = next.find((n) => n.id === currentBoard.id);
-            if (updated) {
-                updateProject(currentBoard.id, {
-                    title: updated.title,
-                    width: updated.width,
-                    height: updated.height,
-                    boardRatio: updated.metadata?.boardRatio,
-                    boardResolution: updated.metadata?.boardResolution as "1k" | "2k" | "4k",
-                    boardBackground: updated.metadata?.boardBackground,
-                    boardBackgroundOpacity: updated.metadata?.boardBackgroundOpacity,
-                    boardLayers: updated.metadata?.boardLayers,
-                    boardPaths: updated.metadata?.boardPaths,
-                    boardAlphaChannels: updated.metadata?.boardAlphaChannels,
-                    boardChannelVisibility: updated.metadata?.boardChannelVisibility,
-                });
-            }
-        },
-        [currentBoard, updateProject],
+        [currentProject, updateProject],
     );
 
     // Studio output: Download composite image
     const handleDownload = async (fileName: string) => {
-        if (!currentBoard) return;
-        const composite = await composeSmartCanvas(currentBoard, resourcePoolNodes);
+        if (!currentProject) return;
+        const composite = await composeSmartCanvas(currentProject);
         if (!composite?.dataUrl) {
             message.error("Failed to render image, please try again");
             return;
@@ -195,7 +139,7 @@ export default function ImageStudioPage() {
 
     // Studio output: Export composite image to selected canvas
     const handleExportToCanvas = async (targetCanvasId: string, nodeTitle: string) => {
-        if (!currentBoard) return;
+        if (!currentProject) return;
         let targetCanvas = canvasProjects.find((p) => p.id === targetCanvasId);
         if (!targetCanvas) {
             if (canvasProjects.length === 0) {
@@ -207,7 +151,7 @@ export default function ImageStudioPage() {
         }
         if (!targetCanvas) return;
 
-        const composite = await composeSmartCanvas(currentBoard, resourcePoolNodes);
+        const composite = await composeSmartCanvas(currentProject);
         if (!composite?.dataUrl) {
             message.error("Failed to render image artwork");
             return;
@@ -217,15 +161,15 @@ export default function ImageStudioPage() {
         const blob = await res.blob();
         const file = new File([blob], `${nodeTitle || "image"}.png`, { type: "image/png" });
         const uploaded = await uploadImage(file);
-        const naturalWidth = currentBoard.width || 1024;
-        const naturalHeight = currentBoard.height || 1024;
+        const naturalWidth = currentProject.width || 1024;
+        const naturalHeight = currentProject.height || 1024;
         const imageDefault = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
         const size = fitNodeSize(naturalWidth, naturalHeight, imageDefault.width, imageDefault.height);
 
         const newNode: CanvasNodeData = {
             id: nanoid(),
             type: CanvasNodeType.Image,
-            title: nodeTitle || currentBoard.title || "Image Artwork",
+            title: nodeTitle || currentProject.title || "Image Artwork",
             position: { x: 80, y: 80 },
             width: size.width,
             height: size.height,
@@ -271,7 +215,7 @@ export default function ImageStudioPage() {
     // 1. Editor View (when :id is present)
     // =========================================================================
     if (id) {
-        if (!currentProject || !currentBoard) {
+        if (!currentProject) {
             return (
                 <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 p-8 text-center bg-background">
                     <Empty description="Image project not found or has been deleted" />
@@ -285,11 +229,8 @@ export default function ImageStudioPage() {
         return (
             <div className="relative flex h-full flex-col overflow-hidden bg-background">
                 <ImageStudio
-                    board={currentBoard}
-                    boards={[currentBoard]}
-                    nodes={[currentBoard, ...resourcePoolNodes]}
-                    setNodes={handleSetNodes}
-                    onSelectBoard={() => undefined}
+                    board={currentProject}
+                    nodes={resourcePoolNodes}
                     onBoardChange={handleBoardChange}
                     onOutput={() => setOutputModalOpen(true)}
                     onBack={() => navigate("/image")}
@@ -300,8 +241,8 @@ export default function ImageStudioPage() {
                     onClose={() => setOutputModalOpen(false)}
                     title="Export Image Artwork"
                     resourceType="image"
-                    defaultFileName={`${currentBoard.title || "artwork"}.png`}
-                    defaultNodeTitle={`${currentBoard.title || "Image"} - Artwork`}
+                    defaultFileName={`${currentProject.title || "artwork"}.png`}
+                    defaultNodeTitle={`${currentProject.title || "Image"} - Artwork`}
                     onDownload={handleDownload}
                     onOutputToCanvas={handleExportToCanvas}
                 />
@@ -437,7 +378,7 @@ export default function ImageStudioPage() {
                 {/* Header */}
                 <div className="glass-surface flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-base font-semibold text-foreground">
+                        <h1 className="text-base font-semibold text-foreground" style={{ margin: 0 }}>
                             {selectedGroup ? selectedGroup.name : "Image Projects"}
                         </h1>
                         <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs text-brand font-medium">
@@ -494,48 +435,14 @@ export default function ImageStudioPage() {
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             {groupProjects.map((project) => {
                                 const otherGroups = groups.filter((g) => g.id !== project.groupId);
-                                const menuItems: MenuProps["items"] = [
-                                    {
-                                        key: "rename",
-                                        label: "Rename",
-                                        icon: <Pencil className="size-3.5" />,
-                                        onClick: () => setRenamingProject({ id: project.id, title: project.title }),
+                                const moveItems: MenuProps["items"] = otherGroups.map((g) => ({
+                                    key: g.id,
+                                    label: g.name,
+                                    onClick: () => {
+                                        setProjectGroup(project.id, g.id);
+                                        message.success(`Moved to "${g.name}"`);
                                     },
-                                    ...(otherGroups.length > 0
-                                        ? [
-                                              {
-                                                  key: "move",
-                                                  label: "Move to Group",
-                                                  icon: <FolderKanban className="size-3.5" />,
-                                                  children: otherGroups.map((g) => ({
-                                                      key: `move-${g.id}`,
-                                                      label: g.name,
-                                                      onClick: () => {
-                                                          setProjectGroup(project.id, g.id);
-                                                          message.success(`Moved to "${g.name}"`);
-                                                      },
-                                                  })),
-                                              },
-                                          ]
-                                        : []),
-                                    {
-                                        type: "divider",
-                                    },
-                                    {
-                                        key: "delete",
-                                        label: armedProjectId === project.id ? "Confirm Delete" : "Delete Project",
-                                        danger: true,
-                                        icon: armedProjectId === project.id ? <Check className="size-3.5" /> : <Trash2 className="size-3.5" />,
-                                        onClick: () => {
-                                            if (armedProjectId !== project.id) {
-                                                setArmedProjectId(project.id);
-                                                return;
-                                            }
-                                            setArmedProjectId(null);
-                                            deleteProject(project.id);
-                                        },
-                                    },
-                                ];
+                                }));
 
                                 return (
                                     <div
@@ -544,24 +451,6 @@ export default function ImageStudioPage() {
                                         className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-4 transition-all hover:border-brand hover:shadow-md cursor-pointer"
                                     >
                                         <div>
-                                            {/* Aspect Ratio Box / Preview */}
-                                            <div className="relative mb-3 flex h-36 w-full items-center justify-center overflow-hidden rounded-lg bg-black/5 dark:bg-white/5">
-                                                <div
-                                                    className="flex items-center justify-center rounded border border-border/80 bg-background shadow-xs text-xs font-medium text-muted-foreground"
-                                                    style={{
-                                                        width: project.boardRatio === "1:1" ? "80px" : project.boardRatio === "9:16" ? "56px" : project.boardRatio === "21:9" ? "120px" : "100px",
-                                                        height: project.boardRatio === "9:16" ? "100px" : project.boardRatio === "1:1" ? "80px" : "56px",
-                                                    }}
-                                                >
-                                                    {project.boardRatio}
-                                                </div>
-
-                                                <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
-                                                    <Layers className="size-3" />
-                                                    <span>{project.boardLayers?.length || 0} {project.boardLayers?.length === 1 ? "layer" : "layers"}</span>
-                                                </div>
-                                            </div>
-
                                             {/* Title & Metadata */}
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="min-w-0 flex-1">
@@ -595,20 +484,40 @@ export default function ImageStudioPage() {
                                                                 type="text"
                                                                 size="small"
                                                                 shape="circle"
+                                                                icon={<Pencil className="size-3.5" />}
+                                                                className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-foreground"
+                                                                onClick={() => setRenamingProject({ id: project.id, title: project.title })}
+                                                                title="Rename"
+                                                            />
+                                                            {otherGroups.length > 0 && (
+                                                                <Dropdown
+                                                                    menu={{ items: moveItems }}
+                                                                    trigger={["click"]}
+                                                                    placement="bottomRight"
+                                                                    open={moveMenuProjectId === project.id}
+                                                                    onOpenChange={(open) => setMoveMenuProjectId(open ? project.id : null)}
+                                                                >
+                                                                    <Button
+                                                                        type="text"
+                                                                        size="small"
+                                                                        shape="circle"
+                                                                        icon={<FolderInput className="size-3.5" />}
+                                                                        className={`text-muted-foreground transition hover:text-foreground ${
+                                                                            moveMenuProjectId === project.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                                                        }`}
+                                                                        title="Move to Group"
+                                                                    />
+                                                                </Dropdown>
+                                                            )}
+                                                            <Button
+                                                                type="text"
+                                                                size="small"
+                                                                shape="circle"
                                                                 icon={<Trash2 className="size-3.5" />}
                                                                 className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-danger"
                                                                 onClick={() => setArmedProjectId(project.id)}
                                                                 title="Delete project"
                                                             />
-                                                            <Dropdown menu={{ items: menuItems }} trigger={["click"]} placement="bottomRight">
-                                                                <Button
-                                                                    type="text"
-                                                                    size="small"
-                                                                    shape="circle"
-                                                                    icon={<MoreVertical className="size-4" />}
-                                                                    className="text-muted-foreground hover:text-foreground"
-                                                                />
-                                                            </Dropdown>
                                                         </>
                                                     )}
                                                 </div>

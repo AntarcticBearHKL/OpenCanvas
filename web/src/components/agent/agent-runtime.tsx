@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import i18n from "@/i18n";
 import { isSiteTool, runSiteTool } from "@/lib/agent/agent-site-tools";
 import { applyAgentOps, getAgentActions, getAgentSchema, subscribeAgentActions } from "@/lib/agent/action-registry";
+import { captureWorkspaceScreenshot } from "@/lib/agent/screenshot-registry";
 import type { AgentOp, AgentPageSnapshot } from "@/lib/agent/agent-ops";
 import { randomId } from "@/lib/utils";
 import { activateAgentClient, postState, postToolResult } from "@/services/api/canvas-agent";
@@ -53,15 +54,15 @@ function normalizeAgentOps(ops: unknown): AgentOp[] {
 export function AgentRuntime() {
     const navigate = useNavigate();
     const url = useAgentStore((state) => state.url);
-    const token = useAgentStore((state) => state.token);
-    const enabled = useAgentStore((state) => state.enabled);
     const connected = useAgentStore((state) => state.connected);
     const setAgentState = useAgentStore((state) => state.setAgentState);
     const endpoint = useMemo(() => url.trim().replace(/\/$/, ""), [url]);
     const pageContextRef = useRef<AgentPageContext | null>(useAgentStore.getState().pageContext);
     const clientIdRef = useRef("");
     const connectedRef = useRef(false);
+    const retryRef = useRef(0);
     const [clientReady, setClientReady] = useState(false);
+    const [reconnectTick, setReconnectTick] = useState(0);
 
     useEffect(() => {
         let disposed = false;
@@ -80,7 +81,7 @@ export function AgentRuntime() {
         const publish = () => {
             if (!useAgentStore.getState().connected) return;
             if (timer) clearTimeout(timer);
-            timer = setTimeout(() => void postState(endpoint, clientIdRef.current, buildPageSnapshot(pageContextRef.current), token), 300);
+            timer = setTimeout(() => void postState(endpoint, clientIdRef.current, buildPageSnapshot(pageContextRef.current)), 300);
         };
         const unsubscribeStore = useAgentStore.subscribe((state) => {
             if (state.pageContext === pageContextRef.current) return;
@@ -93,21 +94,21 @@ export function AgentRuntime() {
             unsubscribeActions();
             if (timer) clearTimeout(timer);
         };
-    }, [endpoint, token]);
+    }, [endpoint]);
 
     const runToolCall = useCallback(async (endpoint: string, payload: AgentPendingToolCall) => {
         if (isSiteTool(payload.name)) {
             try {
                 const result = await runSiteTool(payload.name, payload.input || {}, navigate, { state: pageContextRef.current?.state || null });
-                await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, result }, token);
+                await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, result });
             } catch (error) {
                 const text = error instanceof Error ? error.message : i18n.t("agent.runtime.toolExecutionFailed");
-                await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, error: text }, token);
+                await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, error: text });
             }
             return;
         }
         try {
-            const input: { ops?: AgentOp[]; path?: string; ns?: string } = payload.input || {};
+            const input: { ops?: AgentOp[]; path?: string; ns?: string; studio?: string } = payload.input || {};
             let result: unknown;
             if (payload.name === "site_navigate") {
                 const path = input.path || "/";
@@ -122,17 +123,22 @@ export function AgentRuntime() {
                 result = { applied: applied.applied, blocked: applied.blocked, errors: applied.errors, ...(applied.state ? { state: applied.state } : {}) };
                 if (applied.state) {
                     const context = pageContextRef.current;
-                    void postState(endpoint, clientIdRef.current, context ? { page: context.page, title: context.title, state: applied.state, availableActions: getAgentActions() } : null, token);
+                    void postState(endpoint, clientIdRef.current, context ? { page: context.page, title: context.title, state: applied.state, availableActions: getAgentActions() } : null);
                 }
+            } else if (payload.name === "app_screenshot") {
+                const studio = (typeof input.studio === "string" && input.studio) || (pageContextRef.current?.state?.workspace as string) || "";
+                const shot = await captureWorkspaceScreenshot(studio);
+                if (!shot) throw new Error(i18n.t("agent.runtime.screenshotUnavailable"));
+                result = shot;
             } else {
                 result = buildPageSnapshot(pageContextRef.current);
             }
-            await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, result }, token);
+            await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, result });
         } catch (error) {
             const text = error instanceof Error ? error.message : i18n.t("agent.runtime.canvasOperationFailed");
-            await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, error: text }, token);
+            await postToolResult(endpoint, clientIdRef.current, { requestId: payload.requestId, error: text });
         }
-    }, [navigate, token]);
+    }, [navigate]);
 
     const handleToolCall = useCallback(async (endpoint: string, payload: AgentPendingToolCall) => {
         // There is no chat UI for manual confirmation, so write tools are always auto-applied.
@@ -140,13 +146,13 @@ export function AgentRuntime() {
     }, [runToolCall]);
 
     useEffect(() => {
-        if (!clientReady || !enabled) return;
+        if (!clientReady) return;
         const clientId = clientIdRef.current;
         let disposed = false;
         let protocolRejected = false;
+        let retryTimer: ReturnType<typeof setTimeout> | null = null;
         const isCurrentConnection = () => !disposed && clientIdRef.current === clientId;
-        // EventSource cannot set headers, so the token travels as a query parameter (the server accepts both).
-        const source = new EventSource(`${endpoint}/events?clientId=${encodeURIComponent(clientId)}${token ? `&token=${encodeURIComponent(token)}` : ""}`);
+        const source = new EventSource(`${endpoint}/events?clientId=${encodeURIComponent(clientId)}`);
         source.addEventListener("hello", (event) => {
             if (!isCurrentConnection()) return;
             const hello = parseEventData<AgentHelloEvent>(event);
@@ -154,13 +160,14 @@ export function AgentRuntime() {
                 protocolRejected = true;
                 source.close();
                 connectedRef.current = false;
-                setAgentState({ enabled: false, connected: false, activity: i18n.t("agent.runtime.restartRequired"), connectError: i18n.t("agent.runtime.agentOutdated") });
+                setAgentState({ connected: false, activity: i18n.t("agent.runtime.restartRequired"), connectError: i18n.t("agent.runtime.agentOutdated") });
                 return;
             }
             connectedRef.current = true;
+            retryRef.current = 0;
             setAgentState({ connected: true, activity: i18n.t("agent.runtime.connected"), connectError: "" });
-            void postState(endpoint, clientId, buildPageSnapshot(pageContextRef.current), token);
-            if (document.visibilityState === "visible" && document.hasFocus()) void activateAgentClient(endpoint, clientId, token);
+            void postState(endpoint, clientId, buildPageSnapshot(pageContextRef.current));
+            if (document.visibilityState === "visible" && document.hasFocus()) void activateAgentClient(endpoint, clientId);
         });
         source.addEventListener("tool_call", (event) => {
             if (!isCurrentConnection()) return;
@@ -177,21 +184,25 @@ export function AgentRuntime() {
                 connected: false,
                 connectError: text,
             });
-            if (!wasConnected) {
-                source.close();
-                setAgentState({ enabled: false });
-            }
+            // Retry with backoff so a bridge restart recovers without reloading the page.
+            source.close();
+            const attempt = (retryRef.current += 1);
+            const delay = Math.min(15000, 1000 * 2 ** Math.min(attempt - 1, 4));
+            retryTimer = setTimeout(() => {
+                if (!disposed) setReconnectTick((tick) => tick + 1);
+            }, delay);
         };
         return () => {
             disposed = true;
+            if (retryTimer) clearTimeout(retryTimer);
             source.close();
             connectedRef.current = false;
         };
-    }, [clientReady, enabled, endpoint, token, handleToolCall, setAgentState]);
+    }, [clientReady, endpoint, handleToolCall, setAgentState, reconnectTick]);
 
     useEffect(() => {
         if (!connected) return;
-        const activate = () => void activateAgentClient(endpoint, clientIdRef.current, token);
+        const activate = () => void activateAgentClient(endpoint, clientIdRef.current);
         const activateVisible = () => {
             if (document.visibilityState === "visible") activate();
         };
@@ -201,7 +212,7 @@ export function AgentRuntime() {
             window.removeEventListener("focus", activate);
             document.removeEventListener("visibilitychange", activateVisible);
         };
-    }, [connected, endpoint, token]);
+    }, [connected, endpoint]);
 
     return null;
 }

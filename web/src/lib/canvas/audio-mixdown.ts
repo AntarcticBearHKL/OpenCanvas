@@ -1,12 +1,12 @@
 import * as Tone from "tone";
 
 import { buildAudioGraph, loadAudioGraphBuffers, vstNoteSchedule, type AudioGraphDoc } from "@/lib/canvas/audio-graph";
+import { preloadSamplerBuffers, samplerPresetIdsFor } from "@/lib/canvas/audio-instruments";
 import { AUDIO_DEFAULT_PPQN } from "@/lib/canvas/audio-midi";
 import { AUDIO_DEFAULT_TEMPO, audioProjectDuration, canHostMidi, isVst3Instrument, resolveAudioClipUrls } from "@/lib/canvas/audio-project";
 import { createVstClient } from "@/lib/canvas/audio-vst";
 import { VST_CHANNELS, VST_FRAMES_PER_BLOCK } from "@/lib/canvas/audio-vst-protocol";
 import { readVstState } from "@/services/file-storage";
-import type { CanvasNodeData } from "@/types/canvas";
 
 const AUDIO_MIDI_RELEASE_TAIL_SECONDS = 1.5;
 
@@ -15,13 +15,14 @@ export type AudioMixdownVstReport = { trackId: string; name: string; reason?: st
 export type AudioMixdownResult = { audio: Tone.ToneAudioBuffer; bounced: AudioMixdownVstReport[]; skipped: AudioMixdownVstReport[] };
 
 /** Offline render through the shared graph builder, so the export matches playback exactly. */
-export async function renderAudioMixdown(doc: AudioGraphDoc, hostNodes: CanvasNodeData[]): Promise<AudioMixdownResult> {
+export async function renderAudioMixdown(doc: AudioGraphDoc): Promise<AudioMixdownResult> {
     const regions = doc.regions ?? [];
     const ppqn = doc.ppqn ?? AUDIO_DEFAULT_PPQN;
     const tempo = doc.tempo ?? AUDIO_DEFAULT_TEMPO;
     const duration = audioProjectDuration(doc.clips, regions, ppqn, tempo) + (regions.length ? AUDIO_MIDI_RELEASE_TAIL_SECONDS : 0);
-    const sources = await resolveAudioClipUrls(doc.clips, hostNodes);
+    const sources = await resolveAudioClipUrls(doc.clips);
     const buffers = await loadAudioGraphBuffers(doc.clips, sources);
+    await preloadSamplerBuffers(samplerPresetIdsFor(doc.tracks));
     const { stems, bounced, skipped } = await bounceVstStems(doc, duration);
     const audio = await Tone.Offline(() => {
         buildAudioGraph({ ...doc, regions, ppqn, tempo }, buffers, { mode: "offline", vstStems: stems });

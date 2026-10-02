@@ -1,5 +1,5 @@
 import { saveAs } from "file-saver";
-import { ArrowLeft, Download, FileText, Focus, History, Info, LayoutGrid, Library } from "lucide-react";
+import { ArrowLeft, Download, FileText, Focus, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -8,38 +8,28 @@ import { nanoid } from "nanoid";
 
 import { DockArea, useDockLayout } from "@/components/canvas/dock/dock-panel";
 import type { DockPanelDef } from "@/components/canvas/dock/dock-layout";
-import { STUDIO_BAR_CLASS, STUDIO_DIVIDER_CLASS, STUDIO_ICON_BUTTON_CLASS, STUDIO_OPTIONS_CLASS } from "@/components/canvas/workspace/studio-chrome";
+import { STUDIO_BAR_CLASS, STUDIO_ICON_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import { StudioOutputModal } from "@/components/studio/studio-output-modal";
 import { WriteMenus } from "@/components/write/write-menus";
-import { BoardPanel } from "@/components/write/board-panel";
-import { CodexPanel } from "@/components/write/codex-panel";
-import { HistoryPanel } from "@/components/write/history-panel";
 import { InspectorPanel } from "@/components/write/inspector-panel";
 import { OutlinePanel } from "@/components/write/outline-panel";
 import { ProseEditor } from "@/components/write/prose-editor";
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { fountainFileName, toFountain } from "@/lib/write/fountain";
-import { WRITE_TEMPLATES } from "@/lib/write/presets";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useWriteUiStore } from "@/stores/use-write-ui-store";
-import { useWritingProject, useWritingStore, writeProjectWordCount } from "@/stores/use-writing-store";
+import { useWritingProject, useWritingStore } from "@/stores/use-writing-store";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 
 const WRITE_DOCK_PANELS: DockPanelDef[] = [
     { id: "outline", labelKey: "writing.panel.outline", icon: FileText, dock: "left" },
-    { id: "codex", labelKey: "writing.panel.codex", icon: Library, dock: "left" },
     { id: "inspector", labelKey: "writing.panel.inspector", icon: Info, dock: "right" },
-    { id: "board", labelKey: "writing.panel.board", icon: LayoutGrid, dock: "bottom" },
-    { id: "history", labelKey: "writing.panel.history", icon: History, dock: "bottom" },
 ];
 
 function renderWritePanel(id: string) {
     if (id === "outline") return <OutlinePanel />;
-    if (id === "codex") return <CodexPanel />;
     if (id === "inspector") return <InspectorPanel />;
-    if (id === "board") return <BoardPanel />;
-    if (id === "history") return <HistoryPanel />;
     return null;
 }
 
@@ -102,7 +92,7 @@ export function WriteStudio() {
 
     return (
         <main className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ background: theme.canvas.background, color: theme.node.text }}>
-            <header className={`${STUDIO_BAR_CLASS} h-10 shrink-0`} style={{ borderBottom: `1px solid ${theme.toolbar.border}` }}>
+            <header className={`${STUDIO_BAR_CLASS} glass-surface h-11 shrink-0 border-b border-border`}>
                 <button
                     type="button"
                     className={STUDIO_ICON_BUTTON_CLASS}
@@ -119,15 +109,11 @@ export function WriteStudio() {
                     onKeyDown={(event) => {
                         if (event.key === "Enter") event.currentTarget.blur();
                     }}
-                    className="min-w-0 max-w-[280px] flex-1 bg-transparent text-sm font-semibold outline-none"
-                    style={{ color: theme.node.text }}
+                    className="min-w-0 max-w-[280px] bg-transparent text-sm font-semibold outline-none"
+                    style={{ color: theme.node.text, width: `${Math.min(32, Math.max(8, title.length))}ch` }}
                     aria-label={t("writing.studio.titleLabel")}
                 />
-                <span className="shrink-0 text-sm" style={{ color: theme.node.muted }}>{t(WRITE_TEMPLATES[project.template].labelKey)}</span>
-                <span className={STUDIO_DIVIDER_CLASS} style={{ background: theme.toolbar.border }} />
-                <span className="shrink-0 text-sm tabular-nums" style={{ color: theme.node.muted }}>
-                    {t("writing.studio.wordCount", { count: writeProjectWordCount(project) })}
-                </span>
+                <WriteMenus defs={WRITE_DOCK_PANELS} layout={dock.layout} onToggle={dock.toggle} onReset={dock.reset} />
                 <div className="ml-auto flex items-center gap-1">
                     <button
                         type="button"
@@ -149,9 +135,6 @@ export function WriteStudio() {
                     </button>
                 </div>
             </header>
-            <div className={STUDIO_OPTIONS_CLASS} style={{ color: theme.node.muted, borderColor: theme.toolbar.border }}>
-                <WriteMenus defs={WRITE_DOCK_PANELS} layout={dock.layout} onToggle={dock.toggle} onReset={dock.reset} />
-            </div>
             {focusMode ? (
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                     <ProseEditor />

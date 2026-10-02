@@ -2,20 +2,38 @@ import { nanoid } from "nanoid";
 
 import { AUDIO_DEFAULT_INSTRUMENT_PRESET, AUDIO_DEFAULT_PPQN, clampPpqn, midiRegionEnd } from "@/lib/canvas/audio-midi";
 import { resolveMediaUrl } from "@/services/file-storage";
-import {
-    CanvasNodeType,
-    type CanvasAudioCapture,
-    type CanvasAudioClip,
-    type CanvasAudioInstrument,
-    type CanvasAudioMarker,
-    type CanvasAudioMidiRegion,
-    type CanvasAudioSend,
-    type CanvasAudioSnap,
-    type CanvasAudioTrack,
-    type CanvasAudioTrackType,
-    type CanvasAudioVst3Instrument,
-    type CanvasNodeData,
+import type {
+    CanvasAudioAutomationLane,
+    CanvasAudioCapture,
+    CanvasAudioClip,
+    CanvasAudioInstrument,
+    CanvasAudioMarker,
+    CanvasAudioMidiRegion,
+    CanvasAudioSend,
+    CanvasAudioSnap,
+    CanvasAudioTrack,
+    CanvasAudioTrackType,
+    CanvasAudioVst3Instrument,
 } from "@/types/canvas";
+
+/** Project fields the audio helpers and the agent reducer read; the audio store document satisfies it structurally. */
+export type AudioProjectDocument = {
+    tracks: CanvasAudioTrack[];
+    clips: CanvasAudioClip[];
+    tempo: number;
+    timeSignature: { numerator: number; denominator: number };
+    grid: { enabled: boolean; snap: CanvasAudioSnap };
+    cycle: { enabled: boolean; start: number; end: number };
+    punch: { enabled: boolean; in: number; out: number };
+    markers: CanvasAudioMarker[];
+    metronome: { enabled: boolean; volumeDb: number };
+    automation: CanvasAudioAutomationLane[];
+    midiRegions: CanvasAudioMidiRegion[];
+    ppqn: number;
+    masterGain: number;
+    capture?: CanvasAudioCapture;
+    countIn?: number;
+};
 
 export const AUDIO_DEFAULT_TEMPO = 120;
 export const AUDIO_DEFAULT_METER = { numerator: 4, denominator: 4 };
@@ -25,62 +43,62 @@ export const AUDIO_DEFAULT_PUNCH = { enabled: false, in: 0, out: 0 };
 export const AUDIO_DEFAULT_METRONOME = { enabled: false, volumeDb: -6 };
 export const AUDIO_DEFAULT_CAPTURE: CanvasAudioCapture = { mode: "normal", channels: 2, gainDb: 0, inputLatencyMs: 0 };
 const AUDIO_CLIP_FALLBACK_SECONDS = 5;
-export function audioProjectTracks(node: CanvasNodeData) {
-    return node.metadata?.audioTracks ?? [];
+export function audioProjectTracks(project: AudioProjectDocument) {
+    return project.tracks ?? [];
 }
 
-export function audioProjectClips(node: CanvasNodeData) {
-    return node.metadata?.audioClips ?? [];
+export function audioProjectClips(project: AudioProjectDocument) {
+    return project.clips ?? [];
 }
 
-export function audioProjectMasterGain(node: CanvasNodeData) {
-    return clampGain(node.metadata?.audioMasterGain ?? 1);
+export function audioProjectMasterGain(project: AudioProjectDocument) {
+    return clampGain(project.masterGain ?? 1);
 }
 
-export function audioProjectTempo(node: CanvasNodeData) {
-    const tempo = node.metadata?.audioTempo;
+export function audioProjectTempo(project: AudioProjectDocument) {
+    const tempo = project.tempo;
     return tempo && tempo > 0 ? tempo : AUDIO_DEFAULT_TEMPO;
 }
 
-export function audioProjectTimeSignature(node: CanvasNodeData) {
-    return node.metadata?.audioTimeSignature ?? AUDIO_DEFAULT_METER;
+export function audioProjectTimeSignature(project: AudioProjectDocument) {
+    return project.timeSignature ?? AUDIO_DEFAULT_METER;
 }
 
-export function audioProjectGrid(node: CanvasNodeData) {
-    return node.metadata?.audioGrid ?? AUDIO_DEFAULT_GRID;
+export function audioProjectGrid(project: AudioProjectDocument) {
+    return project.grid ?? AUDIO_DEFAULT_GRID;
 }
 
-export function audioProjectCycle(node: CanvasNodeData) {
-    return node.metadata?.audioCycle ?? AUDIO_DEFAULT_CYCLE;
+export function audioProjectCycle(project: AudioProjectDocument) {
+    return project.cycle ?? AUDIO_DEFAULT_CYCLE;
 }
 
-export function audioProjectPunch(node: CanvasNodeData) {
-    return node.metadata?.audioPunch ?? AUDIO_DEFAULT_PUNCH;
+export function audioProjectPunch(project: AudioProjectDocument) {
+    return project.punch ?? AUDIO_DEFAULT_PUNCH;
 }
 
-export function audioProjectMarkers(node: CanvasNodeData) {
-    return node.metadata?.audioMarkers ?? [];
+export function audioProjectMarkers(project: AudioProjectDocument) {
+    return project.markers ?? [];
 }
 
-export function audioProjectMetronome(node: CanvasNodeData) {
-    return node.metadata?.audioMetronome ?? AUDIO_DEFAULT_METRONOME;
+export function audioProjectMetronome(project: AudioProjectDocument) {
+    return project.metronome ?? AUDIO_DEFAULT_METRONOME;
 }
 
-export function audioProjectAutomation(node: CanvasNodeData) {
-    return node.metadata?.audioAutomation ?? [];
+export function audioProjectAutomation(project: AudioProjectDocument) {
+    return project.automation ?? [];
 }
 
-export function audioProjectMidiRegions(node: CanvasNodeData) {
-    return node.metadata?.audioMidiRegions ?? [];
+export function audioProjectMidiRegions(project: AudioProjectDocument) {
+    return project.midiRegions ?? [];
 }
 
-export function audioProjectPpqn(node: CanvasNodeData) {
-    return clampPpqn(node.metadata?.audioPpqn);
+export function audioProjectPpqn(project: AudioProjectDocument) {
+    return clampPpqn(project.ppqn);
 }
 
-/** Capture settings are clamped on read: the document is user-editable metadata, so a stray value never reaches the recorder. */
-export function audioProjectCapture(node: CanvasNodeData) {
-    const capture = { ...AUDIO_DEFAULT_CAPTURE, ...node.metadata?.audioCapture };
+/** Capture settings are clamped on read: the document is user-editable state, so a stray value never reaches the recorder. */
+export function audioProjectCapture(project: AudioProjectDocument) {
+    const capture = { ...AUDIO_DEFAULT_CAPTURE, ...project.capture };
     return {
         mode: capture.mode === "punch" ? ("punch" as const) : ("normal" as const),
         channels: capture.channels === 1 ? 1 : 2,
@@ -89,8 +107,8 @@ export function audioProjectCapture(node: CanvasNodeData) {
     };
 }
 
-export function audioProjectCountIn(node: CanvasNodeData) {
-    return Math.min(4, Math.max(0, Math.round(node.metadata?.audioCountIn ?? 0)));
+export function audioProjectCountIn(project: AudioProjectDocument) {
+    return Math.min(4, Math.max(0, Math.round(project.countIn ?? 0)));
 }
 
 /** Duration is defined by the last clip or MIDI region end. */
@@ -128,10 +146,9 @@ export function canHostClips(track: CanvasAudioTrack) {
     return audioTrackType(track) === "audio";
 }
 
-/** Instrument and MIDI tracks carry MIDI regions; each plays through its built-in synth or, for the vst3 variant, the native bridge. */
+/** Instrument tracks carry MIDI regions; each plays through its built-in synth or, for the vst3 variant, the native bridge. */
 export function canHostMidi(track: CanvasAudioTrack) {
-    const type = audioTrackType(track);
-    return type === "instrument" || type === "midi";
+    return audioTrackType(track) === "instrument";
 }
 
 /** True when the instrument is the native VST3 variant, which the shared graph builder hosts over the bridge instead of a synth. */
@@ -198,17 +215,19 @@ export function createAudioMarker(time: number, name = ""): CanvasAudioMarker {
     return { id: nanoid(), time: Math.max(0, time), name };
 }
 
-function resolveAudioNodeUrl(node: CanvasNodeData | undefined) {
-    return resolveMediaUrl(node?.metadata?.storageKey, node?.metadata?.content || "");
+/** Source key of a clip's audio bitmap: the `audio:` storageKey, or the plain content URL when there is no key. */
+export function audioClipSourceKey(clip: CanvasAudioClip) {
+    return clip.storageKey || clip.content || "";
 }
 
-/** Resolve every clip source to a playable URL; a missing or unreadable node yields an empty string. */
-export async function resolveAudioClipUrls(clips: CanvasAudioClip[], nodes: CanvasNodeData[]) {
-    const ids = Array.from(new Set(clips.map((clip) => clip.sourceNodeId)));
+/** Resolve every clip source to a playable URL; a missing or unreadable source yields an empty string. */
+export async function resolveAudioClipUrls(clips: CanvasAudioClip[]) {
+    const keys = Array.from(new Set(clips.map(audioClipSourceKey).filter(Boolean)));
     const entries = await Promise.all(
-        ids.map(async (id) => {
-            const node = nodes.find((item) => item.id === id);
-            return [id, node?.type === CanvasNodeType.Audio ? await resolveAudioNodeUrl(node) : ""] as const;
+        keys.map(async (key) => {
+            const clip = clips.find((item) => audioClipSourceKey(item) === key);
+            const url = clip?.storageKey ? await resolveMediaUrl(clip.storageKey, clip.content || "") : clip?.content || "";
+            return [key, url] as const;
         }),
     );
     return Object.fromEntries(entries) as Record<string, string>;
@@ -216,12 +235,13 @@ export async function resolveAudioClipUrls(clips: CanvasAudioClip[], nodes: Canv
 
 const durationCache = new Map<string, Promise<number>>();
 
-/** Source duration in seconds; the metadata duration is trusted and the <audio> probe is cached per node. */
-export function resolveAudioNodeDuration(node: CanvasNodeData) {
-    if (node.metadata?.durationMs) return Promise.resolve(node.metadata.durationMs / 1000);
-    const cached = durationCache.get(node.id);
+/** Source duration in seconds; a stored duration is trusted and the <audio> probe is cached per source key. */
+export function resolveAudioSourceDuration(source: { id?: string; storageKey?: string; content?: string; durationMs?: number }) {
+    if (source.durationMs) return Promise.resolve(source.durationMs / 1000);
+    const key = source.storageKey || source.content || source.id || "";
+    const cached = durationCache.get(key);
     if (cached) return cached;
-    const task = resolveAudioNodeUrl(node).then((url) => {
+    const task = resolveMediaUrl(source.storageKey, source.content || "").then((url) => {
         if (!url) return AUDIO_CLIP_FALLBACK_SECONDS;
         return new Promise<number>((resolve) => {
             const audio = document.createElement("audio");
@@ -231,7 +251,7 @@ export function resolveAudioNodeDuration(node: CanvasNodeData) {
             audio.src = url;
         });
     });
-    durationCache.set(node.id, task);
+    durationCache.set(key, task);
     return task;
 }
 
@@ -239,9 +259,9 @@ export function clampGain(value: number) {
     return Math.min(AUDIO_GAIN_MAX, Math.max(0, Number.isFinite(value) ? value : 1));
 }
 
-/** Fader scale: -60 dB … +6 dB, where the bottom stands for true silence and 1.0 (0.0 dB) is unity. */
+/** Fader scale: -60 dB … +24 dB, where the bottom stands for true silence and 1.0 (0.0 dB) is unity. */
 export const AUDIO_FADER_MIN_DB = -60;
-export const AUDIO_FADER_MAX_DB = 6;
+export const AUDIO_FADER_MAX_DB = 24;
 export const AUDIO_GAIN_MAX = 10 ** (AUDIO_FADER_MAX_DB / 20);
 
 /** Fader position of a linear gain; a silent gain reads as the bottom of the scale. */
@@ -278,7 +298,7 @@ export function clampPan(value: number) {
 }
 
 export function clampClipGain(value: number) {
-    return Math.min(2, Math.max(0, Number.isFinite(value) ? value : 1));
+    return Math.min(AUDIO_GAIN_MAX, Math.max(0, Number.isFinite(value) ? value : 1));
 }
 
 /**

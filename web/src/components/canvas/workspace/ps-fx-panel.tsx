@@ -1,22 +1,21 @@
-import type { Dispatch, SetStateAction } from "react";
 import { Checkbox, Modal, Select, Slider } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
 import PsColorPicker from "@/components/canvas/workspace/ps-color-picker";
 import { PsGradientStopsEditor } from "@/components/canvas/workspace/ps-param-editors";
-import { commitBoardLayers, ensurePsLayerStyle, patchPsLayerStyle } from "@/components/canvas/workspace/ps-layer-ops";
+import { commitBoardLayers, ensurePsLayerStyle, patchPsLayerStyle, type PsBoardCommit } from "@/components/canvas/workspace/ps-layer-ops";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { STUDIO_PANEL_LABEL_CLASS, STUDIO_PANEL_ROW_CLASS, STUDIO_PANEL_VALUE_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import { CANVAS_BLEND_MODES } from "@/lib/canvas/blend-modes";
 import { PS_LAYER_STYLE_DEFAULTS, PS_LAYER_STYLE_NAME_KEYS, PS_LAYER_STYLE_TYPES, PS_PATTERN_KINDS } from "@/lib/canvas/ps-layer-styles";
-import { smartCanvasLayers } from "@/lib/canvas/smart-canvas";
+import { smartCanvasLayers, type SmartCanvasBoard } from "@/lib/canvas/smart-canvas";
 import { usePsAssetStore } from "@/stores/use-ps-asset-store";
-import type { CanvasNodeData, CanvasPsLayer, CanvasPsLayerStyleType, CanvasPsParamValue } from "@/types/canvas";
+import type { CanvasPsLayer, CanvasPsLayerStyleType, CanvasPsParamValue } from "@/types/canvas";
 
 type PsFxPanelProps = {
-    board: CanvasNodeData;
-    setNodes: Dispatch<SetStateAction<CanvasNodeData[]>>;
+    board: SmartCanvasBoard;
+    commitBoard: PsBoardCommit;
     layer: CanvasPsLayer | null;
     onClose: () => void;
 };
@@ -122,12 +121,12 @@ const STYLE_CONTROLS: Record<CanvasPsLayerStyleType, StyleControl[]> = {
     ],
 };
 
-export default function PsFxPanel({ board, setNodes, layer, onClose }: PsFxPanelProps) {
+export default function PsFxPanel({ board, commitBoard, layer, onClose }: PsFxPanelProps) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     const layers = smartCanvasLayers(board);
     const styles = layer?.styles || [];
-    const commit = (next: CanvasPsLayer[]) => commitBoardLayers(setNodes, board.id, next);
+    const commit = (next: CanvasPsLayer[]) => commitBoardLayers(commitBoard, board.id, next);
     return (
         <Modal open={Boolean(layer)} title={t("canvas.ps.fxTitle")} footer={null} width={380} onCancel={onClose} classNames={{ container: "glass-raised" }} styles={{ container: { background: "var(--glass-strong)" } }}>
             <ImageSettingsTheme theme={theme}>

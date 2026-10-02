@@ -7,6 +7,7 @@ import { App } from "antd";
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { isCanvasOverlayTarget } from "@/lib/canvas/canvas-overlays";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
+import { useDragPreviewPosition } from "@/hooks/use-drag-preview";
 import { formatBytes } from "@/lib/image-utils";
 import { copyImageToClipboard } from "@/lib/clipboard-image";
 import { formatAudioTime } from "@/lib/canvas/audio-waveform";
@@ -17,9 +18,8 @@ import { getNodeDefinition } from "@/lib/canvas/node-registry";
 import { resolveTextStyle, textStyleToCss } from "@/lib/canvas/text-style";
 import { buildNodeContext } from "@/lib/canvas/plugin-node-context";
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
-import { AudioProjectNodeContent } from "./nodes/builtin-nodes";
-import { SmartCanvasNodeContent } from "./smart-canvas-node";
 import { AudioNodeContent } from "./nodes/audio-node-content";
+import { MidiNodeContent } from "./nodes/midi-node-content";
 import { PromptContent } from "./nodes/prompt-node-content";
 import { CanvasNodeType, type CanvasNodeData, type CanvasNodeImage, type CanvasNodeText, type CanvasVideoSlot, type Position } from "@/types/canvas";
 import type { CanvasNodeContext, CanvasPluginHost } from "@/types/canvas-plugin";
@@ -38,7 +38,7 @@ const expandedImageIconClass = "grid h-8 w-8 shrink-0 place-items-center rounded
 type CanvasNodeProps = {
     data: CanvasNodeData;
     scale: number;
-    previewPosition?: Position;
+    ghostDragging?: boolean;
     dragDimmed?: boolean;
     isSelected: boolean;
     isRelated: boolean;
@@ -51,7 +51,6 @@ type CanvasNodeProps = {
     registryVersion?: number;
     renderPanel?: (node: CanvasNodeData) => ReactNode;
     renderNodeContent?: (node: CanvasNodeData, dropSlot?: CanvasVideoSlot | null) => ReactNode;
-    isBoardDropTarget?: boolean;
     isAssetsDropTarget?: boolean;
     videoSlotDropTarget?: { nodeId: string; slot: CanvasVideoSlot } | null;
     returnFrom?: Position | null;
@@ -76,7 +75,6 @@ type CanvasNodeProps = {
     onRetry?: (node: CanvasNodeData) => void;
     onViewImage?: (node: CanvasNodeData, imageId?: string) => void;
     onInfo?: (node: CanvasNodeData) => void;
-    onBoardPreview?: (node: CanvasNodeData) => void;
 };
 
 type NodeContentRendererProps = {
@@ -107,8 +105,7 @@ type NodeContentRendererProps = {
 export const CanvasNode = React.memo(function CanvasNode({
     data,
     scale,
-    previewPosition,
-    dragDimmed = false,
+    ghostDragging = false,
     isSelected,
     isRelated,
     isFocusRelated,
@@ -119,7 +116,6 @@ export const CanvasNode = React.memo(function CanvasNode({
     pluginHost,
     renderPanel,
     renderNodeContent,
-    isBoardDropTarget = false,
     isAssetsDropTarget = false,
     videoSlotDropTarget = null,
     returnFrom,
@@ -144,10 +140,11 @@ export const CanvasNode = React.memo(function CanvasNode({
     onRetry,
     onViewImage,
     onInfo,
-    onBoardPreview,
 }: CanvasNodeProps) {
     const theme = useCanvasTheme();
     const { t } = useTranslation();
+    const previewPosition = useDragPreviewPosition(data.id);
+    const dragDimmed = ghostDragging && previewPosition !== undefined;
     const [hovered, setHovered] = useState(false);
     const definition = getNodeDefinition(data.type);
     const pluginContext = useMemo<CanvasNodeContext | null>(() => (pluginHost ? buildNodeContext(pluginHost, data, theme, scale, isSelected) : null), [pluginHost, data, theme, scale, isSelected]);
@@ -157,9 +154,9 @@ export const CanvasNode = React.memo(function CanvasNode({
     const hasImageContent = data.type === CanvasNodeType.Image && Boolean(data.metadata?.content);
     const hasVideoContent = data.type === CanvasNodeType.Video && Boolean(data.metadata?.content);
     const hasAudioContent = data.type === CanvasNodeType.Audio && Boolean(data.metadata?.content);
-    const isBoard = data.type === CanvasNodeType.SmartCanvas;
+    const hasMidiContent = data.type === CanvasNodeType.Midi && Boolean(data.metadata?.content);
     const isVideoSlotDropTarget = data.type === CanvasNodeType.VideoPrompt && videoSlotDropTarget?.nodeId === data.id;
-    const isNodeDropTarget = ((data.type === CanvasNodeType.Assets || data.type === CanvasNodeType.ImageModifier || data.type === CanvasNodeType.AudioProject) && isAssetsDropTarget) || isVideoSlotDropTarget;
+    const isNodeDropTarget = ((data.type === CanvasNodeType.Assets || data.type === CanvasNodeType.ImageModifier) && isAssetsDropTarget) || isVideoSlotDropTarget;
     const locked = Boolean(data.metadata?.locked);
     const [enteredImage, setEnteredImage] = useState(false);
     const previousStatusRef = useRef(data.metadata?.status);
@@ -338,7 +335,7 @@ export const CanvasNode = React.memo(function CanvasNode({
     return (
         <div
             data-node-id={data.id}
-            className={`node-element absolute flex select-none flex-col transition-shadow duration-200 ${dragDimmed ? "opacity-25" : ""} ${isBoard || data.type === CanvasNodeType.Config ? "z-[5]" : isSelected ? "z-50" : "z-10"} ${returnFrom ? "canvas-node-return" : ""}`}
+            className={`node-element absolute flex select-none flex-col transition-shadow duration-200 ${dragDimmed ? "opacity-25" : ""} ${data.type === CanvasNodeType.Config ? "z-[5]" : isSelected ? "z-50" : "z-10"} ${returnFrom ? "canvas-node-return" : ""}`}
             style={
                 {
                     transform: `translate(${renderedPosition.x}px, ${renderedPosition.y}px)`,
@@ -365,7 +362,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                 onSelectCapture?.(event, data.id);
             }}
         >
-            {!hasImageContent && !hasAudioContent && (
+            {!hasImageContent && !hasAudioContent && !hasMidiContent && (
                 <div className="absolute left-3 top-[-28px] z-[65] max-w-[calc(100%-24px)]" onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
                     {isEditingTitle ? (
                         <input
@@ -402,12 +399,12 @@ export const CanvasNode = React.memo(function CanvasNode({
             )}
 
             <div
-                className={`relative h-full w-full overflow-visible rounded-3xl ${isBoard ? "border-0" : "border-2"} ${frostedCard ? "canvas-glass-card glass-card" : ""} ${enteredImage ? "canvas-node-enter" : ""}`}
+                className={`relative h-full w-full overflow-visible rounded-3xl border-2 ${frostedCard ? "canvas-glass-card glass-card" : ""} ${enteredImage ? "canvas-node-enter" : ""}`}
                 style={{
                     borderColor: hasImageContent ? imageBorderColor : isNodeDropTarget ? selectionBlue : isActive ? selectionBlue : isRelated ? theme.node.muted : "transparent",
                     borderStyle: "solid",
-                    outline: isBoard ? (isBoardDropTarget ? `2px solid ${selectionBlue}66` : isActive ? `2px solid ${selectionBlue}` : undefined) : isNodeDropTarget ? `2px solid ${selectionBlue}66` : undefined,
-                    outlineOffset: (isBoard && isBoardDropTarget) || isNodeDropTarget ? 2 : undefined,
+                    outline: isNodeDropTarget ? `2px solid ${selectionBlue}66` : undefined,
+                    outlineOffset: isNodeDropTarget ? 2 : undefined,
                     boxShadow: isActive ? `0 0 0 1px ${selectionBlue}55` : isRelated ? `0 0 0 1px ${theme.node.muted}55` : undefined,
                 }}
                 onMouseDown={(event) => {
@@ -417,11 +414,6 @@ export const CanvasNode = React.memo(function CanvasNode({
                 onDoubleClick={(event) => {
                     if (isCanvasOverlayTarget(event.target)) return;
                     if (locked) return;
-                    if (isBoard && onBoardPreview) {
-                        event.stopPropagation();
-                        onBoardPreview(data);
-                        return;
-                    }
                     if (definition?.onDoubleClick && pluginContext) {
                         if (definition.onDoubleClick(pluginContext)) event.stopPropagation();
                         return;
@@ -525,8 +517,7 @@ const nodeContentRenderers: Partial<Record<CanvasNodeType, (props: NodeContentRe
     [CanvasNodeType.ImageGeneration]: ImageGenerationContent,
     [CanvasNodeType.Video]: VideoNodeContent,
     [CanvasNodeType.Audio]: AudioNodeContent,
-    [CanvasNodeType.AudioProject]: AudioProjectNodeContent,
-    [CanvasNodeType.SmartCanvas]: SmartCanvasNodeContent,
+    [CanvasNodeType.Midi]: MidiNodeContent,
 };
 
 function LoadingContent({ theme }: Pick<NodeContentRendererProps, "theme">) {

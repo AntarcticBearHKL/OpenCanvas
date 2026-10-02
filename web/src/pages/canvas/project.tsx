@@ -1,9 +1,9 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
-import { ClipboardCopy, Download, Image as ImageIcon, ImagePlus, Music2, Video } from "lucide-react";
+import { ClipboardCopy, Download, FileMusic, Image as ImageIcon, Music2, Video } from "lucide-react";
 
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
@@ -12,7 +12,9 @@ import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { useLocalModelStore } from "@/stores/use-local-model-store";
 import { cleanupUnusedCanvasImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { removeImageBackground } from "@/services/background-removal";
-import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
+import { getMediaBlob, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
+import { transcribeAudioToMidi, type TranscriptionStage } from "@/services/midi-transcription";
+import { midiFileFromTracks } from "@/lib/canvas/audio-midi-file";
 import { nanoid } from "nanoid";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -39,6 +41,7 @@ import { CanvasNodeResolutionDialog, type CanvasImageResolutionPayload } from "@
 import { CanvasNodeSegmentDialog, type CanvasImageSegmentResult } from "@/components/canvas/canvas-node-segment-dialog";
 import { buildNodeGenerationInputs, type NodeGenerationInput } from "@/components/canvas/canvas-node-generation";
 import { CanvasNodeHoverToolbar, CanvasNodeInfoModal } from "@/components/canvas/canvas-node-hover-toolbar";
+import { CanvasMidiTranscribeDialog } from "@/components/canvas/canvas-midi-transcribe-dialog";
 import { CanvasNodeListPanel } from "@/components/canvas/canvas-node-layer-popover";
 import { CanvasRulers } from "@/components/canvas/canvas-rulers";
 import { CanvasSelectionToolbar } from "@/components/canvas/canvas-selection-toolbar";
@@ -49,11 +52,11 @@ import { VIDEO_REFERENCE_LIMITS, VIDEO_REFERENCE_TOTAL_LIMIT, openRouterVideoMod
 import { isCanvasOverlayTarget } from "@/lib/canvas/canvas-overlays";
 import { registerCanvasRightButtonTool } from "@/lib/canvas/canvas-pointer-tools";
 import { InfiniteCanvas } from "@/components/canvas/infinite-canvas";
+import { setDragPreviewSignal } from "@/lib/canvas/drag-preview-signal";
 import { Minimap } from "@/components/canvas/canvas-mini-map";
 import { CanvasNode, selectionBlue } from "@/components/canvas/canvas-node";
 import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "@/components/canvas/canvas-node-prompt-panel";
 import { PromptNodePanel } from "@/components/canvas/prompt-node-panel";
-import { SmartCanvasSettingsPopover } from "@/components/canvas/smart-canvas-settings-popover";
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
 import { CanvasSidePanel } from "@/components/canvas/canvas-side-panel";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
@@ -62,19 +65,14 @@ import { usePluginHost } from "@/pages/canvas/hooks/use-plugin-host";
 import { useCanvasGeneration } from "@/pages/canvas/hooks/use-canvas-generation";
 import { useCanvasInsertion } from "@/pages/canvas/hooks/use-canvas-insertion";
 import { useCanvasHistory } from "@/pages/canvas/hooks/use-canvas-history";
-import { useCanvasWorkspace } from "@/pages/canvas/hooks/use-canvas-workspace";
 import { useCanvasDocument } from "@/pages/canvas/hooks/use-canvas-document";
 import { NODE_STATUS_SUCCESS, VIDEO_NODE_MAX_HEIGHT, VIDEO_NODE_MAX_WIDTH } from "@/lib/canvas/canvas-node-constants";
 import { buildNodeMentionReferences, type CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { applyNodeConfigPatch, audioMetadata, createCanvasNode } from "@/lib/canvas/canvas-node-factory";
 import { insertDerivedAsset } from "@/lib/canvas/canvas-derived-asset";
-import { audioProjectAutomation, audioProjectClips, audioProjectDuration, audioProjectMasterGain, audioProjectMidiRegions, audioProjectPpqn, audioProjectTempo, audioProjectTracks, audioStemSourceIds, createAudioTrack, nextClipStart, resolveAudioNodeDuration } from "@/lib/canvas/audio-project";
-import { encodeWavBlob, renderAudioMixdown } from "@/lib/canvas/audio-mixdown";
-import { replaceClipRange } from "@/lib/canvas/audio-clip-ops";
 import { renderImageModifierBlob } from "@/lib/canvas/image-modifier";
 import { extractImageText, ocrPrompt } from "@/lib/canvas/canvas-ocr";
-import { composeSmartCanvas, createPsImageLayer, smartCanvasBackground, smartCanvasBackgroundOpacity, smartCanvasLayers, smartCanvasSizeForRatio } from "@/lib/canvas/smart-canvas";
-import { CANVAS_GRID_SIZE, bulkRenameTitles, findAssetsDropTarget, findAudioProjectDropTarget, findBoardDropTarget, findImageModifierDropTarget, getConnectionTargetAnchor, isNodeHidden, isNodeLocked, nodeBounds, nodeCenterInside, normalizeConnection, snapDragToGuides } from "@/lib/canvas/canvas-node-geometry";
+import { CANVAS_GRID_SIZE, bulkRenameTitles, findAssetsDropTarget, findImageModifierDropTarget, getConnectionTargetAnchor, isNodeHidden, isNodeLocked, nodeBounds, nodeCenterInside, normalizeConnection, snapDragToGuides } from "@/lib/canvas/canvas-node-geometry";
 import {
     audioExtension,
     buildGenerationConfig,
@@ -83,6 +81,7 @@ import {
     hasResumableVideoTask,
     hydrateCanvasImages,
     imageExtension,
+    isGenerationCanceled,
     resetInterruptedGeneration,
 } from "@/lib/canvas/canvas-generation-helpers";
 import { getNodeDefinition, useNodeRegistryVersion } from "@/lib/canvas/node-registry";
@@ -101,7 +100,6 @@ import {
     type CanvasConnection,
     type CanvasNodeData,
     type CanvasNodeMetadata,
-    type CanvasPsLayer,
     type CanvasWorkspace,
     type ConnectionHandle,
     type Position,
@@ -114,9 +112,6 @@ import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
 // Register built-in nodes in the shared registry once when the module loads.
 registerBuiltinNodes();
-
-const ImageStudio = lazy(() => import("@/components/canvas/workspace/image-studio"));
-const AudioStudio = lazy(() => import("@/components/canvas/workspace/audio-studio"));
 
 // Stable empty reference array prevents `... || []` from invalidating CanvasNode's React.memo on every render.
 const EMPTY_REFERENCES: CanvasResourceReference[] = [];
@@ -216,18 +211,22 @@ function InfiniteCanvasPage() {
 
     useEffect(() => {
         if (params.workspace === "image") {
-            navigate(`/image?canvasId=${projectId}`, { replace: true });
+            navigate("/image", { replace: true });
         } else if (params.workspace === "audio") {
-            navigate(`/audio?canvasId=${projectId}`, { replace: true });
+            navigate("/audio", { replace: true });
+        } else if (params.workspace === "pixel") {
+            navigate("/pixel", { replace: true });
         }
-    }, [params.workspace, projectId, navigate]);
+    }, [params.workspace, navigate]);
 
     const handleWorkspaceChange = useCallback(
         (next: CanvasWorkspace) => {
             if (next === "image") {
-                navigate(`/image?canvasId=${projectId}`);
+                navigate("/image");
             } else if (next === "audio") {
-                navigate(`/audio?canvasId=${projectId}`);
+                navigate("/audio");
+            } else if (next === "pixel") {
+                navigate("/pixel");
             } else {
                 navigate(`/canvas/${projectId}`);
             }
@@ -244,7 +243,6 @@ function InfiniteCanvasPage() {
     const dragPreviewRef = useRef<Map<string, Position> | null>(null);
     const dropTargetAssetsRef = useRef<string | null>(null);
     const dropTargetModifierRef = useRef<string | null>(null);
-    const dropTargetAudioProjectRef = useRef<string | null>(null);
     const dropTargetSlotRef = useRef<VideoSlotDropTarget | null>(null);
     const nodeDraggingRef = useRef(false);
     const dragRef = useRef<{
@@ -306,6 +304,13 @@ function InfiniteCanvasPage() {
     const [analyzeNodeId, setAnalyzeNodeId] = useState<string | null>(null);
     const [segmentNodeId, setSegmentNodeId] = useState<string | null>(null);
     const [angleNodeId, setAngleNodeId] = useState<string | null>(null);
+    const [midiTranscribeNodeId, setMidiTranscribeNodeId] = useState<string | null>(null);
+    const [midiHighQuality, setMidiHighQuality] = useState(true);
+    const [midiRunning, setMidiRunning] = useState(false);
+    const [midiStage, setMidiStage] = useState<TranscriptionStage | null>(null);
+    const [midiProgress, setMidiProgress] = useState(0);
+    const [midiFailed, setMidiFailed] = useState(false);
+    const midiAbortRef = useRef<AbortController | null>(null);
     const [previewNodeId, setPreviewNodeId] = useState<string | null>(null);
     const [previewImageId, setPreviewImageId] = useState<string | null>(null);
     const [titleEditing, setTitleEditing] = useState(false);
@@ -313,16 +318,13 @@ function InfiniteCanvasPage() {
     const [expandedBatchNodeIds, setExpandedBatchNodeIds] = useState<Set<string>>(new Set());
     const [isNodeDragging, setIsNodeDragging] = useState(false);
     const [isNodeResizing, setIsNodeResizing] = useState(false);
-    const [dropTargetBoardId, setDropTargetBoardId] = useState<string | null>(null);
     const [dropTargetAssetsNodeId, setDropTargetAssetsNodeId] = useState<string | null>(null);
     const [dropTargetModifierNodeId, setDropTargetModifierNodeId] = useState<string | null>(null);
-    const [dropTargetAudioProjectId, setDropTargetAudioProjectId] = useState<string | null>(null);
     const [dropSlotState, setDropSlotState] = useState<VideoSlotDropTarget | null>(null);
     const [snapGuides, setSnapGuides] = useState<{ x: number[]; y: number[] }>(EMPTY_SNAP_GUIDES);
-    const [dragPreview, setDragPreview] = useState<Map<string, Position> | null>(null);
-    const [dragGhost, setDragGhost] = useState<{ x: number; y: number; nodeId: string; count: number } | null>(null);
+    const [ghostMeta, setGhostMeta] = useState<{ nodeId: string; count: number } | null>(null);
+    const ghostChipRef = useRef<HTMLDivElement>(null);
     const [returningNodes, setReturningNodes] = useState<Map<string, Position>>(new Map());
-    const [boardPreview, setBoardPreview] = useState<{ dataUrl: string; width: number; height: number; title: string; boardId: string } | null>(null);
     const [isNodeListOpen, setIsNodeListOpen] = useState(false);
 
     const nodesRef = useRef(nodes);
@@ -596,17 +598,7 @@ function InfiniteCanvasPage() {
         [screenToCanvas],
     );
 
-    const visibleNodes = useMemo(() => {
-        const padding = 280;
-        const width = size.width;
-        const height = size.height;
-        const viewLeft = -viewport.x / viewport.k - padding;
-        const viewTop = -viewport.y / viewport.k - padding;
-        const viewRight = viewLeft + width / viewport.k + padding * 2;
-        const viewBottom = viewTop + height / viewport.k + padding * 2;
-
-        return nodes.filter((node) => !isNodeHidden(node) && node.position.x + node.width > viewLeft && node.position.x < viewRight && node.position.y + node.height > viewTop && node.position.y < viewBottom);
-    }, [nodes, size.height, size.width, viewport.k, viewport.x, viewport.y]);
+    const visibleNodes = useMemo(() => nodes.filter((node) => !isNodeHidden(node)), [nodes]);
 
     const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
     // The toolbar follows a single selected node selected by click, creation, marquee, or keyboard.
@@ -622,6 +614,7 @@ function InfiniteCanvasPage() {
     const analyzeNode = analyzeNodeId ? nodeById.get(analyzeNodeId) || null : null;
     const segmentNode = segmentNodeId ? nodeById.get(segmentNodeId) || null : null;
     const angleNode = angleNodeId ? nodeById.get(angleNodeId) || null : null;
+    const midiTranscribeNode = midiTranscribeNodeId ? nodeById.get(midiTranscribeNodeId) || null : null;
     const previewNode = previewNodeId ? nodeById.get(previewNodeId) || null : null;
     const previewContent = previewImageId ? previewNode?.metadata?.images?.find((image) => image.id === previewImageId)?.content : previewNode?.metadata?.content;
     const hasMultipleSelectedNodes = selectedNodeIds.size > 1;
@@ -632,15 +625,6 @@ function InfiniteCanvasPage() {
         setNodes((prev) => prev.map((node) => { const next = positions.get(node.id); return next ? { ...node, position: next } : node; }));
     };
     const activeNodeId = hasMultipleSelectedNodes ? null : hoveredNodeId || (selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null);
-    const { board: workspaceBoard, boards: workspaceBoards, audioProject: workspaceAudioProject, audioProjects: workspaceAudioProjects } = useCanvasWorkspace(nodes, selectedNodeIds);
-    const selectWorkspaceBoard = useCallback((boardId: string) => {
-        setSelectedNodeIds(new Set([boardId]));
-        setSelectedConnectionId(null);
-    }, []);
-    const selectWorkspaceAudioProject = useCallback((nodeId: string) => {
-        setSelectedNodeIds(new Set([nodeId]));
-        setSelectedConnectionId(null);
-    }, []);
     const relatedHighlight = useMemo(() => {
         const nodeIds = new Set<string>();
         const connectionIds = new Set<string>();
@@ -704,15 +688,12 @@ function InfiniteCanvasPage() {
                 const from = nodeById.get(connection.fromNodeId);
                 const to = nodeById.get(connection.toNodeId);
                 if (!from || !to) return null;
-                const fromPreview = dragPreview?.get(from.id);
-                const toPreview = dragPreview?.get(to.id);
-
                 return (
                     <ConnectionPath
                         key={connection.id}
                         connection={connection}
-                        from={fromPreview ? { ...from, position: fromPreview } : from}
-                        to={toPreview ? { ...to, position: toPreview } : to}
+                        from={from}
+                        to={to}
                         active={selectedConnectionId === connection.id || relatedHighlight.connectionIds.has(connection.id)}
                         referenceIndex={promptReferenceIndexByConnectionId.get(connection.id)}
                         scale={viewport.k}
@@ -720,7 +701,7 @@ function InfiniteCanvasPage() {
                     />
                 );
             }),
-        [connections, dragPreview, nodeById, promptReferenceIndexByConnectionId, relatedHighlight, selectConnection, selectedConnectionId, viewport.k],
+        [connections, nodeById, promptReferenceIndexByConnectionId, relatedHighlight, selectConnection, selectedConnectionId, viewport.k],
     );
     const runAgentNode = (nodeId: string, run: (node: CanvasNodeData) => void) => {
         const node = nodesRef.current.find((item) => item.id === nodeId);
@@ -756,12 +737,6 @@ function InfiniteCanvasPage() {
         },
         capture_video_frame: (op) => {
             if (op.type === "capture_video_frame") void captureVideoNodeFrame(op.nodeId, op.position);
-        },
-        compose_board: (op) => {
-            if (op.type === "compose_board") runAgentNode(op.id, (node) => void handleComposeBoard(node));
-        },
-        save_board_as_node: (op) => {
-            if (op.type === "save_board_as_node") runAgentNode(op.id, (node) => void handleSaveBoardAsNode(node));
         },
     };
     const { applyAgentOps } = useAgentBridge({
@@ -954,6 +929,7 @@ function InfiniteCanvasPage() {
             initialSelectedNodes: draggedNodes.map((node) => ({ id: node.id, x: node.position.x, y: node.position.y })),
             ghost: draggedNodes.every((node) => isCanvasDropSourceType(node.type)) ? { nodeId, count: draggedNodes.length } : null,
         };
+        setGhostMeta(dragRef.current.ghost);
         historyPausedRef.current = true;
         nodeDraggingRef.current = true;
         setIsNodeDragging(true);
@@ -979,27 +955,6 @@ function InfiniteCanvasPage() {
             }
         })();
     }, []);
-
-    /** Dropping audio nodes onto an audio project appends one track plus one clip per node in a single edit, like the studio's add-clip flow. */
-    const appendAudioNodesToProject = useCallback(
-        async (targetId: string, audioNodes: CanvasNodeData[]) => {
-            const durations = await Promise.all(audioNodes.map((node) => resolveAudioNodeDuration(node)));
-            setNodes((prev) =>
-                prev.map((node) => {
-                    if (node.id !== targetId) return node;
-                    const tracks = [...audioProjectTracks(node)];
-                    const clips = [...audioProjectClips(node)];
-                    audioNodes.forEach((source, index) => {
-                        const track = { ...createAudioTrack(), name: source.title || t("canvas.audioStudio.trackName", { index: tracks.length + 1 }) };
-                        tracks.push(track);
-                        clips.push({ id: nanoid(), trackId: track.id, sourceNodeId: source.id, start: nextClipStart(clips, track.id), offset: 0, duration: durations[index] });
-                    });
-                    return { ...node, metadata: { ...node.metadata, audioTracks: tracks, audioClips: clips } };
-                }),
-            );
-        },
-        [setNodes, t],
-    );
 
     const applyNodeMetadata = useCallback((nodeId: string, patch: Partial<CanvasNodeData["metadata"]>) => {
         setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, ...patch } } : node)));
@@ -1051,7 +1006,6 @@ function InfiniteCanvasPage() {
         const initialPositions = dragRef.current.initialSelectedNodes;
         const assetsTargetId = dragRef.current.hasMoved ? dropTargetAssetsRef.current : null;
         const modifierTargetId = dragRef.current.hasMoved ? dropTargetModifierRef.current : null;
-        const audioProjectTargetId = dragRef.current.hasMoved ? dropTargetAudioProjectRef.current : null;
         const slotTarget = dragRef.current.hasMoved ? dropTargetSlotRef.current : null;
         const previewPositions = dragPreviewRef.current;
 
@@ -1059,18 +1013,15 @@ function InfiniteCanvasPage() {
         nodeDraggingRef.current = false;
         setIsNodeDragging(false);
         delete containerRef.current?.dataset.canvasDragging;
-        setDropTargetBoardId(null);
         setDropTargetAssetsNodeId(null);
         setDropTargetModifierNodeId(null);
-        setDropTargetAudioProjectId(null);
         setDropSlotState(null);
         dropTargetAssetsRef.current = null;
         dropTargetModifierRef.current = null;
-        dropTargetAudioProjectRef.current = null;
         dropTargetSlotRef.current = null;
         setSnapGuides(EMPTY_SNAP_GUIDES);
-        setDragPreview(null);
-        setDragGhost(null);
+        setDragPreviewSignal(null);
+        setGhostMeta(null);
         dragPreviewRef.current = null;
         dragMoveRef.current = null;
 
@@ -1145,59 +1096,14 @@ function InfiniteCanvasPage() {
                 setReturningNodes(returned);
                 window.setTimeout(() => setReturningNodes(new Map()), NODE_RETURN_MS);
             }
-        } else if (audioProjectTargetId) {
-            const target = nodesRef.current.find((node) => node.id === audioProjectTargetId);
-            const returned = new Map<string, Position>();
-            const droppedAudios: CanvasNodeData[] = [];
-            if (target) {
-                nodesRef.current.forEach((node) => {
-                    if (node.type !== CanvasNodeType.Audio) return;
-                    const initial = initialPositions.find((item) => item.id === node.id);
-                    if (!initial) return;
-                    const dropped = previewPositions?.get(node.id) || { x: initial.x + dx, y: initial.y + dy };
-                    if (!nodeCenterInside({ ...node, position: dropped }, target)) return;
-                    returned.set(node.id, dropped);
-                    droppedAudios.push(node);
-                });
-            }
-            if (returned.size) {
-                setReturningNodes(returned);
-                window.setTimeout(() => setReturningNodes(new Map()), NODE_RETURN_MS);
-                void appendAudioNodesToProject(audioProjectTargetId, droppedAudios);
-            }
         } else if (dragRef.current.hasMoved && clientX != null && clientY != null) {
-            const movedIds = new Set(initialPositions.map((item) => item.id));
             const snapped = snapDragToGuides(initialPositions, nodesRef.current, dx, dy, 6 / currentViewport.k, CANVAS_GRID_SIZE);
-            const droppedNodes = nodesRef.current.map((node) => {
-                const initial = initialPositions.find((item) => item.id === node.id);
-                return initial ? { ...node, position: { x: initial.x + snapped.dx, y: initial.y + snapped.dy } } : node;
-            });
-            const board = findBoardDropTarget(movedIds, droppedNodes.filter((node) => !isNodeHidden(node)));
-            const placedLayers: CanvasPsLayer[] = [];
-            const returned = new Map<string, Position>();
-            let placedOnBoard = false;
-            if (board) {
-                droppedNodes.forEach((node) => {
-                    if (!movedIds.has(node.id) || (node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.SmartCanvas) || !nodeCenterInside(node, board)) return;
-                    const initial = initialPositions.find((item) => item.id === node.id)!;
-                    returned.set(node.id, previewPositions?.get(node.id) || { x: initial.x + snapped.dx, y: initial.y + snapped.dy });
-                    placedLayers.push(createPsImageLayer(board, node));
-                });
-                if (placedLayers.length) {
-                    placedOnBoard = true;
-                    handleSmartCanvasChange(board.id, { boardLayers: [...smartCanvasLayers(board), ...placedLayers] });
-                    setReturningNodes(returned);
-                    window.setTimeout(() => setReturningNodes(new Map()), NODE_RETURN_MS);
-                }
-            }
-            if (!placedOnBoard) {
-                setNodes((prev) =>
-                    prev.map((node) => {
-                        const initial = initialPositions.find((item) => item.id === node.id);
-                        return initial ? { ...node, position: { x: initial.x + snapped.dx, y: initial.y + snapped.dy } } : node;
-                    }),
-                );
-            }
+            setNodes((prev) =>
+                prev.map((node) => {
+                    const initial = initialPositions.find((item) => item.id === node.id);
+                    return initial ? { ...node, position: { x: initial.x + snapped.dx, y: initial.y + snapped.dy } } : node;
+                }),
+            );
         }
 
         dragRef.current.isDraggingNode = false;
@@ -1205,15 +1111,13 @@ function InfiniteCanvasPage() {
         dragRef.current.initialSelectedNodes = [];
         dragRef.current.ghost = null;
         if (wasClick && clickedNodeId) setDialogNodeId((current) => (current === clickedNodeId ? current : null));
-    }, [applyNodeMetadata, appendAudioNodesToProject, bakeImageModifierNode, collectImageIntoAssets]);
+    }, [applyNodeMetadata, bakeImageModifierNode, collectImageIntoAssets]);
 
     const moveNodeLayer = useCallback((nodeId: string, direction: "up" | "down") => {
         const current = nodesRef.current;
         const index = current.findIndex((node) => node.id === nodeId);
         if (index < 0) return;
-        const step = direction === "up" ? 1 : -1;
-        let target = index + step;
-        while (target >= 0 && target < current.length && current[target].type === CanvasNodeType.SmartCanvas) target += step;
+        const target = index + (direction === "up" ? 1 : -1);
         if (target < 0 || target >= current.length) return;
         const next = [...current];
         const [node] = next.splice(index, 1);
@@ -1267,21 +1171,23 @@ function InfiniteCanvasPage() {
                     const slotTarget = findVideoSlotDropTarget(point.clientX, point.clientY, movedIds, nodesRef.current);
                     const assetsTarget = slotTarget ? null : findAssetsDropTarget(movedIds, dropCandidates);
                     const modifierTarget = slotTarget ? null : findImageModifierDropTarget(movedIds, dropCandidates);
-                    const audioProjectTarget = slotTarget || assetsTarget || modifierTarget ? null : findAudioProjectDropTarget(movedIds, dropCandidates);
                     dropTargetAssetsRef.current = assetsTarget?.id || null;
                     dropTargetModifierRef.current = modifierTarget?.id || null;
-                    dropTargetAudioProjectRef.current = audioProjectTarget?.id || null;
                     dropTargetSlotRef.current = slotTarget;
                     setDropTargetAssetsNodeId(assetsTarget?.id || null);
                     setDropTargetModifierNodeId(modifierTarget?.id || null);
-                    setDropTargetAudioProjectId(audioProjectTarget?.id || null);
                     setDropSlotState((current) => (current?.nodeId === slotTarget?.nodeId && current?.slot === slotTarget?.slot ? current : slotTarget));
-                    setDropTargetBoardId(assetsTarget || modifierTarget || audioProjectTarget || slotTarget ? null : findBoardDropTarget(movedIds, dropCandidates)?.id || null);
                     const preview = new Map(initialPositions.map((item) => [item.id, { x: item.x + finalDx, y: item.y + finalDy }]));
                     dragPreviewRef.current = preview;
-                    setDragPreview(preview);
+                    setDragPreviewSignal(preview);
                     const ghost = dragRef.current.ghost;
-                    if (ghost && dragRef.current.hasMoved) setDragGhost({ x: point.clientX, y: point.clientY, nodeId: ghost.nodeId, count: ghost.count });
+                    if (ghost && dragRef.current.hasMoved) {
+                        const chip = ghostChipRef.current;
+                        if (chip) {
+                            chip.style.left = `${point.clientX}px`;
+                            chip.style.top = `${point.clientY}px`;
+                        }
+                    }
                 });
                 return;
             }
@@ -1599,208 +1505,19 @@ function InfiniteCanvasPage() {
         setNodes((prev) => prev.map((node) => (node.id === nodeId ? applyNodeConfigPatch(node, patch) : node)));
     }, []);
 
-    const handleSmartCanvasChange = useCallback((nodeId: string, patch: Partial<CanvasNodeMetadata>) => {
-        setNodes((prev) =>
-            prev.map((node) => {
-                if (node.id !== nodeId || node.type !== CanvasNodeType.SmartCanvas) return node;
-                const next = { ...node, metadata: { ...node.metadata, ...patch } };
-                if (patch.boardRatio && patch.boardRatio !== node.metadata?.boardRatio) {
-                    const size = smartCanvasSizeForRatio(patch.boardRatio);
-                    return { ...next, ...size, position: { x: node.position.x + node.width / 2 - size.width / 2, y: node.position.y + node.height / 2 - size.height / 2 } };
-                }
-                return next;
-            }),
-        );
-    }, []);
-
-    const composeBoardImage = useCallback(
-        async (board: CanvasNodeData) => {
-            if (!smartCanvasLayers(board).some((layer) => !layer.hidden)) {
-                message.warning(t("canvas.smartCanvas.noContent"));
-                return null;
-            }
-            try {
-                const composite = await composeSmartCanvas(board, nodesRef.current);
-                if (!composite.dataUrl) {
-                    message.warning(t("canvas.smartCanvas.noContent"));
-                    return null;
-                }
-                return composite;
-            } catch {
-                message.error(t("canvas.smartCanvas.composeFailed"));
-                return null;
-            }
-        },
-        [message, t],
-    );
-
-    const handleComposeBoard = useCallback(
-        async (board: CanvasNodeData) => {
-            const composite = await composeBoardImage(board);
-            if (composite) setBoardPreview({ ...composite, title: board.title || t("canvas.nodeTypes.smartCanvas"), boardId: board.id });
-        },
-        [composeBoardImage, t],
-    );
-
-    const handleSaveBoardAsNode = useCallback(
-        async (board: CanvasNodeData) => {
-            const composite = await composeBoardImage(board);
-            if (!composite) return;
-            try {
-                const uploaded = await uploadImage(composite.dataUrl);
-                const size = fitNodeSize(composite.width, composite.height, NODE_DEFAULT_SIZE[CanvasNodeType.Image].width, NODE_DEFAULT_SIZE[CanvasNodeType.Image].height);
-                insertDerivedAsset(
-                    {
-                        source: board,
-                        children: [{ image: uploaded, title: board.title || t("canvas.nodeTypes.smartCanvas"), size, position: { x: board.position.x + board.width + 40, y: board.position.y }, metadata: { naturalWidth: composite.width, naturalHeight: composite.height } }],
-                        select: "children",
-                        clearSelectedConnection: true,
-                    },
-                    { setNodes, setSelectedNodeIds, setSelectedConnectionId, setDialogNodeId },
-                );
-                message.success(t("canvas.smartCanvas.savedAsNode"));
-            } catch {
-                message.error(t("common.imageReadFailed"));
-            }
-        },
-        [composeBoardImage, message, t],
-    );
-
-    const handleMixdownAudioProject = useCallback(
-        async (target: CanvasNodeData) => {
-            const tracks = audioProjectTracks(target);
-            const clips = audioProjectClips(target);
-            const regions = audioProjectMidiRegions(target);
-            const ppqn = audioProjectPpqn(target);
-            const tempo = audioProjectTempo(target);
-            if ((!clips.length && !regions.length) || audioProjectDuration(clips, regions, ppqn, tempo) <= 0) {
-                message.warning(t("canvas.audioStudio.noContent"));
+    const downloadNodeImage = useCallback(
+        async (node: CanvasNodeData) => {
+            if (node.type === CanvasNodeType.Midi) {
+                if (!node.metadata?.content) return;
+                const blob = node.metadata.storageKey ? await getMediaBlob(node.metadata.storageKey) : await (await fetch(node.metadata.content)).blob();
+                if (blob) saveAs(blob, `${node.title || "midi"}.mid`);
                 return;
             }
-            try {
-                const { audio, skipped } = await renderAudioMixdown(
-                    { tracks, clips, regions, ppqn, tempo, masterGain: audioProjectMasterGain(target), automation: audioProjectAutomation(target) },
-                    nodesRef.current,
-                );
-                if (skipped.length) message.warning(t("canvas.audioStudio.mixdownVstSkipped", { tracks: skipped.map((report) => report.name || t("canvas.audioStudio.trackName", { index: tracks.findIndex((track) => track.id === report.trackId) + 1 })).join(", ") }));
-                const uploaded = await uploadMediaFile(encodeWavBlob(audio), "audio");
-                insertDerivedAsset(
-                    {
-                        source: target,
-                        children: [
-                            {
-                                type: CanvasNodeType.Audio,
-                                title: t("canvas.audioStudio.nodeTitle", { name: target.title || t("canvas.nodeTypes.audioProject") }),
-                                size: NODE_DEFAULT_SIZE[CanvasNodeType.Audio],
-                                position: { x: target.position.x + target.width + 40, y: target.position.y },
-                                metadata: audioMetadata(uploaded),
-                            },
-                        ],
-                        select: "children",
-                        clearSelectedConnection: true,
-                    },
-                    { setNodes, setSelectedNodeIds, setSelectedConnectionId, setDialogNodeId },
-                );
-                message.success(t("canvas.audioStudio.savedAsNode"));
-            } catch {
-                message.error(t("canvas.audioStudio.mixdownFailed"));
-            }
+            if ((node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.Video && node.type !== CanvasNodeType.Audio) || !node.metadata?.content) return;
+            saveAs(node.metadata.content, `canvas-${node.type}-${node.id}.${node.type === CanvasNodeType.Video ? "mp4" : node.type === CanvasNodeType.Audio ? audioExtension(node.metadata.mimeType) : imageExtension(node.metadata.content)}`);
         },
-        [message, t],
+        [],
     );
-
-    /** A finished take is one edit: the armed track's clips are rewritten and the recorded audio node is appended in the same patch. */
-    const handleAudioRecorded = useCallback(
-        async (target: CanvasNodeData, blob: Blob, take: { trackId: string; start: number; duration: number; name: string }) => {
-            try {
-                const uploaded = await uploadMediaFile(blob, "audio");
-                const id = nanoid();
-                const size = NODE_DEFAULT_SIZE[CanvasNodeType.Audio];
-                const x = target.position.x + target.width + 96;
-                let y = target.position.y;
-                while (nodesRef.current.some((node) => node.position.x < x + size.width && node.position.x + node.width > x && node.position.y < y + size.height && node.position.y + node.height > y)) y += size.height + 24;
-                setNodes((prev) =>
-                    prev
-                        .map((node) =>
-                            node.id === target.id
-                                ? {
-                                      ...node,
-                                      metadata: {
-                                          ...node.metadata,
-                                          audioClips: [...replaceClipRange(audioProjectClips(node), take.trackId, take.start, take.start + take.duration), { id: nanoid(), trackId: take.trackId, sourceNodeId: id, start: take.start, offset: 0, duration: take.duration, name: take.name }],
-                                      },
-                                  }
-                                : node,
-                        )
-                        .concat({ id, type: CanvasNodeType.Audio, title: take.name, position: { x, y }, width: size.width, height: size.height, metadata: audioMetadata(uploaded) }),
-                );
-                message.success(t("canvas.audioStudio.recordSaved"));
-            } catch {
-                message.error(t("canvas.audioStudio.recordFailed"));
-            }
-        },
-        [message, setNodes, t],
-    );
-
-    /** One offline render per track through the shared builder, so a stem is exactly what that track contributes. */
-    const handleExportAudioStems = useCallback(
-        async (target: CanvasNodeData) => {
-            const tracks = audioProjectTracks(target);
-            const clips = audioProjectClips(target);
-            const regions = audioProjectMidiRegions(target);
-            const ppqn = audioProjectPpqn(target);
-            const tempo = audioProjectTempo(target);
-            const masterGain = audioProjectMasterGain(target);
-            const automation = audioProjectAutomation(target);
-            const stems = tracks.flatMap((track) => {
-                const sources = audioStemSourceIds(tracks, track);
-                if (!sources) return [];
-                const stemClips = clips.filter((clip) => sources.has(clip.trackId));
-                const stemRegions = regions.filter((region) => sources.has(region.trackId));
-                return stemClips.length || stemRegions.length ? [{ track, clips: stemClips, regions: stemRegions }] : [];
-            });
-            if (!stems.length) {
-                message.warning(t("canvas.audioStudio.exportStemsEmpty"));
-                return;
-            }
-            try {
-                const files = await Promise.all(
-                    stems.map(async (stem) => {
-                        const { audio, skipped } = await renderAudioMixdown({ tracks, clips: stem.clips, regions: stem.regions, ppqn, tempo, masterGain, automation }, nodesRef.current);
-                        if (skipped.length) message.warning(t("canvas.audioStudio.mixdownVstSkipped", { tracks: skipped.map((report) => report.name || t("canvas.audioStudio.trackName", { index: tracks.findIndex((track) => track.id === report.trackId) + 1 })).join(", ") }));
-                        return {
-                            name: stem.track.name || t("canvas.audioStudio.trackName", { index: tracks.indexOf(stem.track) + 1 }),
-                            file: await uploadMediaFile(encodeWavBlob(audio), "audio"),
-                        };
-                    }),
-                );
-                insertDerivedAsset(
-                    {
-                        source: target,
-                        children: files.map((stem, index) => ({
-                            type: CanvasNodeType.Audio,
-                            title: t("canvas.audioStudio.stemTitle", { name: target.title || t("canvas.nodeTypes.audioProject"), track: stem.name }),
-                            size: NODE_DEFAULT_SIZE[CanvasNodeType.Audio],
-                            position: { x: target.position.x + target.width + 40, y: target.position.y + index * (NODE_DEFAULT_SIZE[CanvasNodeType.Audio].height + 16) },
-                            metadata: audioMetadata(stem.file),
-                        })),
-                        select: "children",
-                        clearSelectedConnection: true,
-                    },
-                    { setNodes, setSelectedNodeIds, setSelectedConnectionId, setDialogNodeId },
-                );
-                message.success(t("canvas.audioStudio.exportStemsDone", { count: files.length }));
-            } catch {
-                message.error(t("canvas.audioStudio.mixdownFailed"));
-            }
-        },
-        [message, t],
-    );
-
-    const downloadNodeImage = useCallback((node: CanvasNodeData) => {
-        if ((node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.Video && node.type !== CanvasNodeType.Audio) || !node.metadata?.content) return;
-        saveAs(node.metadata.content, `canvas-${node.type}-${node.id}.${node.type === CanvasNodeType.Video ? "mp4" : node.type === CanvasNodeType.Audio ? audioExtension(node.metadata.mimeType) : imageExtension(node.metadata.content)}`);
-    }, []);
 
     const downloadBatchImage = useCallback((node: CanvasNodeData, imageId: string) => {
         const image = node.metadata?.images?.find((item) => item.id === imageId);
@@ -2171,13 +1888,6 @@ function InfiniteCanvasPage() {
                     onChange={(composerContent) => handleConfigNodeChange(panelNode.id, { composerContent })}
                     onClose={() => setDialogNodeId(null)}
                 />
-            ) : panelNode.type === CanvasNodeType.SmartCanvas ? (
-                <div className="flex items-center gap-2" style={{ color: theme.node.text }}>
-                    <SmartCanvasSettingsPopover ratio={panelNode.metadata?.boardRatio || "16:9"} resolution={panelNode.metadata?.boardResolution || "2k"} background={smartCanvasBackground(panelNode)} backgroundOpacity={smartCanvasBackgroundOpacity(panelNode)} onChange={(patch) => handleSmartCanvasChange(panelNode.id, patch)} />
-                    <Button size="small" type="text" className="!h-8 !rounded-full !px-2.5" style={{ color: theme.node.text }} icon={<ImagePlus className="size-3.5" />} onClick={() => void handleSaveBoardAsNode(panelNode)}>
-                        {t("canvas.smartCanvas.saveAsNode")}
-                    </Button>
-                </div>
             ) : (
                 <div data-canvas-no-zoom>
                     <CanvasNodePromptPanel
@@ -2198,7 +1908,7 @@ function InfiniteCanvasPage() {
                     />
                 </div>
             ),
-        [configInputsById, confirmStopGeneration, connectedNodesByNodeId, handleConfigNodeChange, handleGenerateNode, handleNodeContentChange, handleNodePromptChange, handleSaveBoardAsNode, handleSmartCanvasChange, mentionReferencesByNodeId, nodes, renderPluginPanel, runningNodeId, t, theme.node.text],
+        [configInputsById, confirmStopGeneration, connectedNodesByNodeId, handleConfigNodeChange, handleGenerateNode, handleNodeContentChange, handleNodePromptChange, mentionReferencesByNodeId, nodes, renderPluginPanel, runningNodeId, t, theme.node.text],
     );
 
     const handleRecordingSaved = useCallback(
@@ -2224,6 +1934,87 @@ function InfiniteCanvasPage() {
         [message, t],
     );
 
+    const openMidiTranscribe = useCallback((node: CanvasNodeData) => {
+        setMidiTranscribeNodeId(node.id);
+        setMidiHighQuality(true);
+        setMidiStage(null);
+        setMidiProgress(0);
+        setMidiFailed(false);
+    }, []);
+
+    const closeMidiTranscribe = useCallback(() => {
+        midiAbortRef.current?.abort();
+        midiAbortRef.current = null;
+        setMidiTranscribeNodeId(null);
+        setMidiRunning(false);
+        setMidiStage(null);
+        setMidiProgress(0);
+        setMidiFailed(false);
+    }, []);
+
+    const startMidiTranscribe = useCallback(async () => {
+        const source = midiTranscribeNodeId ? nodesRef.current.find((item) => item.id === midiTranscribeNodeId) : undefined;
+        if (!source?.metadata?.content) return;
+        const controller = new AbortController();
+        midiAbortRef.current = controller;
+        setMidiRunning(true);
+        setMidiFailed(false);
+        setMidiStage("decode");
+        setMidiProgress(0);
+        try {
+            const blob = source.metadata.storageKey ? await getMediaBlob(source.metadata.storageKey) : await (await fetch(source.metadata.content)).blob();
+            if (!blob) throw new Error("midi-source-missing");
+            const result = await transcribeAudioToMidi(blob, {
+                highQuality: midiHighQuality,
+                signal: controller.signal,
+                onProgress: (progress) => {
+                    setMidiStage(progress.stage);
+                    setMidiProgress(progress.progress <= 1 ? progress.progress * 100 : progress.progress);
+                },
+            });
+            const data = midiFileFromTracks(result.tracks, { tempo: result.tempo, ppqn: 960 });
+            const uploaded = await uploadMediaFile(new Blob([data], { type: "audio/midi" }), "midi");
+            const noteCount = result.tracks.reduce((total, track) => total + track.notes.length, 0);
+            insertDerivedAsset(
+                {
+                    source,
+                    children: [
+                        {
+                            id: nanoid(),
+                            type: CanvasNodeType.Midi,
+                            title: `${source.title || t("canvas.nodeTypes.midi")} MIDI`,
+                            size: NODE_DEFAULT_SIZE[CanvasNodeType.Midi],
+                            position: { x: source.position.x + source.width + 40, y: source.position.y },
+                            metadata: {
+                                content: uploaded.url,
+                                storageKey: uploaded.storageKey,
+                                status: NODE_STATUS_SUCCESS,
+                                bytes: uploaded.bytes,
+                                mimeType: "audio/midi",
+                                durationMs: result.durationMs,
+                                midi: { trackCount: result.tracks.length, noteCount, tempo: result.tempo, ppqn: 960 },
+                            },
+                        },
+                    ],
+                    select: "children",
+                    clearSelectedConnection: true,
+                    openDialog: null,
+                },
+                { setNodes, setSelectedNodeIds, setSelectedConnectionId, setDialogNodeId },
+            );
+            message.success(t("canvas.midiTranscribe.success", { defaultValue: "已生成 MIDI 节点" }));
+            closeMidiTranscribe();
+        } catch (error) {
+            if (isGenerationCanceled(error)) {
+                closeMidiTranscribe();
+                return;
+            }
+            setMidiFailed(true);
+            setMidiRunning(false);
+            message.error(t("canvas.midiTranscribe.failed", { defaultValue: "转换失败，请重试" }));
+        }
+    }, [closeMidiTranscribe, message, midiHighQuality, midiTranscribeNodeId, t]);
+
     const renderNodeContentPanel = useCallback(
         (contentNode: CanvasNodeData, dropSlot?: CanvasVideoSlot | null) => {
             const musicTags = t("canvas.promptNode.musicTags", { returnObjects: true }) as unknown as string[];
@@ -2244,7 +2035,7 @@ function InfiniteCanvasPage() {
                         onVideoSlotsChange={(nodeId, videoSlots) => applyNodeMetadata(nodeId, { videoSlots })}
                     />
                 );
-            if (contentNode.type === CanvasNodeType.Assets) return <AssetsNodeContent node={contentNode} onInsert={(file) => void insertFolderFile(file)} onSourceChange={(assetSource) => applyNodeMetadata(contentNode.id, { assetSource })} />;
+            if (contentNode.type === CanvasNodeType.Assets) return <AssetsNodeContent node={contentNode} onInsert={(file) => void insertFolderFile(file)} onSourceChange={(assetSource) => applyNodeMetadata(contentNode.id, { assetSource })} onStudioProjectsChange={(assetStudioProjects) => applyNodeMetadata(contentNode.id, { assetStudioProjects })} />;
             if (contentNode.type === CanvasNodeType.Recording) return <RecordingNodeContent onRecorded={(blob) => handleRecordingSaved(contentNode, blob)} />;
             if (contentNode.type === CanvasNodeType.ImageModifier)
                 return (
@@ -2281,9 +2072,9 @@ function InfiniteCanvasPage() {
 
     const guideBounds = snapGuides.x.length || snapGuides.y.length ? nodeBounds(nodes) : null;
     const guideSpan = guideBounds ? { left: guideBounds.left - 400, top: guideBounds.top - 400, right: guideBounds.right + 400, bottom: guideBounds.bottom + 400 } : null;
-    const isGhostDrag = Boolean(dragGhost);
-    const ghostNode = dragGhost ? nodeById.get(dragGhost.nodeId) : undefined;
-    const GhostIcon = ghostNode?.type === CanvasNodeType.Video ? Video : ghostNode?.type === CanvasNodeType.Audio ? Music2 : ImageIcon;
+    const isGhostDrag = Boolean(ghostMeta);
+    const ghostNode = ghostMeta ? nodeById.get(ghostMeta.nodeId) : undefined;
+    const GhostIcon = ghostNode?.type === CanvasNodeType.Video ? Video : ghostNode?.type === CanvasNodeType.Audio ? Music2 : ghostNode?.type === CanvasNodeType.Midi ? FileMusic : ImageIcon;
 
     return (
         <main className="relative flex h-full min-h-0 overflow-hidden" style={{ background: theme.canvas.background, color: theme.node.text }}>
@@ -2326,16 +2117,14 @@ function InfiniteCanvasPage() {
                             key={node.id}
                             data={node}
                             scale={viewport.k}
-                            previewPosition={dragPreview?.get(node.id)}
-                            dragDimmed={isGhostDrag && Boolean(dragPreview?.has(node.id))}
+                            ghostDragging={isGhostDrag}
                             isSelected={selectedNodeIds.has(node.id)}
                             isRelated={relatedHighlight.nodeIds.has(node.id)}
                             isFocusRelated={activeNodeId === node.id}
                             isConnectionTarget={connectionTargetNodeId === node.id}
                             isConnecting={Boolean(connectingParams)}
                             showPanel={!isNodeResizing && node.type !== CanvasNodeType.Video && node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.ImageGeneration && node.type !== CanvasNodeType.SpeechGeneration && node.type !== CanvasNodeType.MusicGeneration && node.type !== CanvasNodeType.VideoGeneration && node.type !== CanvasNodeType.Prompt && node.type !== CanvasNodeType.MusicPrompt && node.type !== CanvasNodeType.SpeechPrompt && node.type !== CanvasNodeType.VideoPrompt && dialogNodeId === node.id && !selectionBox && !getNodeDefinition(node.type)?.hidePanel}
-                            isBoardDropTarget={dropTargetBoardId === node.id}
-                            isAssetsDropTarget={dropTargetAssetsNodeId === node.id || dropTargetModifierNodeId === node.id || dropTargetAudioProjectId === node.id}
+                            isAssetsDropTarget={dropTargetAssetsNodeId === node.id || dropTargetModifierNodeId === node.id}
                             videoSlotDropTarget={dropSlotState?.nodeId === node.id ? dropSlotState : null}
                             returnFrom={returningNodes.get(node.id)}
                             nodes={nodes}
@@ -2364,7 +2153,6 @@ function InfiniteCanvasPage() {
                             onRetry={handleNodeRetry}
                             onViewImage={handleNodeViewImage}
                             onInfo={handleNodeInfo}
-                        onBoardPreview={(board) => void handleComposeBoard(board)}
                         />
                     ))}
 
@@ -2403,15 +2191,14 @@ function InfiniteCanvasPage() {
                     onKeep={keepNodeToolbar}
                     onLeave={hideNodeToolbar}
                     onInfo={(node) => setInfoNodeId(node.id)}
-                    onOpenInImageStudio={(node) => navigate(`/image?canvasId=${projectId}&nodeId=${node.id}`)}
-                    onOpenInAudioStudio={(node) => navigate(`/audio?canvasId=${projectId}&nodeId=${node.id}`)}
                     onDecreaseFont={(node) => handleFontSizeChange(node.id, Math.max(10, (node.metadata?.fontSize || 14) - 2))}
                     onIncreaseFont={(node) => handleFontSizeChange(node.id, Math.min(32, (node.metadata?.fontSize || 14) + 2))}
                     onTextStyleChange={handleConfigNodeChange}
                     onToggleDialog={(node) => setDialogNodeId((current) => (current === node.id ? null : node.id))}
                     onGenerateImage={generateImageFromTextNode}
                     onUpload={(node) => handleUploadRequest(node.id)}
-                    onDownload={downloadNodeImage}
+                    onDownload={(node) => void downloadNodeImage(node)}
+                    onTranscribeMidi={openMidiTranscribe}
                     onCopy={(node) => void copyImage(node.metadata?.content)}
                     onMaskEdit={(node) => setMaskEditNodeId(node.id)}
                     onCrop={(node) => setCropNodeId(node.id)}
@@ -2430,7 +2217,6 @@ function InfiniteCanvasPage() {
                     onToggleFlag={toggleNodeFlag}
                     onBulkRename={renameNodes}
                     onCaptureVideoFrame={(node, position) => void captureVideoNodeFrame(node.id, position)}
-                    onSaveBoardAsNode={(node) => void handleSaveBoardAsNode(node)}
                 />
 
                 {hasMultipleSelectedNodes && !selectionBox ? (
@@ -2464,7 +2250,7 @@ function InfiniteCanvasPage() {
                     onToggleNodeList={() => setIsNodeListOpen((value) => !value)}
                 />
 
-                <CanvasRulers viewport={viewport} viewportSize={size} />
+                <CanvasRulers viewportSize={size} />
                 {isMiniMapOpen ? <Minimap nodes={nodes} viewport={viewport} viewportSize={size} onViewportChange={setViewport} /> : null}
 
                 {isNodeListOpen ? (
@@ -2473,9 +2259,22 @@ function InfiniteCanvasPage() {
                     </div>
                 ) : null}
 
-                <input ref={imageInputRef} type="file" multiple accept="image/*,video/*,audio/mpeg,audio/wav,audio/x-wav,.mp3,.wav" className="hidden" onChange={handleImageInputChange} />
+                <input ref={imageInputRef} type="file" multiple accept="image/*,video/*,audio/mpeg,audio/wav,audio/x-wav,.mp3,.wav,.mid,.midi,audio/midi,audio/x-midi" className="hidden" onChange={handleImageInputChange} />
 
                 <CanvasNodeInfoModal node={infoNode} open={Boolean(infoNode)} onClose={() => setInfoNodeId(null)} />
+
+                <CanvasMidiTranscribeDialog
+                    open={Boolean(midiTranscribeNode)}
+                    node={midiTranscribeNode}
+                    highQuality={midiHighQuality}
+                    onHighQualityChange={setMidiHighQuality}
+                    running={midiRunning}
+                    stage={midiStage}
+                    progress={midiProgress}
+                    failed={midiFailed}
+                    onStart={() => void startMidiTranscribe()}
+                    onClose={closeMidiTranscribe}
+                />
                 <CanvasPluginManagerModal open={pluginManagerOpen} onClose={() => setPluginManagerOpen(false)} />
 
                 {cropNode?.metadata?.content ? <CanvasNodeCropDialog dataUrl={cropNode.metadata.content} open={Boolean(cropNode)} onClose={() => setCropNodeId(null)} onConfirm={(crop) => void cropImageNode(cropNode!, crop)} /> : null}
@@ -2529,37 +2328,18 @@ function InfiniteCanvasPage() {
                         </>
                     ) : null}
                 </Modal>
-
-                <Modal
-                    title={boardPreview?.title || t("canvas.smartCanvas.previewTitle")}
-                    open={Boolean(boardPreview)}
-                    centered
-                    onCancel={() => setBoardPreview(null)}
-                    footer={null}
-                    width="auto"
-                    styles={{ body: { padding: 0, display: "flex", flexDirection: "column", gap: 12, alignItems: "center", maxHeight: "80vh" } }}
-                >
-                    {boardPreview ? (
-                        <>
-                            <img src={boardPreview.dataUrl} alt={boardPreview.title} style={{ maxWidth: "100%", maxHeight: "72vh", objectFit: "contain" }} />
-                            <div className="flex items-center gap-2">
-                                <Button className="!border-foreground !bg-foreground !text-background hover:!border-foreground hover:!bg-foreground/85 hover:!text-background" icon={<Download className="size-4" />} aria-label={t("canvas.smartCanvas.download")} title={t("canvas.smartCanvas.download")} onClick={() => saveAs(boardPreview.dataUrl, `smart-canvas-${boardPreview.width}x${boardPreview.height}.png`)} />
-                                <Button className="!border-foreground !bg-foreground !text-background hover:!border-foreground hover:!bg-foreground/85 hover:!text-background" icon={<ClipboardCopy className="size-4" />} aria-label={t("canvas.imageTools.copyTitle")} title={t("canvas.imageTools.copyTitle")} onClick={() => void copyImage(boardPreview.dataUrl)} />
-                            </div>
-                        </>
-                    ) : null}
-                </Modal>
             </section>
-            {dragGhost ? (
+            {ghostMeta ? (
                 <div
+                    ref={ghostChipRef}
                     className="canvas-drag-ghost pointer-events-none fixed z-[120] flex size-11 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-0.5 rounded-md border"
-                    style={{ left: dragGhost.x, top: dragGhost.y, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
+                    style={{ left: -9999, top: -9999, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
                 >
                     <GhostIcon className="size-5 shrink-0" />
                     {ghostNode?.title ? <span className="max-w-[40px] truncate text-xs leading-none">{ghostNode.title}</span> : null}
-                    {dragGhost.count > 1 ? (
+                    {ghostMeta.count > 1 ? (
                         <span className="absolute -right-1.5 -top-1.5 rounded-full border px-1 text-xs leading-4" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }}>
-                            ×{dragGhost.count}
+                            ×{ghostMeta.count}
                         </span>
                     ) : null}
                 </div>

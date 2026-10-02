@@ -17,7 +17,7 @@ export function AppTopNav() {
     const colorTheme = useThemeStore((state) => state.theme);
     const theme = canvasThemes[colorTheme];
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
-    const hideHeader = /^\/(canvas|write|image|audio)\/[^/]+/.test(pathname);
+    const hideHeader = /^\/(canvas|write|image|audio|pixel)\/[^/]+/.test(pathname);
     const slug = pathname.split("/").filter(Boolean)[0];
     const activeToolSlug = navigationTools.some((tool) => tool.slug === slug) ? (slug as NavigationToolSlug) : undefined;
 

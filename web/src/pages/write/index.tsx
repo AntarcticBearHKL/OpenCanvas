@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { App, Button, Dropdown, Empty, Input, Modal, Select, type MenuProps } from "antd";
-import { BookOpen, Check, FileText, FolderKanban, MoreVertical, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, FolderInput, FolderKanban, Pencil, Plus, Trash2, X } from "lucide-react";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
 import { WriteStudio } from "@/components/write/write-studio";
-import { flattenOutline } from "@/lib/write/outline";
-import { WRITE_TEMPLATES } from "@/lib/write/presets";
 import { useWriteUiStore } from "@/stores/use-write-ui-store";
-import { useWritingStore, writeProjectWordCount, type WriteProject } from "@/stores/use-writing-store";
-import type { WriteTemplate } from "@/types/writing";
+import { useWritingStore, type WriteProject } from "@/stores/use-writing-store";
 
 export default function WritePage() {
     const { message } = App.useApp();
@@ -36,7 +33,6 @@ export default function WritePage() {
     // Dialog & UI states
     const [createOpen, setCreateOpen] = useState(false);
     const [newTitle, setNewTitle] = useState("");
-    const [newTemplate, setNewTemplate] = useState<WriteTemplate>("novel");
     const [createGroupId, setCreateGroupId] = useState<string | null>(null);
 
     const [renamingProject, setRenamingProject] = useState<{ id: string; title: string } | null>(null);
@@ -46,6 +42,7 @@ export default function WritePage() {
     // Armed deletion confirmation states
     const [armedGroupId, setArmedGroupId] = useState<string | null>(null);
     const [armedProjectId, setArmedProjectId] = useState<string | null>(null);
+    const [moveMenuProjectId, setMoveMenuProjectId] = useState<string | null>(null);
 
     useEffect(() => {
         setProject(id ?? null);
@@ -89,7 +86,7 @@ export default function WritePage() {
     const handleCreateProject = () => {
         const title = newTitle.trim() || "Untitled Project";
         const targetGroupId = createGroupId || selectedGroup?.id || groups[0]?.id || null;
-        const newId = createProject(title, newTemplate, targetGroupId);
+        const newId = createProject(title, targetGroupId);
         setCreateOpen(false);
         navigate(`/write/${newId}`);
     };
@@ -216,7 +213,7 @@ export default function WritePage() {
                 {/* Header */}
                 <div className="glass-surface flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-base font-semibold text-foreground">
+                        <h1 className="text-base font-semibold text-foreground" style={{ margin: 0 }}>
                             {selectedGroup ? selectedGroup.name : "Writing Projects"}
                         </h1>
                         <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs text-brand font-medium">
@@ -230,7 +227,6 @@ export default function WritePage() {
                             icon={<Plus className="size-4" />}
                             onClick={() => {
                                 setNewTitle("");
-                                setNewTemplate("novel");
                                 setCreateGroupId(selectedGroup?.id || groups[0]?.id || null);
                                 setCreateOpen(true);
                             }}
@@ -260,7 +256,6 @@ export default function WritePage() {
                                 icon={<Plus className="size-4" />}
                                 onClick={() => {
                                     setNewTitle("");
-                                    setNewTemplate("novel");
                                     setCreateGroupId(selectedGroup?.id || groups[0]?.id || null);
                                     setCreateOpen(true);
                                 }}
@@ -272,52 +267,16 @@ export default function WritePage() {
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             {groupProjects.map((project) => {
                                 const otherGroups = groups.filter((g) => g.id !== project.groupId);
-                                const menuItems: MenuProps["items"] = [
-                                    {
-                                        key: "rename",
-                                        label: "Rename",
-                                        icon: <Pencil className="size-3.5" />,
-                                        onClick: () => setRenamingProject({ id: project.id, title: project.title }),
+                                const moveItems: MenuProps["items"] = otherGroups.map((g) => ({
+                                    key: g.id,
+                                    label: g.name,
+                                    onClick: () => {
+                                        setProjectGroup(project.id, g.id);
+                                        message.success(`Moved to "${g.name}"`);
                                     },
-                                    ...(otherGroups.length > 0
-                                        ? [
-                                              {
-                                                  key: "move",
-                                                  label: "Move to Group",
-                                                  icon: <FolderKanban className="size-3.5" />,
-                                                  children: otherGroups.map((g) => ({
-                                                      key: `move-${g.id}`,
-                                                      label: g.name,
-                                                      onClick: () => {
-                                                          setProjectGroup(project.id, g.id);
-                                                          message.success(`Moved to "${g.name}"`);
-                                                      },
-                                                  })),
-                                              },
-                                          ]
-                                        : []),
-                                    {
-                                        type: "divider",
-                                    },
-                                    {
-                                        key: "delete",
-                                        label: armedProjectId === project.id ? "Confirm Delete" : "Delete Project",
-                                        danger: true,
-                                        icon: armedProjectId === project.id ? <Check className="size-3.5" /> : <Trash2 className="size-3.5" />,
-                                        onClick: () => {
-                                            if (armedProjectId !== project.id) {
-                                                setArmedProjectId(project.id);
-                                                return;
-                                            }
-                                            setArmedProjectId(null);
-                                            deleteProjects([project.id]);
-                                        },
-                                    },
-                                ];
+                                }));
 
-                                const wordCount = writeProjectWordCount(project);
-                                const unitCount = flattenOutline(project.outline).length;
-                                const templateDef = WRITE_TEMPLATES[project.template] || WRITE_TEMPLATES.novel;
+                                const unitCount = project.outline.length;
 
                                 return (
                                     <div
@@ -326,21 +285,6 @@ export default function WritePage() {
                                         className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-4 transition-all hover:border-brand hover:shadow-md cursor-pointer"
                                     >
                                         <div>
-                                            {/* Preview Box */}
-                                            <div className="relative mb-3 flex h-36 w-full items-center justify-center overflow-hidden rounded-lg bg-black/5 dark:bg-white/5">
-                                                <div className="flex flex-col items-center justify-center gap-1.5 text-muted-foreground/70">
-                                                    <BookOpen className="size-9 stroke-[1.5]" />
-                                                    <span className="rounded border border-border/60 bg-background/80 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                                                        {templateDef.labelKey ? t(templateDef.labelKey) : project.template}
-                                                    </span>
-                                                </div>
-
-                                                <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
-                                                    <FileText className="size-3" />
-                                                    <span>{wordCount} words</span>
-                                                </div>
-                                            </div>
-
                                             {/* Title & Metadata */}
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="min-w-0 flex-1">
@@ -368,15 +312,46 @@ export default function WritePage() {
                                                             Confirm
                                                         </Button>
                                                     ) : (
-                                                        <Dropdown menu={{ items: menuItems }} trigger={["click"]} placement="bottomRight">
+                                                        <>
                                                             <Button
                                                                 type="text"
                                                                 size="small"
                                                                 shape="circle"
-                                                                icon={<MoreVertical className="size-4" />}
-                                                                className="text-muted-foreground hover:text-foreground"
+                                                                icon={<Pencil className="size-3.5" />}
+                                                                className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-foreground"
+                                                                onClick={() => setRenamingProject({ id: project.id, title: project.title })}
+                                                                title="Rename"
                                                             />
-                                                        </Dropdown>
+                                                            {otherGroups.length > 0 && (
+                                                                <Dropdown
+                                                                    menu={{ items: moveItems }}
+                                                                    trigger={["click"]}
+                                                                    placement="bottomRight"
+                                                                    open={moveMenuProjectId === project.id}
+                                                                    onOpenChange={(open) => setMoveMenuProjectId(open ? project.id : null)}
+                                                                >
+                                                                    <Button
+                                                                        type="text"
+                                                                        size="small"
+                                                                        shape="circle"
+                                                                        icon={<FolderInput className="size-3.5" />}
+                                                                        className={`text-muted-foreground transition hover:text-foreground ${
+                                                                            moveMenuProjectId === project.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                                                        }`}
+                                                                        title="Move to Group"
+                                                                    />
+                                                                </Dropdown>
+                                                            )}
+                                                            <Button
+                                                                type="text"
+                                                                size="small"
+                                                                shape="circle"
+                                                                icon={<Trash2 className="size-3.5" />}
+                                                                className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-danger"
+                                                                onClick={() => setArmedProjectId(project.id)}
+                                                                title="Delete project"
+                                                            />
+                                                        </>
                                                     )}
                                                 </div>
                                             </div>
@@ -412,18 +387,6 @@ export default function WritePage() {
                             onChange={(e) => setNewTitle(e.target.value)}
                             autoFocus
                             onPressEnter={handleCreateProject}
-                        />
-                    </div>
-                    <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground">Template</label>
-                        <Select
-                            className="w-full"
-                            value={newTemplate}
-                            onChange={(val) => setNewTemplate(val)}
-                            options={(Object.keys(WRITE_TEMPLATES) as WriteTemplate[]).map((key) => ({
-                                value: key,
-                                label: t(WRITE_TEMPLATES[key].labelKey),
-                            }))}
                         />
                     </div>
                     <div>

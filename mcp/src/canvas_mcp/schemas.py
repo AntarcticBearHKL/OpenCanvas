@@ -1,6 +1,6 @@
-"""The 29 agent tools: names, verbatim descriptions, and input schemas.
+"""The 30 agent tools: names, verbatim descriptions, and input schemas.
 
-Three generic relay tools (``app_*``) forward straight to the browser, three site
+Four generic relay tools (``app_*``) forward straight to the browser, three site
 tools are relayed verbatim too, and the 23 ``canvas_*`` tools are compiled
 server-side into ``app_apply_ops`` requests. Tool names and Chinese descriptions
 are copied verbatim; the zod schemas are re-expressed as Pydantic models whose JSON
@@ -27,7 +27,7 @@ NodeType = Literal[
     "video-generation",
     "video",
     "audio",
-    "smart-canvas",
+    "midi",
     "assets",
     "recording",
     "image-modifier",
@@ -42,6 +42,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "app_get_state",
     "app_describe_actions",
     "app_apply_ops",
+    "app_screenshot",
     "canvas_create_node",
     "canvas_create_text_node",
     "canvas_create_text_nodes",
@@ -137,6 +138,10 @@ class AppApplyOpsInput(PassthroughInput):
     ops: list[dict[str, Any]]
 
 
+class AppScreenshotInput(PassthroughInput):
+    studio: str | None = None
+
+
 class SiteNavigateInput(BaseModel):
     path: str
 
@@ -187,8 +192,10 @@ class CreateConfigNodeInput(GenerationOptions):
 
 class CreateImagePromptFlowInput(GenerationOptions):
     prompt: str
+    title: str | None = None
     x: float | None = None
     y: float | None = None
+    referenceNodeIds: list[str] | None = None
     autoRun: bool | None = None
 
 
@@ -294,6 +301,7 @@ INPUT_MODELS: dict[str, type[BaseModel]] = {
     "app_get_state": AppGetStateInput,
     "app_describe_actions": AppDescribeActionsInput,
     "app_apply_ops": AppApplyOpsInput,
+    "app_screenshot": AppScreenshotInput,
     "canvas_create_node": CreateNodeInput,
     "canvas_create_text_node": CreateTextNodeInput,
     "canvas_create_text_nodes": CreateTextNodesInput,
@@ -329,7 +337,8 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "app_get_state": "读取当前网页的页面快照，返回 { page, title, state, availableActions }。availableActions 列出当前页可用的操作命名空间（ns）、标题、说明和 op 名称（不含 schema）。操作任何页面前先调用本工具确认当前页面。",
     "app_describe_actions": "读取操作的 schema。传入 ns 返回该命名空间的可用操作及字段定义；省略 ns 返回全部可用命名空间及其 schema，用于构造 app_apply_ops 的 ops。",
     "app_apply_ops": "向当前网页提交一批操作。ops 为扁平、带 ns 标记的操作对象数组，例如 { ns: \"canvas\", type: \"add_node\", ... }；每个 op 的字段以 app_describe_actions 返回的 schema 为准。",
-    "canvas_create_node": "创建任意类型节点。nodeType 可为 text、prompt、music-prompt、speech-prompt、video-prompt、image、video、audio、config、image-generation、speech-generation、music-generation、video-generation、smart-canvas、assets、recording、image-modifier。适合创建占位图、媒体占位、提示词节点、配置节点或自定义 metadata 节点。",
+    "app_screenshot": "截取当前工作区的画面并返回 PNG 图片。默认截取当前工作区，可用 studio 指定 image 或 pixel。用于查看图像工作台 / 像素画布当前渲染出的效果。",
+    "canvas_create_node": "创建任意类型节点。nodeType 可为 text、prompt、music-prompt、speech-prompt、video-prompt、image、video、audio、midi、config、image-generation、speech-generation、music-generation、video-generation、assets、recording、image-modifier。适合创建占位图、媒体占位、提示词节点、配置节点或自定义 metadata 节点。",
     "canvas_create_text_node": "在当前画布创建单个文本节点。",
     "canvas_create_text_nodes": "批量创建文本节点，适合生成标题、段落、脚本、说明等内容块。",
     "canvas_create_config_node": "创建生成配置节点，可指定 text/image/video/audio 模式和生成参数，可选择立即触发生成。视频为 minimax/hailuo-3-max：分辨率 480p/768p、时长 5-15s、frames/reference 两种模式；首尾帧与参考图槽位（videoSlots）只对 video-prompt + video-generation 节点组合生效。",

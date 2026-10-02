@@ -100,7 +100,7 @@ async function decodeAudioBuffer(url: string) {
 }
 
 /** Build the min/max pyramid: the deep stage pools every channel, then each further stage folds two buckets. */
-function buildAudioPeaks(buffer: AudioBuffer): AudioPeaks {
+export function buildAudioPeaks(buffer: AudioBuffer): AudioPeaks {
     const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
     const bands: AudioPeakBand[] = [];
     let bucketSamples = AUDIO_PEAK_BUCKET_SAMPLES;

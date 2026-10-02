@@ -1,28 +1,28 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useState } from "react";
 import { InputNumber, Segmented, Select, Slider, Switch } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
 import PsColorPicker from "@/components/canvas/workspace/ps-color-picker";
-import { commitBoardLayers, patchPsLayer } from "@/components/canvas/workspace/ps-layer-ops";
+import { commitBoardLayers, patchPsLayer, type PsBoardCommit } from "@/components/canvas/workspace/ps-layer-ops";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { STUDIO_PANEL_LABEL_CLASS, STUDIO_PANEL_ROW_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import { PS_FONT_FAMILIES, PS_TEXT_ALIGNS, PS_TEXT_ALIGN_NAME_KEYS, PS_TEXT_CASES, PS_TEXT_CASE_NAME_KEYS, PS_TEXT_WARP_NAME_KEYS, PS_TEXT_WARP_STYLES, psTextFontSize, psTextParagraph, psTextWarpDefault } from "@/lib/canvas/ps-text";
-import { psTextRenderStyle, smartCanvasLayers } from "@/lib/canvas/smart-canvas";
-import type { CanvasNodeData, CanvasPsLayer, CanvasPsPath, CanvasPsTextCase, CanvasPsTextWarpStyle } from "@/types/canvas";
+import { psTextRenderStyle, smartCanvasLayers, type SmartCanvasBoard } from "@/lib/canvas/smart-canvas";
+import type { CanvasPsLayer, CanvasPsPath, CanvasPsTextCase, CanvasPsTextWarpStyle } from "@/types/canvas";
 
-type PsTextPanelProps = { board: CanvasNodeData; setNodes: Dispatch<SetStateAction<CanvasNodeData[]>>; layer: CanvasPsLayer; paths: CanvasPsPath[] };
+type PsTextPanelProps = { board: SmartCanvasBoard; commitBoard: PsBoardCommit; layer: CanvasPsLayer; paths: CanvasPsPath[] };
 
 const ROW_CLASS = STUDIO_PANEL_ROW_CLASS;
 const LABEL_CLASS = STUDIO_PANEL_LABEL_CLASS;
 const TOGGLE_CLASS = "grid size-6 shrink-0 place-items-center rounded-md text-sm font-semibold transition hover:bg-hover";
 
-export default function PsTextPanel({ board, setNodes, layer, paths }: PsTextPanelProps) {
+export default function PsTextPanel({ board, commitBoard, layer, paths }: PsTextPanelProps) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     const [tab, setTab] = useState<"character" | "paragraph">("character");
     const layers = smartCanvasLayers(board);
-    const commit = (patch: Partial<CanvasPsLayer>) => commitBoardLayers(setNodes, board.id, patchPsLayer(layers, layer.id, patch));
+    const commit = (patch: Partial<CanvasPsLayer>) => commitBoardLayers(commitBoard, board.id, patchPsLayer(layers, layer.id, patch));
     const paragraph = psTextParagraph(layer);
     const number = (label: string, key: keyof CanvasPsLayer, min: number, max: number, fallback: number, suffix = "") => (
         <div className={ROW_CLASS} key={String(key)}>

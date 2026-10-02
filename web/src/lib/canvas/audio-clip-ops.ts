@@ -110,7 +110,7 @@ export function glueClip(clips: CanvasAudioClip[], clipId: string) {
     const clip = clips.find((item) => item.id === clipId);
     if (!clip) return null;
     const next = clips
-        .filter((item) => item.trackId === clip.trackId && item.id !== clip.id && item.start > clip.start && Math.abs(item.start - clipEnd(clip)) < EPSILON && item.sourceNodeId === clip.sourceNodeId && Math.abs(item.offset - (clip.offset + clip.duration)) < EPSILON)
+        .filter((item) => item.trackId === clip.trackId && item.id !== clip.id && item.start > clip.start && Math.abs(item.start - clipEnd(clip)) < EPSILON && (item.storageKey || item.content || "") === (clip.storageKey || clip.content || "") && Math.abs(item.offset - (clip.offset + clip.duration)) < EPSILON)
         .sort((a, b) => a.start - b.start)[0];
     if (!next) return null;
     return clips.flatMap((item) => (item.id === clip.id ? [{ ...clip, duration: clip.duration + next.duration, fadeOut: next.fadeOut ?? clip.fadeOut }] : item.id === next.id ? [] : [item]));

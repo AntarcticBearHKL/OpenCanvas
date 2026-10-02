@@ -9,11 +9,17 @@ import { readImageMeta } from "@/lib/image-utils";
 import { fitNodeSize } from "@/lib/canvas/canvas-node-size";
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
 import { createCanvasNode, audioMetadata, imageMetadata, videoMetadata } from "@/lib/canvas/canvas-node-factory";
-import { isAudioFile } from "@/lib/canvas/canvas-generation-helpers";
-import { ASSET_FOLDER_DRAG_MIME, classifyAssetFolderFile } from "@/lib/canvas/asset-folder";
+import { parseMidiFile } from "@/lib/canvas/audio-midi-file";
+import { isAudioFile, isMidiFile } from "@/lib/canvas/canvas-generation-helpers";
+import { ASSET_FOLDER_DRAG_MIME, STUDIO_ASSET_DRAG_MIME, classifyAssetFolderFile } from "@/lib/canvas/asset-folder";
+import { renderStudioAssetOutput, type StudioAssetKind } from "@/lib/canvas/studio-asset-output";
 import { BROWSER_CACHE_DRAG_MIME, getBrowserCacheFile } from "@/services/api/browser-cache";
 import { NODE_STATUS_SUCCESS, VIDEO_NODE_MAX_HEIGHT, VIDEO_NODE_MAX_WIDTH } from "@/lib/canvas/canvas-node-constants";
 import { useAssetFolderStore } from "@/stores/use-asset-folder-store";
+import { useImageStore } from "@/stores/use-image-store";
+import { useAudioStore } from "@/stores/use-audio-store";
+import { usePixelStore } from "@/stores/use-pixel-store";
+import { useWritingStore } from "@/stores/use-writing-store";
 import { CanvasNodeType, type CanvasAssistantImage, type CanvasNodeData, type Position } from "@/types/canvas";
 
 type AssetInsertPayload = { kind: "text"; content: string; title: string } | { kind: "image"; dataUrl: string; title: string; storageKey?: string } | { kind: "video"; url: string; title: string; storageKey?: string; width?: number; height?: number };
@@ -101,6 +107,36 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
         setSelectedConnectionId(null);
     }, []);
 
+    const createMidiFileNode = useCallback(async (file: File, position: Position) => {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const parsed = parseMidiFile(bytes);
+        const uploaded = await uploadMediaFile(new Blob([bytes], { type: "audio/midi" }), "midi");
+        const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Midi];
+        const id = `midi-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        setNodes((prev) => [
+            ...prev,
+            {
+                id,
+                type: CanvasNodeType.Midi,
+                title: file.name,
+                position: { x: position.x - spec.width / 2, y: position.y - spec.height / 2 },
+                width: spec.width,
+                height: spec.height,
+                metadata: {
+                    content: uploaded.url,
+                    storageKey: uploaded.storageKey,
+                    status: NODE_STATUS_SUCCESS,
+                    bytes: uploaded.bytes,
+                    mimeType: "audio/midi",
+                    durationMs: parsed.durationMs,
+                    midi: { trackCount: parsed.tracks.length, noteCount: parsed.noteCount, tempo: parsed.tempo, ppqn: parsed.ppq },
+                },
+            },
+        ]);
+        setSelectedNodeIds(new Set([id]));
+        setSelectedConnectionId(null);
+    }, []);
+
     const createTextNodeFromClipboard = useCallback(
         (text: string) => {
             const trimmed = text.trim();
@@ -147,7 +183,7 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
     const handleImageInputChange = useCallback(
         async (event: ReactChangeEvent<HTMLInputElement>) => {
             const files = Array.from(event.target.files || []).filter(
-                (f) => f.type.startsWith("image/") || f.type.startsWith("video/") || isAudioFile(f),
+                (f) => f.type.startsWith("image/") || f.type.startsWith("video/") || isMidiFile(f) || isAudioFile(f),
             );
             if (!files.length) {
                 uploadTargetRef.current = null;
@@ -169,7 +205,39 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
                 const [first, ...rest] = files;
 
                 // Replace the target node with the first file.
-                if (isAudioFile(first)) {
+                if (isMidiFile(first)) {
+                    const bytes = new Uint8Array(await first.arrayBuffer());
+                    const parsed = parseMidiFile(bytes);
+                    const uploaded = await uploadMediaFile(new Blob([bytes], { type: "audio/midi" }), "midi");
+                    const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Midi];
+                    setNodes((prev) =>
+                        prev.map((node) =>
+                            node.id === target.nodeId
+                                ? {
+                                      ...node,
+                                      type: CanvasNodeType.Midi,
+                                      title: first.name,
+                                      position: { x: node.position.x + node.width / 2 - spec.width / 2, y: node.position.y + node.height / 2 - spec.height / 2 },
+                                      width: spec.width,
+                                      height: spec.height,
+                                      metadata: {
+                                          ...node.metadata,
+                                          content: uploaded.url,
+                                          storageKey: uploaded.storageKey,
+                                          status: NODE_STATUS_SUCCESS,
+                                          bytes: uploaded.bytes,
+                                          mimeType: "audio/midi",
+                                          durationMs: parsed.durationMs,
+                                          midi: { trackCount: parsed.tracks.length, noteCount: parsed.noteCount, tempo: parsed.tempo, ppqn: parsed.ppq },
+                                          errorDetails: undefined,
+                                      },
+                                  }
+                                : node,
+                        ),
+                    );
+                    setSelectedNodeIds(new Set([target.nodeId]));
+                    setSelectedConnectionId(null);
+                } else if (isAudioFile(first)) {
                     const audio = await uploadMediaFile(first, "audio");
                     const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Audio];
                     setNodes((prev) =>
@@ -247,7 +315,9 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
                 for (let i = 0; i < rest.length; i++) {
                     const offsetPos = { x: basePosition.x + (i + 1) * STAGGER, y: basePosition.y + (i + 1) * STAGGER };
                     const f = rest[i];
-                    if (isAudioFile(f)) {
+                    if (isMidiFile(f)) {
+                        void createMidiFileNode(f, offsetPos);
+                    } else if (isAudioFile(f)) {
                         void createAudioFileNode(f, offsetPos);
                     } else if (f.type.startsWith("video/")) {
                         void createVideoFileNode(f, offsetPos);
@@ -260,7 +330,9 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
                 for (let i = 0; i < files.length; i++) {
                     const offsetPos = { x: basePosition.x + i * STAGGER, y: basePosition.y + i * STAGGER };
                     const f = files[i];
-                    if (isAudioFile(f)) {
+                    if (isMidiFile(f)) {
+                        void createMidiFileNode(f, offsetPos);
+                    } else if (isAudioFile(f)) {
                         void createAudioFileNode(f, offsetPos);
                     } else if (f.type.startsWith("video/")) {
                         void createVideoFileNode(f, offsetPos);
@@ -376,6 +448,21 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
         [insertFolderFile],
     );
 
+    const insertStudioAsset = useCallback(
+        async (kind: StudioAssetKind, projectId: string, position: Position) => {
+            const stores = { image: useImageStore.getState(), audio: useAudioStore.getState(), pixel: usePixelStore.getState(), write: useWritingStore.getState() };
+            const project = stores[kind].projects.find((item) => item.id === projectId);
+            if (!project) return;
+            try {
+                const output = await renderStudioAssetOutput(kind, { id: projectId, title: project.title, groupId: project.groupId }, { [kind]: project });
+                await insertFolderFile(output.file, position);
+            } catch {
+                return;
+            }
+        },
+        [insertFolderFile],
+    );
+
     const handleDrop = useCallback(
         (event: ReactDragEvent<HTMLDivElement>) => {
             event.preventDefault();
@@ -415,8 +502,19 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
                 return;
             }
 
+            if (event.dataTransfer.types.includes(STUDIO_ASSET_DRAG_MIME)) {
+                const raw = event.dataTransfer.getData(STUDIO_ASSET_DRAG_MIME);
+                try {
+                    const payload = JSON.parse(raw) as { kind?: StudioAssetKind; projectId?: string };
+                    if (payload.kind && payload.projectId) void insertStudioAsset(payload.kind, payload.projectId, screenToCanvas(event.clientX, event.clientY));
+                } catch {
+                    // Ignore malformed drag payloads.
+                }
+                return;
+            }
+
             const files = Array.from(event.dataTransfer.files).filter(
-                (item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item),
+                (item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isMidiFile(item) || isAudioFile(item),
             );
             if (!files.length) return;
 
@@ -425,7 +523,9 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
             for (let i = 0; i < files.length; i++) {
                 const pos = { x: basePos.x + i * STAGGER, y: basePos.y + i * STAGGER };
                 const f = files[i];
-                if (isAudioFile(f)) {
+                if (isMidiFile(f)) {
+                    void createMidiFileNode(f, pos);
+                } else if (isAudioFile(f)) {
                     void createAudioFileNode(f, pos);
                 } else if (f.type.startsWith("video/")) {
                     void createVideoFileNode(f, pos);
@@ -434,7 +534,7 @@ export function useCanvasInsertion(params: CanvasInsertionParams) {
                 }
             }
         },
-        [createAudioFileNode, createImageFileNode, createVideoFileNode, handleAssetInsert, insertBrowserCacheFile, insertFolderFile, screenToCanvas],
+        [createAudioFileNode, createImageFileNode, createMidiFileNode, createVideoFileNode, handleAssetInsert, insertBrowserCacheFile, insertFolderFile, insertStudioAsset, screenToCanvas],
     );
 
     return { handleUploadRequest, handleImageInputChange, handleAssetInsert, insertFolderFile, handleDrop, pasteSystemClipboard };

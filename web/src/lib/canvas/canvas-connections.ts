@@ -5,7 +5,6 @@ import type { CanvasConnection, CanvasNodeData, Position } from "@/types/canvas"
 const EDGE_SAMPLE_SEGMENTS = 24;
 
 const SOURCE_RELATIONS: Record<string, string> = {
-    [CanvasNodeType.SmartCanvas]: "composite",
     [CanvasNodeType.Text]: "prompt",
     [CanvasNodeType.Prompt]: "prompt",
     [CanvasNodeType.MusicPrompt]: "prompt",

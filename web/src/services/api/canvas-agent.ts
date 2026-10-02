@@ -8,17 +8,11 @@ class AgentApiError<T = unknown> extends Error {
     }
 }
 
-function agentHeaders(token: string, headers?: Record<string, string>) {
-    const next: Record<string, string> = { ...headers };
-    if (token) next.Authorization = `Bearer ${token}`;
-    return next;
-}
-
-export async function postState(endpoint: string, clientId: string, snapshot: AgentPageSnapshot | null, token = "") {
+export async function postState(endpoint: string, clientId: string, snapshot: AgentPageSnapshot | null) {
     try {
         const response = await fetch(`${endpoint}/canvas/state?clientId=${encodeURIComponent(clientId)}`, {
             method: "POST",
-            headers: agentHeaders(token, { "content-type": "application/json" }),
+            headers: { "content-type": "application/json" },
             body: JSON.stringify(snapshot ?? { hasCanvas: false }),
         });
         return response.ok;
@@ -27,14 +21,14 @@ export async function postState(endpoint: string, clientId: string, snapshot: Ag
     }
 }
 
-export async function activateAgentClient(endpoint: string, clientId: string, token = "") {
+export async function activateAgentClient(endpoint: string, clientId: string) {
     try {
-        await fetch(`${endpoint}/canvas/activate?clientId=${encodeURIComponent(clientId)}`, { method: "POST", headers: agentHeaders(token) });
+        await fetch(`${endpoint}/canvas/activate?clientId=${encodeURIComponent(clientId)}`, { method: "POST" });
     } catch {}
 }
 
-export async function postToolResult(endpoint: string, clientId: string, body: { requestId: string; result?: unknown; error?: string }, token = "") {
-    await fetchAgentJson(endpoint, `/canvas/result?clientId=${encodeURIComponent(clientId)}`, { method: "POST", headers: agentHeaders(token, { "content-type": "application/json" }), body: JSON.stringify(body) });
+export async function postToolResult(endpoint: string, clientId: string, body: { requestId: string; result?: unknown; error?: string }) {
+    await fetchAgentJson(endpoint, `/canvas/result?clientId=${encodeURIComponent(clientId)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 }
 
 async function fetchAgentJson<T>(endpoint: string, path: string, init?: RequestInit) {

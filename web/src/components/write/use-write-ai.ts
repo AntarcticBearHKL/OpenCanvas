@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import i18n from "@/i18n";
-import { runGenerationTaskWithRetry } from "@/lib/canvas/canvas-generation-helpers";
 import { findNode } from "@/lib/write/outline";
-import { childKindOf } from "@/lib/write/presets";
-import { buildOutlineExpandPrompt, buildWritePrompt, parseOutlineExpansion } from "@/lib/write/write-prompt";
+import { buildWritePrompt } from "@/lib/write/write-prompt";
 import { requestImageQuestion } from "@/services/api/image";
 import { resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useWriteUiStore } from "@/stores/use-write-ui-store";
@@ -12,6 +10,8 @@ import { useWritingStore } from "@/stores/use-writing-store";
 import type { WritingProject } from "@/types/writing";
 
 export type WriteAiMode = "continue" | "rewrite" | "expand" | "condense" | "polish" | "dialogue";
+
+export const WRITE_AI_MODES: WriteAiMode[] = ["continue", "rewrite", "expand", "condense", "polish", "dialogue"];
 
 type WriteAiState = { running: boolean; mode: WriteAiMode | null; text: string; error: string | null };
 
@@ -28,7 +28,6 @@ export function useWriteAi(): {
     runProse: (outlineId: string, mode: WriteAiMode, instruction?: string, selection?: string) => Promise<void>;
     stop: () => void;
     reset: () => void;
-    expandOutline: (nodeId: string, instruction?: string) => Promise<boolean>;
 } {
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
@@ -104,47 +103,5 @@ export function useWriteAi(): {
         setState(IDLE_STATE);
     }, []);
 
-    const expandOutline = useCallback(
-        async (nodeId: string, instruction = "") => {
-            const project = projectFor(nodeId);
-            const node = project ? findNode(project.outline, nodeId) : null;
-            if (!project || !node) {
-                fail();
-                return false;
-            }
-            const childKind = childKindOf(project.template, node.kind);
-            if (!childKind) return false;
-            if (!isAiConfigReady(config, config.model)) {
-                setState((prev) => ({ ...prev, error: i18n.t("writing.ai.needModel") }));
-                return false;
-            }
-            const prompt = buildOutlineExpandPrompt(project, node, instruction);
-            const controller = begin();
-            setState({ running: true, mode: null, text: "", error: null });
-            try {
-                const raw = await runGenerationTaskWithRetry(() => requestImageQuestion(config, [{ role: "user", content: prompt }], () => {}, { signal: controller.signal }), {
-                    signal: controller.signal,
-                });
-                const children = parseOutlineExpansion(raw);
-                if (!children) {
-                    if (!controller.signal.aborted) fail();
-                    return false;
-                }
-                const store = useWritingStore.getState();
-                children.forEach((child) => {
-                    const childId = store.addOutlineNode(project.id, node.id, childKind, child.title);
-                    if (child.description) store.updateOutlineNode(project.id, childId, { summary: child.description });
-                });
-                return true;
-            } catch {
-                if (!controller.signal.aborted) fail();
-                return false;
-            } finally {
-                finish(controller);
-            }
-        },
-        [begin, config, fail, finish, isAiConfigReady],
-    );
-
-    return { state, runProse, stop, reset, expandOutline };
+    return { state, runProse, stop, reset };
 }

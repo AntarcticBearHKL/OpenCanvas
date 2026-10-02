@@ -3,12 +3,13 @@ import { Check, Eye, EyeOff, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
-import { renderPsDocument } from "@/lib/canvas/smart-canvas";
+import type { PsBoardCommit } from "@/components/canvas/workspace/ps-layer-ops";
+import { renderPsDocument, type SmartCanvasBoard } from "@/lib/canvas/smart-canvas";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { STUDIO_FLAT_BUTTON_CLASS } from "@/components/canvas/workspace/studio-chrome";
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { psSelectionBlob, type PsSelection } from "@/components/canvas/workspace/ps-selection";
-import type { CanvasNodeData, CanvasNodeMetadata, CanvasPsAlphaChannel } from "@/types/canvas";
+import type { CanvasPsAlphaChannel } from "@/types/canvas";
 
 export type PsChannelView = "rgb" | "r" | "g" | "b";
 
@@ -20,11 +21,9 @@ const DEFAULT_VISIBILITY = { r: true, g: true, b: true };
 /** Channel view is a viewing mode, not a document effect: the composite comes from the shared renderer and only the shown channel changes. */
 export function PsChannelPreview({
     board,
-    nodes,
     channel,
 }: {
-    board?: CanvasNodeData | null;
-    nodes: CanvasNodeData[];
+    board?: SmartCanvasBoard | null;
     channel: PsChannelView;
 }) {
     const [url, setUrl] = useState("");
@@ -35,7 +34,7 @@ export function PsChannelPreview({
             return;
         }
         let active = true;
-        void renderPsDocument(board, nodes, { width: board.width, height: board.height }).then(({ canvas }) => {
+        void renderPsDocument(board, { width: board.width, height: board.height }).then(({ canvas }) => {
             const context = canvas?.getContext("2d");
             if (!active || !canvas || !context) return;
             const index = channel === "r" ? 0 : channel === "g" ? 1 : 2;
@@ -54,7 +53,7 @@ export function PsChannelPreview({
         return () => {
             active = false;
         };
-    }, [board, nodes, channel]);
+    }, [board, channel]);
 
     if (channel === "rgb" || !url) return null;
     return <img src={url} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill" />;
@@ -62,14 +61,14 @@ export function PsChannelPreview({
 
 export function PsChannelsPanel({
     board,
-    onBoardChange,
+    commitBoard,
     selection,
     onLoadSelection,
     view,
     onView,
 }: {
-    board?: CanvasNodeData | null;
-    onBoardChange: (boardId: string, patch: Partial<CanvasNodeMetadata>) => void;
+    board?: SmartCanvasBoard | null;
+    commitBoard: PsBoardCommit;
     selection: HTMLCanvasElement | null;
     onLoadSelection: (selection: PsSelection) => void;
     view: PsChannelView;
@@ -80,8 +79,8 @@ export function PsChannelsPanel({
 
     if (!board) return null;
 
-    const channels = board.metadata?.boardAlphaChannels ?? EMPTY_CHANNELS;
-    const visibility = board.metadata?.boardChannelVisibility ?? DEFAULT_VISIBILITY;
+    const channels = board.boardAlphaChannels ?? EMPTY_CHANNELS;
+    const visibility = board.boardChannelVisibility ?? DEFAULT_VISIBILITY;
     const [urls, setUrls] = useState<Record<string, string>>({});
     const [renamingId, setRenamingId] = useState("");
     const [nameDraft, setNameDraft] = useState("");
@@ -113,7 +112,7 @@ export function PsChannelsPanel({
         };
     }, [channelKeys]);
 
-    const setChannels = (next: CanvasPsAlphaChannel[]) => onBoardChange(board.id, { boardAlphaChannels: next });
+    const setChannels = (next: CanvasPsAlphaChannel[]) => commitBoard(board.id, { boardAlphaChannels: next });
     const saveSelection = async () => {
         if (!selection) return;
         const blob = await psSelectionBlob(selection);
@@ -143,7 +142,7 @@ export function PsChannelsPanel({
     const toggle = (key: "r" | "g" | "b") => {
         const next = { ...visibility, [key]: !visibility[key] };
         if (!next.r && !next.g && !next.b) return;
-        onBoardChange(board.id, { boardChannelVisibility: next });
+        commitBoard(board.id, { boardChannelVisibility: next });
     };
     const compositeRows: { key: PsChannelView; label: string }[] = [
         { key: "rgb", label: t("canvas.ps.channelRgb") },

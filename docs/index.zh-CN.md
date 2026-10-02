@@ -38,6 +38,3 @@
 - 当前画布项目和文本创作器的作品主要保存在浏览器本地，暂不提供云同步。
 - AI API Key 保存在浏览器本地，并由前端直接请求 OpenAI 兼容接口。
 
-## 原理说明
-
-- [本地画布 MCP 连接画布原理](/zh-CN/docs/development/local-canvas-mcp)

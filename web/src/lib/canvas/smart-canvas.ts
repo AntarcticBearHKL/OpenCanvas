@@ -9,9 +9,31 @@ import { drawPsWarpedContent, psHasTransform, psTransformMesh } from "@/lib/canv
 import { psComposeLayerStyles, psStylePadding } from "@/lib/canvas/ps-layer-styles";
 import { readMediaDimensions } from "@/lib/media-size";
 import { resolveImageUrl } from "@/services/image-storage";
-import { CanvasNodeType, type CanvasNodeData, type CanvasPsAdjustmentType, type CanvasPsLayer, type CanvasPsLayerStyle, type CanvasPsPath, type CanvasPsShapeKind } from "@/types/canvas";
+import type { CanvasPsAdjustmentType, CanvasPsAlphaChannel, CanvasPsLayer, CanvasPsLayerStyle, CanvasPsPath, CanvasPsShapeKind } from "@/types/canvas";
 
 export type SmartCanvasResolution = "1k" | "2k" | "4k";
+
+/**
+ * Standalone board document shared by the Image Studio project and the layer compositor; the doc fields sit at the
+ * top level because the document no longer lives inside a canvas node's metadata.
+ */
+export type SmartCanvasBoard = {
+    id: string;
+    title: string;
+    width: number;
+    height: number;
+    boardRatio: string;
+    boardResolution: SmartCanvasResolution;
+    boardBackground: string;
+    boardBackgroundOpacity: number;
+    boardLayers: CanvasPsLayer[];
+    boardPaths?: CanvasPsPath[];
+    boardAlphaChannels?: CanvasPsAlphaChannel[];
+    boardChannelVisibility?: { r: boolean; g: boolean; b: boolean };
+};
+
+/** Image source a board layer can be created from; either an `image:` storageKey or a plain content URL. */
+export type PsImageSource = { title: string; width: number; height: number; naturalWidth?: number; naturalHeight?: number; storageKey?: string; content?: string };
 
 export const PS_SHAPE_KINDS: CanvasPsShapeKind[] = ["rectangle", "rounded-rectangle", "ellipse", "polygon", "line"];
 
@@ -38,20 +60,20 @@ type SmartCanvasComposite = {
     height: number;
 };
 
-export function smartCanvasRatio(board: CanvasNodeData) {
-    return board.metadata?.boardRatio || SMART_CANVAS_DEFAULT_RATIO;
+export function smartCanvasRatio(board: SmartCanvasBoard) {
+    return board.boardRatio || SMART_CANVAS_DEFAULT_RATIO;
 }
 
-export function smartCanvasResolution(board: CanvasNodeData) {
-    return board.metadata?.boardResolution || SMART_CANVAS_DEFAULT_RESOLUTION;
+export function smartCanvasResolution(board: SmartCanvasBoard) {
+    return board.boardResolution || SMART_CANVAS_DEFAULT_RESOLUTION;
 }
 
-export function smartCanvasBackground(board: CanvasNodeData) {
-    return board.metadata?.boardBackground || SMART_CANVAS_DEFAULT_BACKGROUND;
+export function smartCanvasBackground(board: SmartCanvasBoard) {
+    return board.boardBackground || SMART_CANVAS_DEFAULT_BACKGROUND;
 }
 
-export function smartCanvasBackgroundOpacity(board: CanvasNodeData) {
-    return clampLayerOpacity(board.metadata?.boardBackgroundOpacity);
+export function smartCanvasBackgroundOpacity(board: SmartCanvasBoard) {
+    return clampLayerOpacity(board.boardBackgroundOpacity);
 }
 
 export function smartCanvasFill(color: string, opacity: number) {
@@ -62,12 +84,12 @@ export function smartCanvasSizeForRatio(ratio: string) {
     return nodeSizeFromRatio(ratio, SMART_CANVAS_BASE_WIDTH, SMART_CANVAS_BASE_HEIGHT) || { width: SMART_CANVAS_BASE_WIDTH, height: SMART_CANVAS_BASE_HEIGHT };
 }
 
-function smartCanvasTargetSize(board: CanvasNodeData) {
+function smartCanvasTargetSize(board: SmartCanvasBoard) {
     return readMediaDimensions("", smartCanvasResolution(board), smartCanvasRatio(board));
 }
 
-export function smartCanvasLayers(board: CanvasNodeData) {
-    return board.metadata?.boardLayers ?? EMPTY_LAYERS;
+export function smartCanvasLayers(board: SmartCanvasBoard) {
+    return board.boardLayers ?? EMPTY_LAYERS;
 }
 
 /** Ids of layers that live inside a group; those layers are composited by the group, never at document level. */
@@ -88,8 +110,8 @@ export function psGroupChildren(layers: CanvasPsLayer[], group: CanvasPsLayer) {
 }
 
 /** True when the document uses something CSS cannot express, so previews must render through the shared raster compositor. */
-export function psDocumentNeedsRaster(board: CanvasNodeData) {
-    const channels = board.metadata?.boardChannelVisibility;
+export function psDocumentNeedsRaster(board: SmartCanvasBoard) {
+    const channels = board.boardChannelVisibility;
     if (channels && (!channels.r || !channels.g || !channels.b)) return true;
     return smartCanvasLayers(board).some((layer) => !layer.hidden && (layer.kind === "adjustment" || psHasTransform(layer) || (layer.kind === "text" && psTextNeedsRaster(layer)) || Boolean(layer.styles?.some((style) => style.enabled))));
 }
@@ -123,11 +145,11 @@ export function psLayerBox(layers: CanvasPsLayer[], layer: CanvasPsLayer) {
     return { x, y, width: Math.max(...corners.map((point) => point.x)) - x, height: Math.max(...corners.map((point) => point.y)) - y };
 }
 
-export function createPsPixelLayer(board: CanvasNodeData, name: string): CanvasPsLayer {
+export function createPsPixelLayer(board: Pick<SmartCanvasBoard, "width" | "height">, name: string): CanvasPsLayer {
     return { id: nanoid(), name, kind: "pixel", x: 0, y: 0, width: Math.max(1, Math.round(board.width)), height: Math.max(1, Math.round(board.height)), rotation: 0, opacity: 1, blendMode: DEFAULT_BLEND_MODE, hidden: false, locked: false };
 }
 
-export function createPsTextLayer(board: CanvasNodeData, text: string, name: string): CanvasPsLayer {
+export function createPsTextLayer(board: Pick<SmartCanvasBoard, "width" | "height">, text: string, name: string): CanvasPsLayer {
     const fontSize = BOARD_TEXT_FONT_SIZE;
     const width = Math.max(1, Math.round(board.width * 0.6));
     const height = Math.max(1, Math.round(fontSize * 1.2));
@@ -154,13 +176,13 @@ export function createPsShapeLayer(kind: CanvasPsShapeKind, box: { x: number; y:
     return { id: nanoid(), name, kind: "shape", shape: kind, shapeRadius: 24, shapeSides: 6, shapeFill: fill, shapeStroke: stroke, shapeStrokeWidth: strokeWidth, ...box, rotation: 0, opacity: 1, blendMode: DEFAULT_BLEND_MODE, hidden: false, locked: false };
 }
 
-export function createPsAdjustmentLayer(board: CanvasNodeData, type: CanvasPsAdjustmentType, name: string): CanvasPsLayer {
+export function createPsAdjustmentLayer(board: Pick<SmartCanvasBoard, "width" | "height">, type: CanvasPsAdjustmentType, name: string): CanvasPsLayer {
     return { id: nanoid(), name, kind: "adjustment", adjustment: type, adjustmentParams: psCopyParams(PS_ADJUSTMENT_DEFAULTS[type]), x: 0, y: 0, width: Math.max(1, Math.round(board.width)), height: Math.max(1, Math.round(board.height)), rotation: 0, opacity: 1, blendMode: DEFAULT_BLEND_MODE, hidden: false, locked: false };
 }
 
-export function createPsImageLayer(board: CanvasNodeData, source: CanvasNodeData): CanvasPsLayer {
-    const sourceWidth = source.metadata?.naturalWidth || source.width;
-    const sourceHeight = source.metadata?.naturalHeight || source.height;
+export function createPsImageLayer(board: Pick<SmartCanvasBoard, "width" | "height">, source: PsImageSource): CanvasPsLayer {
+    const sourceWidth = source.naturalWidth || source.width;
+    const sourceHeight = source.naturalHeight || source.height;
     const scale = sourceWidth > 0 && sourceHeight > 0 ? Math.min(board.width / sourceWidth, board.height / sourceHeight) : 0;
     const width = Math.max(1, Math.round(scale ? sourceWidth * scale : board.width));
     const height = Math.max(1, Math.round(scale ? sourceHeight * scale : board.height));
@@ -168,7 +190,8 @@ export function createPsImageLayer(board: CanvasNodeData, source: CanvasNodeData
         id: nanoid(),
         name: source.title,
         kind: "image",
-        sourceNodeId: source.id,
+        storageKey: source.storageKey,
+        content: source.content,
         x: Math.round((board.width - width) / 2),
         y: Math.round((board.height - height) / 2),
         width,
@@ -181,7 +204,7 @@ export function createPsImageLayer(board: CanvasNodeData, source: CanvasNodeData
     };
 }
 
-export function movePsLayer(board: CanvasNodeData, layerId: string, direction: "forward" | "backward") {
+export function movePsLayer(board: SmartCanvasBoard, layerId: string, direction: "forward" | "backward") {
     const layers = smartCanvasLayers(board);
     const index = layers.findIndex((layer) => layer.id === layerId);
     const target = index + (direction === "forward" ? 1 : -1);
@@ -225,7 +248,7 @@ function boardGridCells(x: number, y: number, width: number, height: number, cou
     return Array.from({ length: count }, (_, index) => ({ x: x + BOARD_LAYOUT_GAP + (index % cols) * (cellWidth + BOARD_LAYOUT_GAP), y: y + BOARD_LAYOUT_GAP + Math.floor(index / cols) * (cellHeight + BOARD_LAYOUT_GAP), width: cellWidth, height: cellHeight }));
 }
 
-function featureBoardCells(board: CanvasNodeData, count: number): BoardCell[] {
+function featureBoardCells(board: Pick<SmartCanvasBoard, "width" | "height">, count: number): BoardCell[] {
     const half = (board.width - BOARD_LAYOUT_GAP * 3) / 2;
     const first: BoardCell = { x: BOARD_LAYOUT_GAP, y: BOARD_LAYOUT_GAP, width: half, height: board.height - BOARD_LAYOUT_GAP * 2 };
     const rest = count - 1;
@@ -239,8 +262,8 @@ function fitPsLayerCell(layer: CanvasPsLayer, cell: BoardCell) {
     return { x: Math.round(cell.x + (cell.width - width) / 2), y: Math.round(cell.y + (cell.height - height) / 2), width, height };
 }
 
-export function arrangePsLayers(board: CanvasNodeData, template: BoardLayoutTemplate = "grid") {
-    const layers = smartCanvasLayers(board);
+export function arrangePsLayers(board: Pick<SmartCanvasBoard, "width" | "height" | "boardLayers">, template: BoardLayoutTemplate = "grid") {
+    const layers = board.boardLayers ?? EMPTY_LAYERS;
     const images = psTopLayers(layers).filter((layer) => layer.kind === "image");
     const count = images.length;
     if (!count) return layers;
@@ -257,14 +280,10 @@ const SMART_CANVAS_COMPOSITE_CACHE_LIMIT = 2;
 
 const compositeCache = new Map<string, SmartCanvasComposite>();
 
-function compositeSignature(board: CanvasNodeData, nodes: CanvasNodeData[], visited: Set<string>): string {
-    const parts = [board.id, board.position.x, board.position.y, board.width, board.height, smartCanvasRatio(board), smartCanvasResolution(board), smartCanvasBackground(board), String(smartCanvasBackgroundOpacity(board))];
+function compositeSignature(board: SmartCanvasBoard): string {
+    const parts = [board.id, board.width, board.height, smartCanvasRatio(board), smartCanvasResolution(board), smartCanvasBackground(board), String(smartCanvasBackgroundOpacity(board))];
     smartCanvasLayers(board).forEach((layer) => {
         parts.push(JSON.stringify(layer));
-        const source = layer.sourceNodeId ? nodes.find((node) => node.id === layer.sourceNodeId) : undefined;
-        if (!source) return;
-        parts.push(`${source.id}:${source.metadata?.storageKey || source.metadata?.content || ""}`);
-        if (source.type === CanvasNodeType.SmartCanvas && !visited.has(source.id)) parts.push(compositeSignature(source, nodes, new Set(visited).add(source.id)));
     });
     return parts.join("|");
 }
@@ -280,14 +299,14 @@ function cacheComposite(signature: string, composite: SmartCanvasComposite) {
     return composite;
 }
 
-export function psCompositeSignature(board: CanvasNodeData, nodes: CanvasNodeData[]) {
-    return compositeSignature(board, nodes, new Set([board.id]));
+export function psCompositeSignature(board: SmartCanvasBoard) {
+    return compositeSignature(board);
 }
 
 export type PsDocumentRender = { canvas: HTMLCanvasElement | null; width: number; height: number };
 
-/** Shared raster renderer: the export path, the editor surface and the board preview all draw through this one function. */
-export async function renderPsDocument(board: CanvasNodeData, nodes: CanvasNodeData[], options: { width?: number; height?: number; visited?: Set<string> } = {}): Promise<PsDocumentRender> {
+/** Shared raster renderer: the export path and the editor surface both draw through this one function. */
+export async function renderPsDocument(board: SmartCanvasBoard, options: { width?: number; height?: number } = {}): Promise<PsDocumentRender> {
     const target = options.width && options.height ? { width: options.width, height: options.height } : smartCanvasTargetSize(board);
     const width = Math.max(1, Math.round(target.width));
     const height = Math.max(1, Math.round(target.height));
@@ -298,8 +317,6 @@ export async function renderPsDocument(board: CanvasNodeData, nodes: CanvasNodeD
 
     const scaleX = width / Math.max(1, board.width);
     const scaleY = height / Math.max(1, board.height);
-    const nextVisited = new Set(options.visited);
-    nextVisited.add(board.id);
 
     context.beginPath();
     context.rect(0, 0, width, height);
@@ -314,22 +331,22 @@ export async function renderPsDocument(board: CanvasNodeData, nodes: CanvasNodeD
     }
 
     const layers = smartCanvasLayers(board);
-    const paths = board.metadata?.boardPaths ?? EMPTY_PATHS;
+    const paths = board.boardPaths ?? EMPTY_PATHS;
     for (const layer of psTopLayers(layers)) {
         if (layer.hidden) continue;
         if (layer.kind === "group") {
-            await drawPsGroup(context, layer, layers, nodes, nextVisited, width, height, scaleX, scaleY, paths);
+            await drawPsGroup(context, layer, layers, width, height, scaleX, scaleY, paths);
             continue;
         }
-        await drawPsLayer(context, layer, nodes, nextVisited, scaleX, scaleY, paths);
+        await drawPsLayer(context, layer, scaleX, scaleY, paths);
     }
     psApplyChannelVisibility(context, board);
     return { canvas, width, height };
 }
 
 /** Hidden channels drop out of the finished composite, so the preview and the export agree on what a hidden channel means. */
-function psApplyChannelVisibility(context: CanvasRenderingContext2D, board: CanvasNodeData) {
-    const channels = board.metadata?.boardChannelVisibility;
+function psApplyChannelVisibility(context: CanvasRenderingContext2D, board: SmartCanvasBoard) {
+    const channels = board.boardChannelVisibility;
     if (!channels || (channels.r && channels.g && channels.b)) return;
     const width = context.canvas.width;
     const height = context.canvas.height;
@@ -342,11 +359,11 @@ function psApplyChannelVisibility(context: CanvasRenderingContext2D, board: Canv
     context.putImageData(image, 0, 0);
 }
 
-export async function composeSmartCanvas(board: CanvasNodeData, nodes: CanvasNodeData[], visited: Set<string> = new Set()): Promise<SmartCanvasComposite> {
-    const signature = visited.size ? "" : psCompositeSignature(board, nodes);
-    const cached = signature ? compositeCache.get(signature) : undefined;
+export async function composeSmartCanvas(board: SmartCanvasBoard): Promise<SmartCanvasComposite> {
+    const signature = psCompositeSignature(board);
+    const cached = compositeCache.get(signature);
     if (cached) return cached;
-    const { canvas, width, height } = await renderPsDocument(board, nodes, { visited });
+    const { canvas, width, height } = await renderPsDocument(board);
     if (!canvas) return { dataUrl: "", width, height };
     try {
         return cacheComposite(signature, { dataUrl: canvas.toDataURL("image/png"), width, height });
@@ -355,7 +372,7 @@ export async function composeSmartCanvas(board: CanvasNodeData, nodes: CanvasNod
     }
 }
 
-async function drawPsLayer(context: CanvasRenderingContext2D, layer: CanvasPsLayer, nodes: CanvasNodeData[], visited: Set<string>, scaleX: number, scaleY: number, paths: CanvasPsPath[]) {
+async function drawPsLayer(context: CanvasRenderingContext2D, layer: CanvasPsLayer, scaleX: number, scaleY: number, paths: CanvasPsPath[]) {
     if (layer.kind === "adjustment") {
         await drawPsAdjustment(context, layer, scaleX, scaleY);
         return;
@@ -375,7 +392,7 @@ async function drawPsLayer(context: CanvasRenderingContext2D, layer: CanvasPsLay
         const pad = styles.length ? psStylePadding(styles, scale) : 0;
         const scratch = createCanvasContext(Math.max(1, Math.round(layerWidth)) + pad * 2, Math.max(1, Math.round(layerHeight)) + pad * 2);
         if (scratch.context) {
-            await drawPsLayerContent(scratch.context, layer, nodes, visited, layerWidth, layerHeight, scaleY, { x: pad, y: pad }, paths);
+            await drawPsLayerContent(scratch.context, layer, layerWidth, layerHeight, scaleY, { x: pad, y: pad }, paths);
             let content = styles.length ? psComposeLayerStyles(scratch.canvas, styles, scale, await psStylePatterns(styles)) : scratch.canvas;
             if (mask) {
                 const masked = createCanvasContext(content.width, content.height);
@@ -390,7 +407,7 @@ async function drawPsLayer(context: CanvasRenderingContext2D, layer: CanvasPsLay
             else context.drawImage(content, -layerWidth / 2 - pad, -layerHeight / 2 - pad, content.width, content.height);
         }
     } else {
-        await drawPsLayerContent(context, layer, nodes, visited, layerWidth, layerHeight, scaleY, { x: -layerWidth / 2, y: -layerHeight / 2 }, paths);
+        await drawPsLayerContent(context, layer, layerWidth, layerHeight, scaleY, { x: -layerWidth / 2, y: -layerHeight / 2 }, paths);
     }
     context.restore();
 }
@@ -429,7 +446,7 @@ async function drawPsAdjustment(context: CanvasRenderingContext2D, layer: Canvas
     context.restore();
 }
 
-async function drawPsLayerContent(context: CanvasRenderingContext2D, layer: CanvasPsLayer, nodes: CanvasNodeData[], visited: Set<string>, width: number, height: number, scaleY: number, origin: { x: number; y: number }, paths: CanvasPsPath[]) {
+async function drawPsLayerContent(context: CanvasRenderingContext2D, layer: CanvasPsLayer, width: number, height: number, scaleY: number, origin: { x: number; y: number }, paths: CanvasPsPath[]) {
     if (layer.kind === "text") {
         drawPsTextLayer(context, layer, width, height, scaleY, origin.x, origin.y, paths);
         return;
@@ -441,7 +458,7 @@ async function drawPsLayerContent(context: CanvasRenderingContext2D, layer: Canv
         context.restore();
         return;
     }
-    const element = await resolvePsLayerBitmap(layer, nodes, visited);
+    const element = await resolvePsLayerBitmap(layer);
     if (element) context.drawImage(element, origin.x, origin.y, width, height);
 }
 
@@ -469,14 +486,14 @@ async function resolvePsMaskBitmap(storageKey: string) {
 }
 
 // Children composite into an isolated layer first so the group's own opacity and blend mode apply to the flattened child result once.
-async function drawPsGroup(context: CanvasRenderingContext2D, group: CanvasPsLayer, layers: CanvasPsLayer[], nodes: CanvasNodeData[], visited: Set<string>, width: number, height: number, scaleX: number, scaleY: number, paths: CanvasPsPath[]) {
+async function drawPsGroup(context: CanvasRenderingContext2D, group: CanvasPsLayer, layers: CanvasPsLayer[], width: number, height: number, scaleX: number, scaleY: number, paths: CanvasPsPath[]) {
     const { canvas, context: groupContext } = createCanvasContext(width, height);
     if (!groupContext) return;
     groupContext.imageSmoothingEnabled = true;
     groupContext.imageSmoothingQuality = "high";
     for (const child of psGroupChildren(layers, group)) {
         if (child.hidden) continue;
-        await drawPsLayer(groupContext, child, nodes, visited, scaleX, scaleY, paths);
+        await drawPsLayer(groupContext, child, scaleX, scaleY, paths);
     }
     const scale = (scaleX + scaleY) / 2;
     const styles = (group.styles || []).filter((style) => style.enabled);
@@ -508,8 +525,7 @@ async function drawPsGroup(context: CanvasRenderingContext2D, group: CanvasPsLay
 }
 
 /** Rasterises one layer's content (a group flattens its children) into its own box, used when a filter has to bake a text / shape / image / group layer. */
-export async function renderPsLayerBitmap(layer: CanvasPsLayer, layers: CanvasPsLayer[], nodes: CanvasNodeData[], paths: CanvasPsPath[] = EMPTY_PATHS): Promise<HTMLCanvasElement | null> {
-    const visited = new Set<string>();
+export async function renderPsLayerBitmap(layer: CanvasPsLayer, layers: CanvasPsLayer[], paths: CanvasPsPath[] = EMPTY_PATHS): Promise<HTMLCanvasElement | null> {
     if (layer.kind === "group") {
         const box = psLayerBox(layers, layer);
         const canvas = createCanvasContext(Math.max(1, Math.round(box.width)), Math.max(1, Math.round(box.height)));
@@ -519,7 +535,7 @@ export async function renderPsLayerBitmap(layer: CanvasPsLayer, layers: CanvasPs
         canvas.context.translate(-box.x, -box.y);
         for (const child of psGroupChildren(layers, layer)) {
             if (child.hidden) continue;
-            await drawPsLayer(canvas.context, child, nodes, visited, 1, 1, paths);
+            await drawPsLayer(canvas.context, child, 1, 1, paths);
         }
         return canvas.canvas;
     }
@@ -529,24 +545,16 @@ export async function renderPsLayerBitmap(layer: CanvasPsLayer, layers: CanvasPs
     if (!canvas.context) return null;
     canvas.context.imageSmoothingEnabled = true;
     canvas.context.imageSmoothingQuality = "high";
-    await drawPsLayerContent(canvas.context, layer, nodes, visited, width, height, 1, { x: 0, y: 0 }, paths);
+    await drawPsLayerContent(canvas.context, layer, width, height, 1, { x: 0, y: 0 }, paths);
     return canvas.canvas;
 }
 
-async function resolvePsLayerBitmap(layer: CanvasPsLayer, nodes: CanvasNodeData[], visited: Set<string>) {
-    if (layer.kind === "pixel") {
-        const url = await resolveImageUrl(layer.storageKey);
+async function resolvePsLayerBitmap(layer: CanvasPsLayer) {
+    if (layer.kind === "pixel" || layer.kind === "image") {
+        const url = await resolveImageUrl(layer.storageKey, layer.content || "");
         return url ? loadCompositeImage(url) : null;
     }
-    const source = layer.sourceNodeId ? nodes.find((node) => node.id === layer.sourceNodeId) : undefined;
-    if (!source) return null;
-    if (source.type === CanvasNodeType.SmartCanvas) {
-        if (visited.has(source.id)) return null;
-        const nested = await composeSmartCanvas(source, nodes, new Set(visited).add(source.id));
-        return nested.dataUrl ? loadCompositeImage(nested.dataUrl) : null;
-    }
-    const url = await resolveImageUrl(source.metadata?.storageKey, source.metadata?.content || "");
-    return url ? loadCompositeImage(url) : null;
+    return null;
 }
 
 function drawPsTextLayer(context: CanvasRenderingContext2D, layer: CanvasPsLayer, width: number, height: number, scale: number, originX = -width / 2, originY = -height / 2, paths: CanvasPsPath[] = EMPTY_PATHS) {

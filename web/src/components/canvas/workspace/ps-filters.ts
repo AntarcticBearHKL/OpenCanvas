@@ -3,7 +3,7 @@ import { renderPsLayerBitmap } from "@/lib/canvas/smart-canvas";
 import { psBitmapSize, psCanvasToBlob, psLoadImage } from "@/components/canvas/workspace/ps-paint";
 import { psSelectionToLayerSpace, type PsSelection } from "@/components/canvas/workspace/ps-selection";
 import { resolveImageUrl } from "@/services/image-storage";
-import type { CanvasNodeData, CanvasPsLayer } from "@/types/canvas";
+import type { CanvasPsLayer } from "@/types/canvas";
 
 export type PsFilterType =
     | "gaussian-blur"
@@ -659,7 +659,7 @@ export function psLiquifyPush(image: ImageData, point: { x: number; y: number },
 }
 
 /** Loads the bitmap a filter will rewrite: a pixel layer's own bitmap, an image layer's source, or a rasterised text / shape / group layer. */
-export async function psLoadFilterSource(layer: CanvasPsLayer, layers: CanvasPsLayer[], nodes: CanvasNodeData[]) {
+export async function psLoadFilterSource(layer: CanvasPsLayer, layers: CanvasPsLayer[]) {
     const width = psBitmapSize(layer.width);
     const height = psBitmapSize(layer.height);
     const { canvas, context } = createCanvasContext(width, height);
@@ -667,13 +667,12 @@ export async function psLoadFilterSource(layer: CanvasPsLayer, layers: CanvasPsL
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
     if (layer.kind === "pixel" || layer.kind === "image") {
-        const source = layer.kind === "pixel" ? undefined : nodes.find((node) => node.id === layer.sourceNodeId);
-        const url = layer.kind === "pixel" ? await resolveImageUrl(layer.storageKey) : await resolveImageUrl(source?.metadata?.storageKey, source?.metadata?.content || "");
+        const url = await resolveImageUrl(layer.storageKey, layer.content || "");
         const image = await psLoadImage(url);
         if (image) context.drawImage(image, 0, 0, width, height);
         return canvas;
     }
-    const rasterised = await renderPsLayerBitmap(layer, layers, nodes);
+    const rasterised = await renderPsLayerBitmap(layer, layers);
     if (rasterised) context.drawImage(rasterised, 0, 0, width, height);
     return canvas;
 }
@@ -719,8 +718,8 @@ export function psMixFiltered(base: ImageData, filtered: ImageData, mask: Float3
     return base;
 }
 
-export async function psFilterLayerBitmap(layer: CanvasPsLayer, layers: CanvasPsLayer[], nodes: CanvasNodeData[], type: PsFilterType, params: PsFilterParams, source: { selection: PsSelection | null; maskUrl?: string }) {
-    const canvas = await psLoadFilterSource(layer, layers, nodes);
+export async function psFilterLayerBitmap(layer: CanvasPsLayer, layers: CanvasPsLayer[], type: PsFilterType, params: PsFilterParams, source: { selection: PsSelection | null; maskUrl?: string }) {
+    const canvas = await psLoadFilterSource(layer, layers);
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return null;
     const base = context.getImageData(0, 0, canvas.width, canvas.height);

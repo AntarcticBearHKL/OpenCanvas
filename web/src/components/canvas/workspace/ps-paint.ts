@@ -1,9 +1,9 @@
 import { createCanvasContext } from "@/lib/canvas/canvas-2d";
 import { resolveBlendMode } from "@/lib/canvas/blend-modes";
-import { composeSmartCanvas, psRotatePoint } from "@/lib/canvas/smart-canvas";
+import { composeSmartCanvas, psRotatePoint, type SmartCanvasBoard } from "@/lib/canvas/smart-canvas";
 import { psSelectionToLayerSpace, type PsSelection } from "@/components/canvas/workspace/ps-selection";
 import { resolveImageUrl } from "@/services/image-storage";
-import type { CanvasNodeData, CanvasPsLayer } from "@/types/canvas";
+import type { CanvasPsLayer } from "@/types/canvas";
 
 export type PsPaintPoint = { x: number; y: number };
 export type PsBrushOptions = { size: number; hardness: number; opacity: number; tolerance: number; color: string; spacing?: number; scatter?: number; angle?: number; roundness?: number; dynamics?: number; texture?: number };
@@ -448,8 +448,8 @@ export async function psLoadLayerPixels(layer: CanvasPsLayer, width: number, hei
 }
 
 /** The eyedropper reads the composited board, i.e. the same pixels the export writes. */
-export async function psLoadBoardSampler(board: CanvasNodeData, nodes: CanvasNodeData[]): Promise<PsBoardSampler | null> {
-    const composite = await composeSmartCanvas(board, nodes);
+export async function psLoadBoardSampler(board: SmartCanvasBoard): Promise<PsBoardSampler | null> {
+    const composite = await composeSmartCanvas(board);
     if (!composite.dataUrl) return null;
     const image = await psLoadImage(composite.dataUrl);
     if (!image) return null;
@@ -460,8 +460,8 @@ export async function psLoadBoardSampler(board: CanvasNodeData, nodes: CanvasNod
 }
 
 /** The composite scaled into document coordinates, which is the space the selection mask lives in. */
-export async function psLoadBoardPixels(board: CanvasNodeData, nodes: CanvasNodeData[], width: number, height: number) {
-    const composite = await composeSmartCanvas(board, nodes);
+export async function psLoadBoardPixels(board: SmartCanvasBoard, width: number, height: number) {
+    const composite = await composeSmartCanvas(board);
     if (!composite.dataUrl) return null;
     return psLoadPixels(width, height, composite.dataUrl);
 }

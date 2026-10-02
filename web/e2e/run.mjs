@@ -14,7 +14,7 @@ const CHROME = ["C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", "C
 const LIB_ASSERTIONS = `(async () => {
     const results = [];
     const ok = (name, pass, detail) => results.push({ name, pass: !!pass, detail: detail === undefined ? "" : String(detail) });
-    const board = { id: "b", type: "smart-canvas", title: "b", position: { x: 0, y: 0 }, width: 640, height: 360, metadata: {} };
+    const board = { id: "b", title: "b", width: 640, height: 360, boardRatio: "16:9", boardResolution: "2k", boardBackground: "transparent", boardBackgroundOpacity: 1, boardLayers: [] };
     const image = (id, width, height, position) => ({ id, type: "image", title: id, position: position || { x: 0, y: 0 }, width, height, metadata: { naturalWidth: width, naturalHeight: height } });
 
     const smart = await import("/src/lib/canvas/smart-canvas.ts");
@@ -27,12 +27,12 @@ const LIB_ASSERTIONS = `(async () => {
     ok("arrange empty", JSON.stringify(smart.arrangePsLayers(board)) === "[]");
 
     const layer = (id, width, height, extra) => ({ id, name: id, kind: "image", x: 0, y: 0, width, height, rotation: 0, opacity: 1, blendMode: "normal", hidden: false, locked: false, ...extra });
-    const layered = { ...board, metadata: { boardLayers: [layer("a", 240, 120)] } };
+    const layered = { ...board, boardLayers: [layer("a", 240, 120)] };
     const one = smart.arrangePsLayers(layered);
     ok("arrange 1 cols=1, gap 16, centred", one[0].width === 608 && one[0].height === 304 && one[0].x === 16 && one[0].y === 28, JSON.stringify(one[0]));
 
     const textLayer = layer("t1", 100, 40, { kind: "text", text: "hi", fontSize: 20, color: "#ffffff" });
-    const mixed = { ...board, metadata: { boardLayers: [layer("a", 400, 300), textLayer, layer("b", 1000, 100), layer("c", 50, 50)] } };
+    const mixed = { ...board, boardLayers: [layer("a", 400, 300), textLayer, layer("b", 1000, 100), layer("c", 50, 50)] };
     const three = smart.arrangePsLayers(mixed);
     ok("arrange 3 grid", three[0].width === 208 && three[0].height === 156 && three[2].width === 296 && three[3].height === 156, JSON.stringify(three));
     ok("arrange 3 aspect kept", Math.abs(three[2].width / three[2].height - 1000 / 100) < 0.2, three[2].width / three[2].height);
@@ -40,7 +40,7 @@ const LIB_ASSERTIONS = `(async () => {
     ok("arrange leaves text layers untouched", three[1].x === textLayer.x && three[1].y === textLayer.y && three[1].width === 100 && three[1].height === 40 && three[1].text === "hi", JSON.stringify(three[1]));
 
     ok("layout templates ordered", smart.BOARD_LAYOUT_TEMPLATES.join(",") === "grid,row,column,feature", smart.BOARD_LAYOUT_TEMPLATES.join(","));
-    const layoutBoard = { ...board, metadata: { boardLayers: [layer("a", 100, 100), layer("b", 100, 100), layer("c", 100, 100)] } };
+    const layoutBoard = { ...board, boardLayers: [layer("a", 100, 100), layer("b", 100, 100), layer("c", 100, 100)] };
     const gridNamed = JSON.stringify(smart.arrangePsLayers(layoutBoard, "grid"));
     ok("grid template keeps default output", gridNamed === JSON.stringify(smart.arrangePsLayers(layoutBoard)), gridNamed);
     const row = smart.arrangePsLayers(layoutBoard, "row");
@@ -52,22 +52,22 @@ const LIB_ASSERTIONS = `(async () => {
     const feature = smart.arrangePsLayers(layoutBoard, "feature");
     ok("feature template keeps first image dominant", feature[0].width > feature[1].width && feature[0].height > feature[1].height && feature[0].x < feature[1].x, JSON.stringify(feature));
     ok("feature template aspect fit integers", feature.every((item) => Number.isInteger(item.width) && Number.isInteger(item.height) && Number.isInteger(item.x) && Number.isInteger(item.y)), JSON.stringify(feature));
-    const rowAspect = smart.arrangePsLayers({ ...board, metadata: { boardLayers: [layer("w", 400, 100), layer("t", 100, 400)] } }, "row");
+    const rowAspect = smart.arrangePsLayers({ ...board, boardLayers: [layer("w", 400, 100), layer("t", 100, 400)] }, "row");
     ok("row template keeps aspect", Math.abs(rowAspect[0].width / rowAspect[0].height - 4) < 0.05 && Math.abs(rowAspect[1].width / rowAspect[1].height - 0.25) < 0.01, JSON.stringify(rowAspect));
 
-    ok("layers read metadata", smart.smartCanvasLayers(layered)[0].id === "a", JSON.stringify(smart.smartCanvasLayers(layered)));
-    const twoLayers = { ...board, metadata: { boardLayers: [layer("a", 100, 100), layer("b", 100, 100)] } };
+    ok("layers read the board document", smart.smartCanvasLayers(layered)[0].id === "a", JSON.stringify(smart.smartCanvasLayers(layered)));
+    const twoLayers = { ...board, boardLayers: [layer("a", 100, 100), layer("b", 100, 100)] };
     ok("movePsLayer backward reorders", smart.movePsLayer(twoLayers, "b", "backward").map((item) => item.id).join(",") === "b,a", smart.movePsLayer(twoLayers, "b", "backward").map((item) => item.id).join(","));
     ok("movePsLayer forward reorders", smart.movePsLayer(twoLayers, "a", "forward").map((item) => item.id).join(",") === "b,a", smart.movePsLayer(twoLayers, "a", "forward").map((item) => item.id).join(","));
     ok("movePsLayer at front is a no-op", smart.movePsLayer(twoLayers, "b", "forward") === smart.smartCanvasLayers(twoLayers));
     ok("movePsLayer at back is a no-op", smart.movePsLayer(twoLayers, "a", "backward") === smart.smartCanvasLayers(twoLayers));
     ok("movePsLayer unknown id is a no-op", smart.movePsLayer(twoLayers, "zz", "forward").map((item) => item.id).join(",") === "a,b", smart.movePsLayer(twoLayers, "zz", "forward").map((item) => item.id).join(","));
 
-    const created = smart.createPsImageLayer(board, image("src", 240, 120, { x: 10, y: 20 }));
+    const created = smart.createPsImageLayer(board, { title: "src", width: 240, height: 120, naturalWidth: 240, naturalHeight: 120, storageKey: "image:src" });
     ok(
         "createPsImageLayer centres a fitted image layer",
         created.kind === "image" &&
-            created.sourceNodeId === "src" &&
+            created.storageKey === "image:src" &&
             created.width === 640 &&
             created.height === 320 &&
             created.x === 0 &&
@@ -79,9 +79,9 @@ const LIB_ASSERTIONS = `(async () => {
             created.locked === false,
         JSON.stringify(created),
     );
-    ok("createPsImageLayer names the layer after the node", created.name === "src", created.name);
-    const nestedLayer = smart.createPsImageLayer(board, { id: "nb", type: "smart-canvas", title: "nb", position: { x: 0, y: 0 }, width: 100, height: 100, metadata: {} });
-    ok("createPsImageLayer keeps a nested board aspect", nestedLayer.width === 360 && nestedLayer.height === 360, JSON.stringify(nestedLayer));
+    ok("createPsImageLayer names the layer after the source", created.name === "src", created.name);
+    const squareLayer = smart.createPsImageLayer(board, { title: "sq", width: 100, height: 100 });
+    ok("createPsImageLayer keeps a square source aspect", squareLayer.width === 360 && squareLayer.height === 360, JSON.stringify(squareLayer));
 
     const blend = await import("/src/lib/canvas/blend-modes.ts");
     ok("blend opacity constants", blend.LAYER_OPACITY_MIN === 0 && blend.LAYER_OPACITY_MAX === 1 && blend.LAYER_OPACITY_DEFAULT === 1, blend.LAYER_OPACITY_MIN + "," + blend.LAYER_OPACITY_MAX + "," + blend.LAYER_OPACITY_DEFAULT);
@@ -113,19 +113,6 @@ const LIB_ASSERTIONS = `(async () => {
 
     const inside = image("in", 100, 100, { x: 150, y: 100 });
     const outside = image("out", 100, 100, { x: 900, y: 900 });
-
-    const boardA = { id: "ba", type: "smart-canvas", title: "A", position: { x: 0, y: 0 }, width: 640, height: 360, metadata: { boardLayers: [layer("la", 640, 360, { sourceNodeId: "bb" })] } };
-    const boardB = { id: "bb", type: "smart-canvas", title: "B", position: { x: 80, y: 60 }, width: 200, height: 150, metadata: { boardLayers: [layer("lb", 200, 150, { sourceNodeId: "bc" })] } };
-    const boardC = { id: "bc", type: "smart-canvas", title: "C", position: { x: 100, y: 80 }, width: 80, height: 60, metadata: {} };
-    const boardTree = [boardA, boardB, boardC];
-    ok("board descendant direct", geo.isBoardDescendant("bb", "ba", boardTree) === true);
-    ok("board descendant indirect", geo.isBoardDescendant("bc", "ba", boardTree) === true);
-    ok("board descendant never self or ancestor", geo.isBoardDescendant("ba", "ba", boardTree) === false && geo.isBoardDescendant("ba", "bc", boardTree) === false);
-    ok("board drop accepts image", geo.findBoardDropTarget(new Set(["bimg"]), [boardA, image("bimg", 100, 100, { x: 40, y: 40 })])?.id === "ba");
-    ok("board drop accepts board", geo.findBoardDropTarget(new Set(["bb"]), [boardA, boardB])?.id === "ba");
-    ok("board drop rejects self", geo.findBoardDropTarget(new Set(["bb"]), [boardB]) === null);
-    ok("board drop rejects descendant cycle", geo.findBoardDropTarget(new Set(["ba"]), boardTree) === null);
-    ok("board drop rejects non-board target", geo.findBoardDropTarget(new Set(["bimg"]), [image("plain", 50, 50, { x: 0, y: 0 }), image("bimg", 100, 100, { x: 40, y: 40 })]) === null);
 
     ok("locked flag predicate", geo.isNodeLocked({ ...dragged, metadata: { locked: true } }) === true && geo.isNodeLocked(dragged) === false);
     ok("hidden flag predicate", geo.isNodeHidden({ ...dragged, metadata: { hidden: true } }) === true && geo.isNodeHidden(dragged) === false);
@@ -285,7 +272,7 @@ const LIB_ASSERTIONS = `(async () => {
     ok("agent permissions default allows every op", allAllowed.permitted.length === 2 && allAllowed.blocked.length === 0, JSON.stringify(allAllowed));
     const denied = permissions.filterPermittedOps(allowedOps, { ...permissions.DEFAULT_AGENT_PERMISSIONS, delete_node: false });
     ok("agent permissions deny blocks matching type", denied.permitted.length === 1 && denied.permitted[0].type === "add_node" && denied.blocked.length === 1 && denied.blocked[0].type === "delete_node", JSON.stringify(denied));
-    const missingKey = permissions.filterPermittedOps([{ type: "arrange_board", id: "b1" }], {});
+    const missingKey = permissions.filterPermittedOps([{ type: "set_zoom", scale: 2 }], {});
     ok("agent permissions missing key stays permitted", missingKey.permitted.length === 1 && missingKey.blocked.length === 0, JSON.stringify(missingKey));
     const noOps = permissions.filterPermittedOps(undefined, permissions.DEFAULT_AGENT_PERMISSIONS);
     ok("agent permissions undefined ops yield nothing", noOps.permitted.length === 0 && noOps.blocked.length === 0, JSON.stringify(noOps));
