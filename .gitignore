@@ -1,0 +1,29 @@
+# build output
+.next/
+out/
+dist/
+tsconfig.tsbuildinfo
+
+# dependencies
+node_modules/
+
+# env
+.env*
+!.env.example
+
+# local data and runtime junk
+data/
+*.log
+*.pid
+.DS_Store
+.idea
+
+# generated plugin bundles
+web/public/plugins
+
+# vst-host build artifacts and the cloned VST3 SDK
+vst-host/external/
+vst-host/build/
+*.pdb
+*.ilk
+*.obj

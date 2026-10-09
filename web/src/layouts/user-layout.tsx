@@ -1,0 +1,18 @@
+import type { ReactNode } from "react";
+
+import { AgentRuntime } from "@/components/agent/agent-runtime";
+import { AppTopNav } from "@/components/layout/app-top-nav";
+import { useCanvasAgentNamespace } from "@/hooks/use-canvas-agent-namespace";
+
+export default function UserLayout({ children }: { children: ReactNode }) {
+    useCanvasAgentNamespace();
+    return (
+        <div className="relative flex h-dvh overflow-hidden bg-background text-foreground">
+            <AgentRuntime />
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <AppTopNav />
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+            </div>
+        </div>
+    );
+}

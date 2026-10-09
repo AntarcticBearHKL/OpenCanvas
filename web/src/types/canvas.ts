@@ -1,0 +1,440 @@
+export type Position = {
+    x: number;
+    y: number;
+};
+
+export type CanvasWorkspace = "canvas" | "image" | "audio" | "pixel";
+
+export const CANVAS_WORKSPACES: CanvasWorkspace[] = ["canvas", "image", "audio", "pixel"];
+
+export type ViewportTransform = {
+    x: number;
+    y: number;
+    k: number;
+};
+
+export enum CanvasNodeType {
+    Image = "image",
+    ImageStack = "image-stack",
+    Text = "text",
+    Prompt = "prompt",
+    MusicPrompt = "music-prompt",
+    SpeechPrompt = "speech-prompt",
+    VideoPrompt = "video-prompt",
+    ImageGeneration = "image-generation",
+    SpeechGeneration = "speech-generation",
+    MusicGeneration = "music-generation",
+    VideoGeneration = "video-generation",
+    Video = "video",
+    Audio = "audio",
+    Midi = "midi",
+    Assets = "assets",
+    Recording = "recording",
+    EntityRef = "entity-ref",
+    PlotBeat = "plot-beat",
+}
+
+// Node types are open strings: built-ins use CanvasNodeType and plugins use "<pluginId>:<name>".
+export type CanvasNodeTypeId = CanvasNodeType | (string & {});
+
+type CanvasNodeStatus = "idle" | "success" | "loading" | "error";
+export type CanvasGenerationMode = "text" | "image" | "video" | "audio";
+export type CanvasImageGenerationType = "generation" | "edit";
+
+export type CanvasNodeImage = {
+    id: string;
+    status: CanvasNodeStatus;
+    errorDetails?: string;
+    content: string;
+    storageKey?: string;
+    thumbnail?: string;
+    thumbnailKey?: string;
+    naturalWidth: number;
+    naturalHeight: number;
+    bytes: number;
+    mimeType: string;
+};
+
+export type CanvasNodeText = {
+    id: string;
+    status: CanvasNodeStatus;
+    errorDetails?: string;
+    content: string;
+};
+
+export type CanvasVideoMode = "frames" | "reference";
+
+export type CanvasVideoSlot = "firstFrame" | "lastFrame" | "reference";
+
+/** Bound media node ids for the video prompt drop slots; never copied payloads. */
+export type CanvasVideoSlots = {
+    firstFrame?: string;
+    lastFrame?: string;
+    references?: string[];
+};
+
+export type CanvasAssetSource = "folder" | "cache" | "studio";
+
+/** Studio project ids selected per studio for the assets node "studio" source. */
+export type CanvasAssetStudioProjects = {
+    image?: string[];
+    audio?: string[];
+    pixel?: string[];
+    write?: string[];
+};
+
+export type CanvasPsLayerKind = "image" | "text" | "group" | "pixel" | "shape" | "adjustment";
+
+export type CanvasPsShapeKind = "rectangle" | "rounded-rectangle" | "ellipse" | "polygon" | "line";
+
+/** Non-destructive adjustment layer types, one per entry of the Adjustments panel. */
+export type CanvasPsAdjustmentType = "brightness-contrast" | "levels" | "curves" | "exposure" | "vibrance" | "hue-saturation" | "color-balance" | "black-white" | "photo-filter" | "channel-mixer" | "gradient-map" | "invert" | "posterize" | "threshold" | "selective-color";
+
+export type CanvasPsLayerStyleType = "stroke" | "drop-shadow" | "inner-shadow" | "outer-glow" | "inner-glow" | "bevel" | "satin" | "color-overlay" | "gradient-overlay" | "pattern-overlay";
+
+export type CanvasPsParamValue = number | string | number[] | string[];
+
+export type CanvasPixelBlend = "normal" | "multiply" | "screen" | "overlay" | "add";
+
+export type CanvasPixelLayer = {
+    id: string;
+    name: string;
+    visible: boolean;
+    opacity: number; // 0..1
+    blend: CanvasPixelBlend;
+};
+
+/** One layer's bitmap on one frame; the bitmap is an `image:`-keyed PNG blob so cleanup keeps it alive. */
+export type CanvasPixelCel = { storageKey?: string };
+
+export type CanvasPixelFrame = {
+    id: string;
+    durationMs: number;
+    cels: Record<string, CanvasPixelCel>; // layerId -> cel
+};
+
+/** Self-contained pixel-art document owned by a pixel project. */
+export type CanvasPixelDoc = {
+    width: number;
+    height: number;
+    palette: string[]; // hex colors
+    layers: CanvasPixelLayer[]; // index 0 = bottom
+    frames: CanvasPixelFrame[];
+    fps: number;
+    background: string; // CSS color or "transparent"
+};
+
+/** Shared 16-color starter palette for new pixel documents. */
+export const DEFAULT_PIXEL_PALETTE: string[] = ["#000000", "#ffffff", "#7f7f7f", "#c0c0c0", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0"];
+
+/** Free-transform geometry, normalized to the layer box: (0,0) is its top-left and (1,1) its bottom-right, so move/scale/rotate keep working on a transformed layer. */
+export type CanvasPsTransform = {
+    quad: { x: number; y: number }[]; // top-left, top-right, bottom-right, bottom-left.
+    warp?: { x: number; y: number }[]; // optional 4x4 control mesh, row-major, 16 points; takes precedence over the quad.
+};
+
+export type CanvasPsTextCase = "none" | "upper" | "lower" | "small-caps";
+
+export type CanvasPsTextAlign = "left" | "center" | "right" | "justify";
+
+export type CanvasPsTextWarpStyle = "arc" | "arc-lower" | "arc-upper" | "flag" | "wave" | "fish" | "rise" | "bulge" | "shell" | "squeeze";
+
+/** Text warp, Photoshop's Warp Text: one style plus bend and the two distortion axes, all in -100..100. */
+export type CanvasPsTextWarp = { style: CanvasPsTextWarpStyle; bend: number; horizontal: number; vertical: number };
+
+export type CanvasPsTextParagraph = {
+    align: CanvasPsTextAlign;
+    indentLeft: number;
+    indentRight: number;
+    indentFirst: number;
+    spaceBefore: number;
+    spaceAfter: number;
+    hyphenate: boolean;
+};
+
+/** Path anchor; the two handles are offsets from the anchor, so the anchor can be moved on its own. */
+export type CanvasPsPathAnchor = { x: number; y: number; handleIn: { x: number; y: number }; handleOut: { x: number; y: number } };
+
+/** Vector path in board coordinates, stored with the board document (metadata), not with the layers. */
+export type CanvasPsPath = { id: string; name: string; anchors: CanvasPsPathAnchor[]; closed: boolean; visible: boolean };
+
+/** Saved selection channel; the bitmap lives in the image store behind an `image:` key so the cleanup sweep keeps it alive. */
+export type CanvasPsAlphaChannel = { id: string; name: string; storageKey: string };
+
+/** Layer style entry; `params` keys and ranges are defined with the renderer so preview and export share one implementation. */
+export type CanvasPsLayerStyle = {
+    id: string;
+    type: CanvasPsLayerStyleType;
+    enabled: boolean;
+    params: Record<string, CanvasPsParamValue>;
+};
+
+/** Image layer document entry; geometry is board-local, an image layer's bitmap comes from its `image:` storageKey (or content URL) and a pixel layer's own bitmap from storageKey. */
+export type CanvasPsLayer = {
+    id: string;
+    name: string;
+    kind: CanvasPsLayerKind;
+    content?: string; // image layers: plain content URL fallback used when the bitmap has no `image:` key.
+    storageKey?: string; // image layers: source bitmap in the image store; pixel layers: own bitmap, sized to the layer box; kept alive by the image cleanup sweep.
+    maskStorageKey?: string; // optional per-layer mask in the image store: white shows, transparent hides; used only by the compositor, never written into images.
+    adjustment?: CanvasPsAdjustmentType; // adjustment layers: which non-destructive adjustment is applied to the layers below it in the same container.
+    adjustmentParams?: Record<string, CanvasPsParamValue>; // adjustment layers: parameters for the chosen adjustment type.
+    styles?: CanvasPsLayerStyle[]; // optional layer styles (fx); rendered by the shared raster compositor so preview and export always agree.
+    text?: string;
+    shape?: CanvasPsShapeKind; // shape layers: geometry drawn as SVG in the preview and Path2D in the composite.
+    shapeRadius?: number; // rounded-md rectangle corner radius, layer-local units.
+    shapeSides?: number; // polygon side count, 3..24.
+    shapeFill?: string;
+    shapeStroke?: string;
+    shapeStrokeWidth?: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    opacity: number;
+    blendMode: string;
+    hidden: boolean;
+    locked: boolean;
+    fontSize?: number;
+    color?: string;
+    fontFamily?: string; // text layers: CSS font family used by the shared renderer, default sans-serif.
+    tracking?: number; // text layers: extra advance per glyph in 1/1000 em.
+    leading?: number; // text layers: baseline distance in px; 0 falls back to 1.2 × font size.
+    kerning?: number; // text layers: extra px between glyph pairs.
+    baselineShift?: number; // text layers: vertical glyph offset in px.
+    textScaleX?: number; // text layers: horizontal glyph scale in percent.
+    textScaleY?: number; // text layers: vertical glyph scale in percent.
+    fauxBold?: boolean;
+    fauxItalic?: boolean;
+    underline?: boolean;
+    strikethrough?: boolean;
+    textCase?: CanvasPsTextCase;
+    paragraph?: CanvasPsTextParagraph;
+    textPathId?: string; // text layers: id of a board path the glyphs follow.
+    textWarp?: CanvasPsTextWarp;
+    transform?: CanvasPsTransform; // free transform (skew / distort / perspective / warp) rendered by the shared raster renderer.
+    children?: string[]; // group layers: ids of image/text layers inside this group, same array, single level only.
+};
+
+/** Audio fade shape; all three are stored, v1 renders linear. */
+export type CanvasAudioFadeShape = "linear" | "exponential" | "sCurve";
+
+/** Audio timeline snap grid; the effective step is derived from tempo + meter. */
+export type CanvasAudioSnap = "off" | "bar" | "beat" | "1/2" | "1/4" | "1/8" | "1/16";
+
+/** Audio timeline cue point; time is seconds. */
+export type CanvasAudioMarker = { id: string; time: number; name?: string; color?: string };
+
+/** Audio track role; `master` is the single output sink, `group` sums its inputs, `return` is fed only by sends, and `instrument` hosts MIDI regions. */
+export type CanvasAudioTrackType = "audio" | "instrument" | "group" | "return" | "master";
+
+/** Built-in instrument of an instrument/MIDI track; it is a sampled instrument (piano / guitar), and `kind: "synth"` still labels the built-in (non-VST3) case. */
+export type CanvasAudioSynthInstrument = { kind: "synth" | "sampler"; preset?: string; soundFontKey?: string };
+
+/** Native VST3 instrument played by the local bridge; `pluginId` is a scanned plugin id, and `stateKey` is the nanoid assigned when the instrument is picked, naming the localforage blob that holds the plug-in's own state. */
+export type CanvasAudioVst3Instrument = { kind: "vst3"; pluginId: string; name?: string; stateKey?: string };
+
+/** Instrument of an instrument/MIDI track: a built-in synth/sampler preset or a native VST3 plugin hosted by the bridge. */
+export type CanvasAudioInstrument = CanvasAudioSynthInstrument | CanvasAudioVst3Instrument;
+
+/** Native VST3 effect inserted inline on a track by the local bridge; `pluginId` is a scanned plugin id. */
+export type CanvasAudioVst3Effect = { kind: "vst3"; pluginId: string; name?: string };
+
+/** Aux send; `pre` taps before the fader (both taps sit inside the track's mute/solo gate). */
+export type CanvasAudioSend = {
+    id: string;
+    targetTrackId: string;
+    gain: number; // linear
+    pre: boolean;
+    enabled: boolean;
+};
+
+/** Audio compositor track; gain is linear over the fader scale 0..+6 dB (the UI shows dB), solo wins over mute. */
+export type CanvasAudioTrack = {
+    id: string;
+    name: string;
+    type?: CanvasAudioTrackType; // defaults to "audio"
+    gain: number;
+    pan?: number; // -1..1, defaults to 0
+    mute: boolean;
+    solo: boolean;
+    output?: string; // target track id; unset means the master track
+    sends?: CanvasAudioSend[];
+    color?: string;
+    armed?: boolean; // Record-arm state only; recording itself is not implemented yet.
+    collapsed?: boolean; // Fold this track's automation lanes in the arrangement.
+    instrument?: CanvasAudioInstrument; // Instrument/MIDI tracks: the built-in synth; unset means the default preset.
+    vst3Effect?: CanvasAudioVst3Effect; // Optional inline VST3 effect on this track's signal; unset keeps the track untouched.
+};
+
+/** Audio compositor clip; times are seconds and the source bitmap is the clip's `audio:` storageKey (or content URL), never a copied payload. */
+export type CanvasAudioClip = {
+    id: string;
+    trackId: string;
+    storageKey?: string;
+    content?: string;
+    sourceDurationMs?: number; // source length in ms, kept on the clip so loop windows survive without canvas nodes.
+    start: number; // timeline position (s)
+    offset: number; // source in-point (s)
+    duration: number; // visible length (s)
+    name?: string;
+    gain?: number; // linear clip gain, defaults to 1
+    fadeIn?: number; // seconds, clamped to duration
+    fadeOut?: number;
+    fadeInShape?: CanvasAudioFadeShape;
+    fadeOutShape?: CanvasAudioFadeShape;
+    loop?: boolean; // repeat the source window to fill duration
+    reversed?: boolean;
+    muted?: boolean;
+    color?: string;
+    locked?: boolean; // no move/trim, still selectable
+};
+
+/** Recording input: `punch` gates a take to the enabled punch range, `channels` is the take's channel count (1 downmixes), and `inputLatencyMs` shifts the take earlier by the input latency. */
+export type CanvasAudioCapture = {
+    mode: "normal" | "punch";
+    channels: number; // 1 = mono (downmixes the input), 2 = stereo
+    gainDb: number; // capture gain applied before recording and monitoring
+    inputLatencyMs: number; // 0 by default; auditable, never a sentinel
+};
+
+/** One MIDI note; `tick` is relative to the region start and `velocity` is 0..1. */
+export type CanvasAudioNote = { id: string; tick: number; durationTicks: number; pitch: number; velocity: number };
+
+/** MIDI region on an instrument/MIDI track; positions are PPQN ticks so the notes follow the project tempo. */
+export type CanvasAudioMidiRegion = {
+    id: string;
+    trackId: string;
+    startTicks: number;
+    durationTicks: number;
+    notes: CanvasAudioNote[];
+    name?: string;
+};
+
+/** Audio automation interpolation; `sCurve` is stored and rendered, the graph approximates it with a few linear ramps. */
+export type CanvasAudioAutomationCurve = "linear" | "hold" | "sCurve";
+
+/** Audio automation breakpoint; time is seconds and `curve` shapes the segment that leaves this point (default linear). */
+export type CanvasAudioAutomationPoint = { time: number; value: number; curve?: CanvasAudioAutomationCurve };
+
+/**
+ * Audio automation lane; `target` is "track.gain" | "track.pan" | "send.<sendId>.gain" and values are the target's own
+ * unit (linear gain, pan -1..1). An enabled lane with points owns its parameter: the graph builder schedules it and the
+ * mixer's manual edits skip it.
+ */
+export type CanvasAudioAutomationLane = {
+    id: string;
+    trackId: string;
+    target: string;
+    enabled: boolean;
+    points: CanvasAudioAutomationPoint[]; // sorted by time
+};
+
+export type CanvasNodeMetadata = {
+    content?: string;
+    composerContent?: string;
+    prompt?: string;
+    status?: CanvasNodeStatus;
+    errorDetails?: string;
+    fontSize?: number;
+    lineHeight?: number;
+    fontFamily?: string;
+    fontWeight?: "normal" | "bold";
+    italic?: boolean;
+    textAlign?: "left" | "center" | "right";
+    textColor?: string;
+    generationMode?: CanvasGenerationMode;
+    generationType?: CanvasImageGenerationType;
+    model?: string;
+    reasoningEffort?: "auto" | "low" | "medium" | "high" | "xhigh";
+    size?: string;
+    quality?: string;
+    background?: string;
+    count?: number;
+    textCount?: number;
+    texts?: CanvasNodeText[];
+    primaryTextId?: string;
+    seconds?: string;
+    vquality?: string;
+    generateAudio?: string;
+    watermark?: string;
+    videoMode?: CanvasVideoMode; // Video prompt mode; defaults to "frames".
+    videoSlots?: CanvasVideoSlots; // Video prompt slots; bound IMAGE / VIDEO / AUDIO node ids.
+    audioVoice?: string;
+    audioFormat?: string;
+    audioSpeed?: string;
+    audioInstructions?: string;
+    references?: string[];
+    naturalWidth?: number;
+    naturalHeight?: number;
+    freeResize?: boolean;
+    images?: CanvasNodeImage[];
+    primaryImageId?: string;
+    storageKey?: string;
+    thumbnail?: string;
+    thumbnailKey?: string;
+    mimeType?: string;
+    bytes?: number;
+    durationMs?: number;
+    /** MIDI resource summary parsed from the .mid blob. */
+    midi?: { trackCount: number; noteCount: number; tempo: number; ppqn: number };
+    videoTaskId?: string;
+    videoTaskProvider?: "openai" | "plugin" | "openrouter";
+    blendMode?: string;
+    opacity?: number;
+    interactive?: boolean; // Plugin node interaction/move state; see CanvasNodeDefinition.interactionToggle.
+    locked?: boolean;
+    hidden?: boolean;
+    assetSource?: CanvasAssetSource; // Assets node source mode; defaults to "folder".
+    assetStudioProjects?: CanvasAssetStudioProjects; // Assets node "studio" source: selected project ids per studio.
+    canvasTitle?: string; // Optional parent canvas title when nodes are projected into studio resource pools.
+    entityRefId?: string; // Entity-ref node target id (a writing entity).
+    entityRefKind?: "character" | "location" | "plot";
+    entityRefName?: string; // Denormalized target name so the ref still renders when the entity is gone.
+};
+
+export type CanvasNodeData = {
+    id: string;
+    type: CanvasNodeTypeId;
+    title: string;
+    position: Position;
+    width: number;
+    height: number;
+    metadata?: CanvasNodeMetadata;
+};
+
+export type CanvasConnection = {
+    id: string;
+    fromNodeId: string;
+    toNodeId: string;
+    relation?: string; // Relationship label key under canvas.relations; when unset the label is derived from the node types.
+};
+
+/** Marks a canvas as owned by a writing project (entity board or relationship graph) instead of the canvas library. */
+export type CanvasScope = {
+    writeProjectId: string;
+    role: "character" | "location" | "plot" | "graph";
+    entityId?: string;
+};
+
+export type CanvasAssistantImage = {
+    id: string;
+    dataUrl: string;
+    storageKey?: string;
+    prompt: string;
+};
+
+export type ConnectionHandle = {
+    nodeId: string;
+    handleType: "source" | "target";
+};
+
+export type SelectionBox = {
+    startWorldX: number;
+    startWorldY: number;
+    currentWorldX: number;
+    currentWorldY: number;
+    additive: boolean;
+    initialSelectedNodeIds: string[];
+};
